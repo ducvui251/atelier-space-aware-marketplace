@@ -1,0 +1,7 @@
+{
+  "name": "@atelier/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Versioned REST and domain-event contract definitions for Atelier services."
+}

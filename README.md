@@ -72,6 +72,18 @@ Open [http://localhost:3000](http://localhost:3000).
 | `pnpm lint`        | Run the linter                          |
 | `pnpm type-check`  | Run TypeScript type checking (`tsc --noEmit`) |
 
+## Monorepo scaffold
+
+The repository now uses a microservices monorepo layout. The current Next.js application
+at the root acts as the web application and API Gateway/BFF. Eight domain-service package
+boundaries live under `services/`; shared contracts and configuration live under
+`packages/`. The boundaries are scaffolded only and do not contain live runtimes yet.
+
+- `services/` — eight internal service boundaries
+- `packages/` — versioned contracts and shared configuration primitives
+- `apps/` — reserved for future applications
+- `docs/architecture/MONOREPO.md` — runtime and ownership rules
+
 ## Project structure
 
 - `src/app/` — App Router pages (`/`, `/artworks`, `/artworks/[id]`, `/artists`, `/artists/[id]`, `/saved`, `/rooms`, `/account`, `/login`)

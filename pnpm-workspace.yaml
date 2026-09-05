@@ -1,2 +1,7 @@
+packages:
+  - "services/*"
+  - "packages/*"
+  - "apps/*"
+
 allowBuilds:
   unrs-resolver: true

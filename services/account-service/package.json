@@ -1,0 +1,7 @@
+{
+  "name": "@atelier/account-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Atelier account, roles, and authentication integration service."
+}

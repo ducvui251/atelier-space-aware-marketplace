@@ -1,0 +1,7 @@
+{
+  "name": "@atelier/recommendation-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Atelier taste signals, room-aware ranking, and recommendation service."
+}
