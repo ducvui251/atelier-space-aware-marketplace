@@ -1,0 +1,7 @@
+{
+  "name": "@atelier/config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Non-business shared configuration primitives for Atelier."
+}

@@ -1,0 +1,7 @@
+{
+  "name": "@atelier/room-preview-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Atelier room templates, artwork placement, and optional 3D/AR preview service."
+}

@@ -85,6 +85,26 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
+  packages/config: {}
+
+  packages/contracts: {}
+
+  services/account-service: {}
+
+  services/admin-service: {}
+
+  services/artist-artwork-service: {}
+
+  services/catalog-discovery-service: {}
+
+  services/commerce-service: {}
+
+  services/recommendation-service: {}
+
+  services/room-preview-service: {}
+
+  services/verification-service: {}
+
 packages:
 
   '@alloc/quick-lru@5.2.0':

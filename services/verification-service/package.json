@@ -1,0 +1,7 @@
+{
+  "name": "@atelier/verification-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Atelier artist and artwork verification, COA, and review service."
+}

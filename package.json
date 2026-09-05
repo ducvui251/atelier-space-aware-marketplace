@@ -1,15 +1,17 @@
 {
-  "name": "atelier",
+  "name": "@atelier/web-gateway",
   "version": "0.1.0",
   "private": true,
-  "description": "Art discovery and commerce platform. Step 2: visual shell + design tokens (placeholder UI only).",
+  "description": "Atelier web application and API Gateway/BFF in the Atelier microservices monorepo.",
   "scripts": {
     "dev": "next dev",
+    "dev:gateway": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit"
   },
+  "packageManager": "pnpm@10.34.5",
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
     "@radix-ui/react-dialog": "^1.1.6",

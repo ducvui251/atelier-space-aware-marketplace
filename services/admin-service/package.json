@@ -1,0 +1,7 @@
+{
+  "name": "@atelier/admin-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Atelier moderation, incidents, audit records, and reporting service."
+}
