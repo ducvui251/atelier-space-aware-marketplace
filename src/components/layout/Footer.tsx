@@ -27,7 +27,6 @@ const footerColumns = [
       { label: "Returns", href: "/" },
       { label: "FAQs", href: "/" },
       { label: "Account", href: "/saved" },
-      { label: "API Docs", href: "/api-docs" },
     ],
   },
 ];

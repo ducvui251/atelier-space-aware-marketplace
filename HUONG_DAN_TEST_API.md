@@ -7,7 +7,9 @@ pnpm install
 pnpm dev
 ```
 
-Mở [http://localhost:3000/api-docs](http://localhost:3000/api-docs) — đây là trang Swagger UI, đọc trực tiếp từ `public/openapi.json`.
+File đặc tả API là [`api-docs/openapi.json`](api-docs/openapi.json) — một file **độc lập**, không
+phải trang trong web app. Mở nó bằng [https://editor.swagger.io](https://editor.swagger.io):
+**File → Import File** → chọn `api-docs/openapi.json` (xem thêm [`api-docs/README.md`](api-docs/README.md)).
 
 > **Lưu ý quan trọng**: API này (`/api/**`) dùng một bộ dữ liệu mock riêng, sống trong bộ nhớ của
 > Node server (mất khi `pnpm dev` restart). Nó **tách biệt hoàn toàn** với dữ liệu bạn thấy khi
