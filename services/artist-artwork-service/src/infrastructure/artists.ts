@@ -1,0 +1,63 @@
+import type { Artist } from "@atelier/contracts";
+import { artistPortrait } from "./images";
+
+export const artists: Artist[] = [
+  {
+    id: "artist-lena-moreau",
+    userId: "user-artist-lena",
+    displayName: "Lena Moreau",
+    location: "Paris, France",
+    nationality: "French",
+    bio: "Lena works between abstraction and the memory of place, layering pigment and wax to build surfaces that feel weathered and tender. Recent work explores the quiet edges of the Atlantic coast.",
+    verificationStatus: "verified",
+    imageUrl: artistPortrait("artist-lena"),
+    portfolioUrl: "https://lenamoreau.example.com",
+  },
+  {
+    id: "artist-ivan-petrova",
+    displayName: "Ivan Petrov",
+    location: "Sofia, Bulgaria",
+    nationality: "Bulgarian",
+    bio: "Ivan is a painter of quiet interiors. His muted, light-filled canvases borrow from domestic architecture and the hush of empty rooms.",
+    verificationStatus: "verified",
+    imageUrl: artistPortrait("artist-ivan"),
+  },
+  {
+    id: "artist-aki-tanaka",
+    displayName: "Aki Tanaka",
+    location: "Kyoto, Japan",
+    nationality: "Japanese",
+    bio: "Aki combines mineral pigments with sumi ink, producing meditative field works that trade figure for atmosphere.",
+    verificationStatus: "verified",
+    imageUrl: artistPortrait("artist-aki"),
+  },
+  {
+    id: "artist-maria-wood",
+    userId: "user-artist-maria",
+    displayName: "Maria Wood",
+    location: "Melbourne, Australia",
+    nationality: "Australian",
+    bio: "Maria photographs the built environment and reconstructs it as large-scale sculptural prints, favoring texture over subject.",
+    verificationStatus: "pending",
+    imageUrl: artistPortrait("artist-maria"),
+    portfolioUrl: "https://mariawood.example.com",
+  },
+  {
+    id: "artist-old-rakim",
+    displayName: "Elias Rahim",
+    location: "London, United Kingdom",
+    nationality: "British",
+    bio: "Elias makes large-scale gestural abstractions drawn from music and memory, working directly with the canvas on the floor.",
+    verificationStatus: "verified",
+    imageUrl: artistPortrait("artist-rakim"),
+  },
+  {
+    id: "artist-sara-lindqvist",
+    displayName: "Sara Lindqvist",
+    location: "Stockholm, Sweden",
+    nationality: "Swedish",
+    bio: "Sara paints the Scandinavian landscape in a near-monochrome palette, withholding detail to leave room for light.",
+    verificationStatus: "pending",
+    imageUrl: artistPortrait("artist-sara"),
+  },
+];

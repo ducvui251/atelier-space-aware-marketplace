@@ -3,5 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Atelier cart, checkout, orders, and payment orchestration service."
+  "description": "Atelier cart, checkout, orders, and payment orchestration service.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@atelier/contracts": "workspace:*" },
+  "scripts": { "type-check": "tsc --noEmit" },
+  "devDependencies": { "typescript": "^5.7.0" }
 }

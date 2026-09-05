@@ -3,5 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Non-business shared configuration primitives for Atelier."
+  "description": "Non-business shared configuration primitives for Atelier.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@atelier/contracts": "workspace:*"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
 }

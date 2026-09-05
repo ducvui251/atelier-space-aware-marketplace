@@ -3,5 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Atelier artist profiles, artwork metadata, editions, and inventory service."
+  "description": "Atelier artist profiles, artwork metadata, editions, and inventory service.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@atelier/contracts": "workspace:*" },
+  "scripts": { "type-check": "tsc --noEmit" },
+  "devDependencies": { "typescript": "^5.7.0" }
 }
