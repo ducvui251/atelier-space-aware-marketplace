@@ -6,8 +6,40 @@ settings:
 
 importers:
 
-  .:
+  .: {}
+
+  apps/web-gateway:
     dependencies:
+      '@atelier/account-service':
+        specifier: workspace:*
+        version: link:../../services/account-service
+      '@atelier/admin-service':
+        specifier: workspace:*
+        version: link:../../services/admin-service
+      '@atelier/artist-artwork-service':
+        specifier: workspace:*
+        version: link:../../services/artist-artwork-service
+      '@atelier/catalog-discovery-service':
+        specifier: workspace:*
+        version: link:../../services/catalog-discovery-service
+      '@atelier/commerce-service':
+        specifier: workspace:*
+        version: link:../../services/commerce-service
+      '@atelier/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@atelier/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@atelier/recommendation-service':
+        specifier: workspace:*
+        version: link:../../services/recommendation-service
+      '@atelier/room-preview-service':
+        specifier: workspace:*
+        version: link:../../services/room-preview-service
+      '@atelier/verification-service':
+        specifier: workspace:*
+        version: link:../../services/verification-service
       '@hookform/resolvers':
         specifier: ^5.9.1
         version: 5.9.1(react-hook-form@7.86.0(react@19.2.8))(zod@4.5.2)
@@ -85,25 +117,108 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
-  packages/config: {}
+  packages/config:
+    dependencies:
+      '@atelier/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.1
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
 
-  packages/contracts: {}
+  packages/contracts:
+    dependencies:
+      zod:
+        specifier: ^4.5.2
+        version: 4.5.2
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
 
-  services/account-service: {}
+  services/account-service:
+    dependencies:
+      '@atelier/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
 
-  services/admin-service: {}
+  services/admin-service:
+    dependencies:
+      '@atelier/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
 
-  services/artist-artwork-service: {}
+  services/artist-artwork-service:
+    dependencies:
+      '@atelier/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
 
-  services/catalog-discovery-service: {}
+  services/catalog-discovery-service:
+    dependencies:
+      '@atelier/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
 
-  services/commerce-service: {}
+  services/commerce-service:
+    dependencies:
+      '@atelier/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
 
-  services/recommendation-service: {}
+  services/recommendation-service:
+    dependencies:
+      '@atelier/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
 
-  services/room-preview-service: {}
+  services/room-preview-service:
+    dependencies:
+      '@atelier/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
 
-  services/verification-service: {}
+  services/verification-service:
+    dependencies:
+      '@atelier/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
 
 packages:
 

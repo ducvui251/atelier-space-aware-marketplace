@@ -1,10 +1,13 @@
 # dependencies
 /node_modules
+**/node_modules/
+/.pnpm-store/
 /.pnp
 .pnp.*
 
 # next.js
 /.next/
+**/.next/
 /out/
 
 # production
@@ -34,3 +37,13 @@ next-env.d.ts
 # project docs (not part of app source)
 AGENTS.md
 PROJECT_PROMPT.md
+/docs/
+
+# local agent/tool artifacts
+/.token-optimizer/
+
+# local reference and presentation documents
+*.pdf
+*.docx
+*.txt
+/*.pptx

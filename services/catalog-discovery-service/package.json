@@ -3,5 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Atelier catalog, search, filters, tags, and discovery service."
+  "description": "Atelier catalog, search, filters, tags, and discovery service.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@atelier/contracts": "workspace:*" },
+  "scripts": { "type-check": "tsc --noEmit" },
+  "devDependencies": { "typescript": "^5.7.0" }
 }
