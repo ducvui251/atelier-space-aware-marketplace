@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Heart, Menu, Search, ShoppingBag, User } from "lucide-react";
+import { Heart, Menu, Search, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS, WORDMARK } from "@/constants/nav";
 import {
@@ -12,6 +12,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { AccountMenu } from "@/components/layout/AccountMenu";
+import { useCart, useSaved } from "@/lib/store/hooks";
 
 function isActive(href: string, pathname: string) {
   if (href === "/") return pathname === "/";
@@ -21,6 +23,8 @@ function isActive(href: string, pathname: string) {
 
 export function Header() {
   const pathname = usePathname();
+  const { cartArtworkIds } = useCart();
+  const { savedArtworkIds } = useSaved();
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur-sm">
@@ -96,15 +100,13 @@ export function Header() {
           <IconAction label="Search" href="/artworks?view=catalog#search">
             <Search className="size-5" />
           </IconAction>
-          <IconAction label="Saved" href="/saved">
+          <IconAction label="Saved" href="/saved" badge={savedArtworkIds.length || undefined}>
             <Heart className="size-5" />
           </IconAction>
-          <IconAction label="Cart" href="/artworks?view=catalog#cart" badge={2}>
+          <IconAction label="Cart" href="/cart" badge={cartArtworkIds.length || undefined}>
             <ShoppingBag className="size-5" />
           </IconAction>
-          <IconAction label="Account" href="/saved" className="hidden sm:inline-flex">
-            <User className="size-5" />
-          </IconAction>
+          <AccountMenu className="hidden sm:inline-flex" />
         </div>
       </div>
     </header>

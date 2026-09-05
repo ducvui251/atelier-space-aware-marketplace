@@ -2,13 +2,15 @@
 
 import * as React from "react";
 import { SearchX } from "lucide-react";
-import type { Artwork } from "@/types";
+import type { Artwork, ArtworkOrientation } from "@/types";
 import { FilterChip } from "@/components/discovery/FilterChip";
+import { SearchInput } from "@/components/discovery/SearchInput";
 import { ArtworkGrid } from "@/components/artwork/ArtworkGrid";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
+import { useAppState } from "@/lib/store/hooks";
 
-type FilterKey = "style" | "medium" | "edition";
+type FilterKey = "style" | "medium" | "edition" | "orientation" | "color" | "price";
 
 interface FilterOption {
   value: string;
@@ -29,54 +31,72 @@ const EDITION_OPTIONS: FilterOption[] = [
   { value: "limited-edition", label: "Limited edition" },
 ];
 
+const ORIENTATION_OPTIONS: FilterOption[] = [
+  { value: "portrait", label: "Portrait" },
+  { value: "landscape", label: "Landscape" },
+  { value: "square", label: "Square" },
+];
+
+const PRICE_BUCKETS: { value: string; label: string; test: (price: number) => boolean }[] = [
+  { value: "under-700", label: "Under $700", test: (p) => p < 700 },
+  { value: "700-1200", label: "$700 – $1,200", test: (p) => p >= 700 && p <= 1200 },
+  { value: "over-1200", label: "Over $1,200", test: (p) => p > 1200 },
+];
+
 function emptyFilterState(): FilterState {
   return {
     style: new Set<string>(),
     medium: new Set<string>(),
     edition: new Set<string>(),
+    orientation: new Set<string>(),
+    color: new Set<string>(),
+    price: new Set<string>(),
   };
 }
 
 function hasActiveFilters(state: FilterState): boolean {
-  return state.style.size > 0 || state.medium.size > 0 || state.edition.size > 0;
+  return Object.values(state).some((set) => set.size > 0);
 }
 
-function deriveStyleOptions(artworks: Artwork[]): FilterOption[] {
+function deriveOptions(artworks: Artwork[], pick: (artwork: Artwork) => string[]): FilterOption[] {
   const seen = new Set<string>();
   const options: FilterOption[] = [];
   for (const artwork of artworks) {
-    for (const style of artwork.style) {
-      if (!seen.has(style)) {
-        seen.add(style);
-        options.push({ value: style, label: style });
+    for (const value of pick(artwork)) {
+      if (!seen.has(value)) {
+        seen.add(value);
+        options.push({ value, label: value });
       }
     }
   }
   return options;
 }
 
-function deriveMediumOptions(artworks: Artwork[]): FilterOption[] {
-  const seen = new Set<string>();
-  const options: FilterOption[] = [];
-  for (const artwork of artworks) {
-    if (!seen.has(artwork.medium)) {
-      seen.add(artwork.medium);
-      options.push({ value: artwork.medium, label: artwork.medium });
-    }
-  }
-  return options;
-}
-
 interface FilterableArtworksProps {
-  artworks: Artwork[];
+  artworks?: Artwork[];
 }
 
-export function FilterableArtworks({ artworks }: FilterableArtworksProps) {
+export function FilterableArtworks({ artworks: initialArtworks }: FilterableArtworksProps) {
+  const { db } = useAppState();
   const [filters, setFilters] = React.useState<FilterState>(emptyFilterState);
+  const [query, setQuery] = React.useState("");
+
+  const artworks = React.useMemo(() => {
+    const source = db.artworks.length > 0 ? db.artworks : initialArtworks ?? [];
+    const q = query.trim().toLowerCase();
+    if (!q) return source;
+    return source.filter((artwork) =>
+      [artwork.title, artwork.artist, artwork.medium, ...artwork.style, ...artwork.dominantColors]
+        .join(" ")
+        .toLowerCase()
+        .includes(q),
+    );
+  }, [db.artworks, initialArtworks, query]);
 
   const groups = React.useMemo<FilterDefinition[]>(() => {
-    const styleOptions = deriveStyleOptions(artworks);
-    const mediumOptions = deriveMediumOptions(artworks);
+    const styleOptions = deriveOptions(artworks, (a) => a.style);
+    const mediumOptions = deriveOptions(artworks, (a) => [a.medium]);
+    const colorOptions = deriveOptions(artworks, (a) => a.dominantColors);
     return [
       {
         key: "style",
@@ -86,11 +106,36 @@ export function FilterableArtworks({ artworks }: FilterableArtworksProps) {
           selected.size === 0 || artwork.style.some((tag) => selected.has(tag)),
       },
       {
+        key: "color",
+        title: "Màu chủ đạo",
+        options: colorOptions,
+        matches: (artwork, selected) =>
+          selected.size === 0 || artwork.dominantColors.some((c) => selected.has(c)),
+      },
+      {
+        key: "orientation",
+        title: "Hướng tranh",
+        options: ORIENTATION_OPTIONS,
+        matches: (artwork, selected) =>
+          selected.size === 0 || selected.has(artwork.orientation),
+      },
+      {
         key: "medium",
         title: "Medium",
         options: mediumOptions,
         matches: (artwork, selected) =>
           selected.size === 0 || selected.has(artwork.medium),
+      },
+      {
+        key: "price",
+        title: "Khoảng giá",
+        options: PRICE_BUCKETS.map(({ value, label }) => ({ value, label })),
+        matches: (artwork, selected) => {
+          if (selected.size === 0) return true;
+          return PRICE_BUCKETS.some(
+            (bucket) => selected.has(bucket.value) && bucket.test(artwork.price),
+          );
+        },
       },
       {
         key: "edition",
@@ -121,10 +166,29 @@ export function FilterableArtworks({ artworks }: FilterableArtworksProps) {
     });
   };
 
-  const clearAll = () => setFilters(emptyFilterState());
+  const clearAll = () => {
+    setFilters(emptyFilterState());
+    setQuery("");
+  };
+
+  const suggestions = React.useMemo(() => {
+    if (filtered.length > 0) return [];
+    // Alternative style suggestions that actually have results on their own.
+    const styleOptions = groups.find((g) => g.key === "style")?.options ?? [];
+    return styleOptions
+      .filter((option) => artworks.some((a) => a.style.includes(option.value)))
+      .slice(0, 4);
+  }, [filtered, groups, artworks]);
 
   return (
     <div className="flex flex-col gap-6">
+      <SearchInput
+        id="search"
+        className="max-w-xl"
+        defaultValue={query}
+        onChange={setQuery}
+      />
+
       <div className="flex flex-col gap-4">
         {groups.map((group) => (
           <div key={group.key}>
@@ -160,14 +224,34 @@ export function FilterableArtworks({ artworks }: FilterableArtworksProps) {
         <EmptyState
           icon={SearchX}
           title="No works found"
-          description="Try adjusting your filters to see more artworks."
+          description="Không có tác phẩm khớp với bộ lọc hiện tại. Thử một trong các phong cách sau, hoặc xoá hết bộ lọc."
           action={
-            <Button variant="outline" size="sm" onClick={clearAll}>
-              Clear filters
-            </Button>
+            <div className="flex flex-col items-center gap-3">
+              {suggestions.length > 0 ? (
+                <div className="flex flex-wrap justify-center gap-2">
+                  {suggestions.map((option) => (
+                    <FilterChip
+                      key={option.value}
+                      label={option.label}
+                      selected={false}
+                      onClick={() => {
+                        setFilters({ ...emptyFilterState(), style: new Set([option.value]) });
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : null}
+              <Button variant="outline" size="sm" onClick={clearAll}>
+                Clear filters
+              </Button>
+            </div>
           }
         />
       )}
     </div>
   );
+}
+
+export function orientationLabel(orientation: ArtworkOrientation): string {
+  return ORIENTATION_OPTIONS.find((o) => o.value === orientation)?.label ?? orientation;
 }

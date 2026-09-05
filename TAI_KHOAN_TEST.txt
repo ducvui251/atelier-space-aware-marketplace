@@ -1,0 +1,35 @@
+ATELIER — TAI KHOAN DEMO / TEST
+================================
+Dung cho ca giao dien web (http://localhost:3000) va Swagger API (http://localhost:3000/api-docs).
+Day la du lieu mock, mat khau luu dang plain text — CHI dung de demo/test local, khong phai he thong that.
+
+--------------------------------------------------------------------
+Vai tro   | Email                     | Mat khau   | Ghi chu
+--------------------------------------------------------------------
+Buyer     | buyer1@atelier.test       | buyer123   | Nguyen Minh Anh — da co san du lieu
+          |                           |            | don hang / khieu nai / danh gia mau
+--------------------------------------------------------------------
+Artist    | artist1@atelier.test      | artist123  | Lena Moreau — nghe si DA VERIFIED
+(verified)|                           |            | (dung de test cac tac pham da xac thuc)
+--------------------------------------------------------------------
+Artist    | artist2@atelier.test      | artist123  | Maria Wood — nghe si DANG PENDING
+(pending) |                           |            | (dung de test luong xac thuc/duyet)
+--------------------------------------------------------------------
+Admin     | admin1@atelier.test       | admin123   | Toan quyen quan tri
+--------------------------------------------------------------------
+
+MOT SO TAC PHAM MAU DE TEST (id dung trong URL /artworks/{id} hoac API):
+- aw-01-morning-tide          Available, Verified, Original      $1,280
+- aw-04-silent-hall           Reserved,  Verified, Original      $890
+- aw-07-concrete-light        Available, Pending,  Limited ed.   $540  (cua Maria Wood)
+- aw-08-below-the-freeway     Sold,      Pending,  Limited ed.   $610  (cua Maria Wood)
+- aw-12-first-snow            Sold,      Pending,  Limited ed.   $470
+
+LUU Y KIEN TRUC (quan trong khi test):
+- Giao dien web (localhost:3000) dung du lieu luu trong localStorage cua trinh duyet ->
+  moi trinh duyet/tab rieng co du lieu rieng, xoa localStorage la ve lai du lieu goc.
+- Swagger API (/api-docs, cac route /api/**) dung MOT bo du lieu khac, luu trong bo nho
+  server (RAM) — TACH BIET voi localStorage cua web. Goi API se KHONG lam thay doi
+  nhung gi ban thay tren web va nguoc lai. Du lieu API se mat khi restart `pnpm dev`.
+- Ca hai bo deu duoc seed (khoi tao) tu cung mot bo du lieu mau ban dau, nen tai khoan
+  va id tac pham giong nhau o ca hai noi.

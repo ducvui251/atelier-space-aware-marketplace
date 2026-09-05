@@ -1,31 +1,16 @@
 "use client";
 
-import { useState } from "react";
 import { Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SaveButtonProps {
-  defaultSaved?: boolean;
+  saved: boolean;
   disabled?: boolean;
-  onSavedChange?: (saved: boolean) => void;
+  onToggle: () => void;
   className?: string;
 }
 
-export function SaveButton({
-  defaultSaved = false,
-  disabled = false,
-  onSavedChange,
-  className,
-}: SaveButtonProps) {
-  const [saved, setSaved] = useState(defaultSaved);
-
-  function toggle() {
-    if (disabled) return;
-    const next = !saved;
-    setSaved(next);
-    onSavedChange?.(next);
-  }
-
+export function SaveButton({ saved, disabled = false, onToggle, className }: SaveButtonProps) {
   return (
     <button
       type="button"
@@ -35,7 +20,7 @@ export function SaveButton({
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        toggle();
+        onToggle();
       }}
       className={cn(
         "focus-ring absolute right-3 top-3 flex size-9 items-center justify-center rounded-full bg-surface/80 shadow-xs backdrop-blur-sm transition-opacity duration-normal",

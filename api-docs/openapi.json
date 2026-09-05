@@ -1,0 +1,488 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Atelier API",
+    "version": "1.0.0",
+    "description": "Mock REST API for the Atelier art marketplace, grouped by the 8 logical services from the thesis document (Account, Catalog & Discovery, Artist & Artwork, Commerce, Recommendation, Verification, Room Preview, Admin). This is an in-memory mock backend for the Next.js dev server — data resets when the server restarts, and it is independent of the browser UI's own localStorage mock."
+  },
+  "servers": [{ "url": "http://localhost:3000", "description": "Local dev server" }],
+  "tags": [
+    { "name": "Account", "description": "Đăng nhập & quản lý tài khoản" },
+    { "name": "Catalog & Discovery", "description": "Tìm kiếm & khám phá tác phẩm/nghệ sĩ" },
+    { "name": "Artist & Artwork", "description": "Nghệ sĩ quản lý listing" },
+    { "name": "Commerce", "description": "Giỏ hàng, checkout, đơn hàng, vận chuyển" },
+    { "name": "Recommendation", "description": "Lưu tác phẩm, follow, gợi ý cá nhân hoá" },
+    { "name": "Verification", "description": "Xác thực nghệ sĩ & tác phẩm" },
+    { "name": "Admin", "description": "Quản trị hệ thống" },
+    { "name": "Room Preview", "description": "Danh sách phòng mẫu" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "description": "Token trả về từ POST /api/auth/login (chỉ là user id mã hoá base64, không phải JWT thật)." }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": { "error": { "type": "string" } }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "fullName": { "type": "string" },
+          "email": { "type": "string" },
+          "phone": { "type": "string" },
+          "role": { "type": "string", "enum": ["buyer", "artist", "admin"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "artistId": { "type": "string" }
+        }
+      },
+      "Artist": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "userId": { "type": "string" },
+          "displayName": { "type": "string" },
+          "location": { "type": "string" },
+          "nationality": { "type": "string" },
+          "bio": { "type": "string" },
+          "verificationStatus": { "type": "string", "enum": ["pending", "verified", "rejected"] },
+          "imageUrl": { "type": "string" },
+          "portfolioUrl": { "type": "string" },
+          "verificationNote": { "type": "string" },
+          "reviewedAt": { "type": "string" }
+        }
+      },
+      "Artwork": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "artistId": { "type": "string" },
+          "artist": { "type": "string" },
+          "price": { "type": "number" },
+          "currency": { "type": "string" },
+          "widthCm": { "type": "number" },
+          "heightCm": { "type": "number" },
+          "medium": { "type": "string" },
+          "style": { "type": "array", "items": { "type": "string" } },
+          "dominantColors": { "type": "array", "items": { "type": "string" } },
+          "editionType": { "type": "string", "enum": ["original", "limited-edition"] },
+          "availability": { "type": "string", "enum": ["available", "reserved", "sold"] },
+          "verificationStatus": { "type": "string", "enum": ["pending", "verified", "rejected"] },
+          "imageUrl": { "type": "string" },
+          "orientation": { "type": "string", "enum": ["portrait", "landscape", "square"] },
+          "year": { "type": "integer" },
+          "description": { "type": "string" },
+          "coaUrl": { "type": "string" }
+        }
+      },
+      "ArtworkInput": {
+        "type": "object",
+        "required": ["title", "medium", "widthCm", "heightCm", "price", "imageUrl", "orientation", "editionType"],
+        "properties": {
+          "title": { "type": "string" },
+          "medium": { "type": "string" },
+          "widthCm": { "type": "number" },
+          "heightCm": { "type": "number" },
+          "price": { "type": "number" },
+          "currency": { "type": "string", "example": "USD" },
+          "dominantColors": { "type": "array", "items": { "type": "string" }, "example": ["Ivory", "Sand"] },
+          "style": { "type": "array", "items": { "type": "string" }, "example": ["Abstract"] },
+          "orientation": { "type": "string", "enum": ["portrait", "landscape", "square"] },
+          "editionType": { "type": "string", "enum": ["original", "limited-edition"] },
+          "year": { "type": "integer", "example": 2026 },
+          "imageUrl": { "type": "string" },
+          "coaUrl": { "type": "string" },
+          "description": { "type": "string" }
+        }
+      },
+      "Order": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "buyerId": { "type": "string" },
+          "artworkId": { "type": "string" },
+          "editionType": { "type": "string" },
+          "totalAmount": { "type": "number" },
+          "currency": { "type": "string" },
+          "status": { "type": "string", "enum": ["pending", "confirmed", "paid", "shipped", "completed", "cancelled"] },
+          "createdAt": { "type": "string" },
+          "shippingAddress": {
+            "type": "object",
+            "properties": {
+              "fullName": { "type": "string" },
+              "address": { "type": "string" },
+              "city": { "type": "string" },
+              "phone": { "type": "string" }
+            }
+          }
+        }
+      },
+      "Shipment": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "orderId": { "type": "string" },
+          "carrier": { "type": "string" },
+          "trackingNumber": { "type": "string" },
+          "status": { "type": "string", "enum": ["packing", "in_transit", "delivered", "incident"] }
+        }
+      },
+      "Review": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "orderId": { "type": "string" },
+          "buyerId": { "type": "string" },
+          "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "comment": { "type": "string" }
+        }
+      },
+      "Complaint": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "orderId": { "type": "string" },
+          "reporterId": { "type": "string" },
+          "reason": { "type": "string" },
+          "status": { "type": "string", "enum": ["open", "resolved", "rejected"] },
+          "resolutionNote": { "type": "string" }
+        }
+      },
+      "Room": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "imageUrl": { "type": "string" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Account"],
+        "summary": "Đăng nhập, lấy bearer token",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": { "email": { "type": "string" }, "password": { "type": "string" } }
+              },
+              "example": { "email": "buyer1@atelier.test", "password": "buyer123" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Đăng nhập thành công",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "token": { "type": "string" }, "user": { "$ref": "#/components/schemas/User" } } } } }
+          },
+          "401": { "description": "Sai email/mật khẩu", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/account/me": {
+      "get": {
+        "tags": ["Account"],
+        "summary": "Xem hồ sơ của tôi",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "user": { "$ref": "#/components/schemas/User" }, "artistProfile": { "$ref": "#/components/schemas/Artist" } } } } } },
+          "401": { "description": "Chưa đăng nhập" }
+        }
+      },
+      "patch": {
+        "tags": ["Account"],
+        "summary": "Cập nhật hồ sơ (họ tên, phone, bio, portfolio)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "required": ["fullName"], "properties": { "fullName": { "type": "string" }, "phone": { "type": "string" }, "bio": { "type": "string" }, "portfolioUrl": { "type": "string" } } } } }
+        },
+        "responses": {
+          "200": { "description": "Đã cập nhật" },
+          "400": { "description": "Thiếu fullName" },
+          "401": { "description": "Chưa đăng nhập" }
+        }
+      }
+    },
+    "/api/artworks": {
+      "get": {
+        "tags": ["Catalog & Discovery"],
+        "summary": "Tìm kiếm / lọc danh sách tác phẩm",
+        "parameters": [
+          { "name": "q", "in": "query", "schema": { "type": "string" }, "description": "Từ khoá (title/artist/medium/style/color)" },
+          { "name": "style", "in": "query", "schema": { "type": "string" } },
+          { "name": "color", "in": "query", "schema": { "type": "string" } },
+          { "name": "orientation", "in": "query", "schema": { "type": "string", "enum": ["portrait", "landscape", "square"] } },
+          { "name": "edition", "in": "query", "schema": { "type": "string", "enum": ["original", "limited-edition"] } },
+          { "name": "availability", "in": "query", "schema": { "type": "string", "enum": ["available", "reserved", "sold"] } },
+          { "name": "minPrice", "in": "query", "schema": { "type": "number" } },
+          { "name": "maxPrice", "in": "query", "schema": { "type": "number" } }
+        ],
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/Artwork" } }, "total": { "type": "integer" } } } } } } }
+      }
+    },
+    "/api/artworks/{id}": {
+      "get": {
+        "tags": ["Catalog & Discovery"],
+        "summary": "Chi tiết một tác phẩm",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "example": "aw-01-morning-tide" }],
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Artwork" } } } },
+          "404": { "description": "Không tồn tại" }
+        }
+      }
+    },
+    "/api/artists": {
+      "get": {
+        "tags": ["Catalog & Discovery"],
+        "summary": "Danh sách nghệ sĩ",
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/Artist" } }, "total": { "type": "integer" } } } } } } }
+      }
+    },
+    "/api/artists/{id}": {
+      "get": {
+        "tags": ["Catalog & Discovery"],
+        "summary": "Chi tiết một nghệ sĩ",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "example": "artist-lena-moreau" }],
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Artist" } } } }, "404": { "description": "Không tồn tại" } }
+      }
+    },
+    "/api/rooms": {
+      "get": {
+        "tags": ["Room Preview"],
+        "summary": "Danh sách phòng mẫu cho room preview",
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/Room" } }, "total": { "type": "integer" } } } } } } }
+      }
+    },
+    "/api/artist/artworks": {
+      "get": {
+        "tags": ["Artist & Artwork"],
+        "summary": "Danh sách listing của chính nghệ sĩ đang đăng nhập",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" }, "401": { "description": "Chưa đăng nhập" }, "403": { "description": "Không phải tài khoản artist" } }
+      },
+      "post": {
+        "tags": ["Artist & Artwork"],
+        "summary": "Tạo listing mới (trạng thái pending)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ArtworkInput" }, "example": { "title": "Harbor Light", "medium": "Oil on canvas", "widthCm": 80, "heightCm": 100, "price": 800, "currency": "USD", "dominantColors": ["Teal", "Sand"], "style": ["Abstract"], "orientation": "portrait", "editionType": "original", "year": 2026, "imageUrl": "https://picsum.photos/seed/harbor-light/900/1100" } } } },
+        "responses": { "201": { "description": "Đã tạo", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Artwork" } } } }, "400": { "description": "Thiếu field bắt buộc" }, "401": { "description": "Chưa đăng nhập" }, "403": { "description": "Không phải tài khoản artist" } }
+      }
+    },
+    "/api/artist/artworks/{id}": {
+      "patch": {
+        "tags": ["Artist & Artwork"],
+        "summary": "Sửa listing của mình (đưa về pending để duyệt lại)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ArtworkInput" } } } },
+        "responses": { "200": { "description": "Đã cập nhật" }, "404": { "description": "Không tìm thấy hoặc không thuộc về bạn" } }
+      }
+    },
+    "/api/cart": {
+      "get": {
+        "tags": ["Commerce"],
+        "summary": "Xem giỏ hàng",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" }, "401": { "description": "Chưa đăng nhập" } }
+      },
+      "post": {
+        "tags": ["Commerce"],
+        "summary": "Thêm tác phẩm vào giỏ",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["artworkId"], "properties": { "artworkId": { "type": "string" } } }, "example": { "artworkId": "aw-02-ember-field" } } } },
+        "responses": { "201": { "description": "Đã thêm" }, "404": { "description": "Không tìm thấy tác phẩm" } }
+      }
+    },
+    "/api/cart/{artworkId}": {
+      "delete": {
+        "tags": ["Commerce"],
+        "summary": "Xoá tác phẩm khỏi giỏ",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "artworkId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Đã xoá" } }
+      }
+    },
+    "/api/checkout": {
+      "post": {
+        "tags": ["Commerce"],
+        "summary": "Thanh toán giỏ hàng, tạo đơn hàng",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["shippingAddress", "method"],
+                "properties": {
+                  "shippingAddress": { "type": "object", "properties": { "fullName": { "type": "string" }, "address": { "type": "string" }, "city": { "type": "string" }, "phone": { "type": "string" } } },
+                  "method": { "type": "string", "enum": ["card", "wallet"] },
+                  "simulateFailure": { "type": "boolean", "description": "true để giả lập thanh toán thất bại (test luồng ngoại lệ)" }
+                }
+              },
+              "example": { "shippingAddress": { "fullName": "Nguyễn Minh Anh", "address": "12 Trần Phú", "city": "Đà Nẵng", "phone": "0901234567" }, "method": "card", "simulateFailure": false }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Đặt hàng thành công", "content": { "application/json": { "schema": { "type": "object", "properties": { "orders": { "type": "array", "items": { "$ref": "#/components/schemas/Order" } } } } } } },
+          "400": { "description": "Giỏ hàng trống / thiếu địa chỉ" },
+          "402": { "description": "Thanh toán thất bại (simulateFailure=true)" },
+          "409": { "description": "Có tác phẩm vừa hết hàng (reserved/sold)" }
+        }
+      }
+    },
+    "/api/orders": {
+      "get": {
+        "tags": ["Commerce"],
+        "summary": "Danh sách đơn hàng của người mua đang đăng nhập",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" }, "401": { "description": "Chưa đăng nhập" } }
+      }
+    },
+    "/api/orders/{id}/confirm-received": {
+      "post": {
+        "tags": ["Commerce"],
+        "summary": "Xác nhận đã nhận hàng (shipped → completed)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "OK" }, "404": { "description": "Không tìm thấy đơn" }, "409": { "description": "Đơn chưa ở trạng thái shipped" } }
+      }
+    },
+    "/api/orders/{id}/reviews": {
+      "post": {
+        "tags": ["Commerce"],
+        "summary": "Đánh giá đơn hàng đã hoàn tất",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["rating"], "properties": { "rating": { "type": "integer", "minimum": 1, "maximum": 5 }, "comment": { "type": "string" } } }, "example": { "rating": 5, "comment": "Rất hài lòng" } } } },
+        "responses": { "201": { "description": "Đã tạo đánh giá" }, "409": { "description": "Đơn chưa completed" } }
+      }
+    },
+    "/api/orders/{id}/complaints": {
+      "post": {
+        "tags": ["Commerce"],
+        "summary": "Báo sự cố cho một đơn hàng",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["reason"], "properties": { "reason": { "type": "string" } } }, "example": { "reason": "Khung tranh bị nứt góc khi nhận hàng" } } } },
+        "responses": { "201": { "description": "Đã tạo khiếu nại", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Complaint" } } } } }
+      }
+    },
+    "/api/artist/orders": {
+      "get": {
+        "tags": ["Commerce"],
+        "summary": "Danh sách đơn hàng cho các tác phẩm của nghệ sĩ đang đăng nhập",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" }, "403": { "description": "Không phải tài khoản artist" } }
+      }
+    },
+    "/api/artist/orders/{id}/ship": {
+      "post": {
+        "tags": ["Commerce"],
+        "summary": "Đánh dấu đơn đã gửi hàng (paid → shipped)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["carrier", "trackingNumber"], "properties": { "carrier": { "type": "string" }, "trackingNumber": { "type": "string" } } }, "example": { "carrier": "GHN Express", "trackingNumber": "GHN000111222" } } } },
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Shipment" } } } }, "403": { "description": "Đơn không thuộc tác phẩm của bạn" } }
+      }
+    },
+    "/api/saved": {
+      "get": {
+        "tags": ["Recommendation"],
+        "summary": "Danh sách tác phẩm đã lưu",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" }, "401": { "description": "Chưa đăng nhập" } }
+      }
+    },
+    "/api/saved/{artworkId}": {
+      "post": {
+        "tags": ["Recommendation"],
+        "summary": "Lưu / bỏ lưu một tác phẩm (toggle)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "artworkId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "saved": { "type": "boolean" } } } } } } }
+      }
+    },
+    "/api/follows/{artistId}": {
+      "post": {
+        "tags": ["Recommendation"],
+        "summary": "Theo dõi / bỏ theo dõi một nghệ sĩ (toggle)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "artistId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "following": { "type": "boolean" } } } } } } }
+      }
+    },
+    "/api/recommendations": {
+      "get": {
+        "tags": ["Recommendation"],
+        "summary": "Gợi ý cá nhân hoá (hoặc curated nếu chưa đủ tín hiệu / chưa đăng nhập)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/Artwork" } }, "reason": { "type": "string", "enum": ["personalized", "curated"] } } } } } } }
+      }
+    },
+    "/api/admin/verification-queue": {
+      "get": {
+        "tags": ["Verification"],
+        "summary": "Hàng chờ xác thực (nghệ sĩ + tác phẩm pending)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" }, "403": { "description": "Không phải tài khoản admin" } }
+      }
+    },
+    "/api/admin/artists/{id}/review": {
+      "post": {
+        "tags": ["Verification"],
+        "summary": "Duyệt / từ chối hồ sơ nghệ sĩ",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["status"], "properties": { "status": { "type": "string", "enum": ["verified", "rejected"] }, "note": { "type": "string" } } }, "example": { "status": "verified" } } } },
+        "responses": { "200": { "description": "OK" }, "400": { "description": "Thiếu note khi reject" } }
+      }
+    },
+    "/api/admin/artworks/{id}/review": {
+      "post": {
+        "tags": ["Verification"],
+        "summary": "Duyệt / từ chối một tác phẩm",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["status"], "properties": { "status": { "type": "string", "enum": ["verified", "rejected"] }, "note": { "type": "string" } } }, "example": { "status": "verified" } } } },
+        "responses": { "200": { "description": "OK" }, "400": { "description": "Thiếu note khi reject" } }
+      }
+    },
+    "/api/admin/stats": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Số liệu tổng quan hệ thống",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" }, "403": { "description": "Không phải tài khoản admin" } }
+      }
+    },
+    "/api/admin/complaints": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Danh sách khiếu nại",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/admin/complaints/{id}/resolve": {
+      "post": {
+        "tags": ["Admin"],
+        "summary": "Xử lý một khiếu nại",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["status"], "properties": { "status": { "type": "string", "enum": ["resolved", "rejected"] }, "note": { "type": "string" } } }, "example": { "status": "resolved", "note": "Đã gửi khung thay thế" } } } },
+        "responses": { "200": { "description": "OK" } }
+      }
+    }
+  }
+}

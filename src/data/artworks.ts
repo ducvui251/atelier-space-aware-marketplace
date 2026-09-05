@@ -20,6 +20,7 @@ export const artworks: Artwork[] = [
     imageUrl: portraitImage("art-01"),
     orientation: "portrait",
     year: 2024,
+    coaUrl: "https://picsum.photos/seed/coa-01/800/1000",
   },
   {
     id: "aw-02-ember-field",
@@ -224,7 +225,7 @@ export const artworks: Artwork[] = [
     style: ["Landscape", "Minimal"],
     dominantColors: ["White", "Silver", "Grey"],
     editionType: "limited-edition",
-    availability: "available",
+    availability: "sold",
     verificationStatus: "pending",
     imageUrl: portraitImage("art-12"),
     orientation: "portrait",
