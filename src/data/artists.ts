@@ -4,12 +4,14 @@ import { artistPortrait } from "./images";
 export const artists: Artist[] = [
   {
     id: "artist-lena-moreau",
+    userId: "user-artist-lena",
     displayName: "Lena Moreau",
     location: "Paris, France",
     nationality: "French",
     bio: "Lena works between abstraction and the memory of place, layering pigment and wax to build surfaces that feel weathered and tender. Recent work explores the quiet edges of the Atlantic coast.",
     verificationStatus: "verified",
     imageUrl: artistPortrait("artist-lena"),
+    portfolioUrl: "https://lenamoreau.example.com",
   },
   {
     id: "artist-ivan-petrova",
@@ -31,12 +33,14 @@ export const artists: Artist[] = [
   },
   {
     id: "artist-maria-wood",
+    userId: "user-artist-maria",
     displayName: "Maria Wood",
     location: "Melbourne, Australia",
     nationality: "Australian",
     bio: "Maria photographs the built environment and reconstructs it as large-scale sculptural prints, favoring texture over subject.",
     verificationStatus: "pending",
     imageUrl: artistPortrait("artist-maria"),
+    portfolioUrl: "https://mariawood.example.com",
   },
   {
     id: "artist-old-rakim",

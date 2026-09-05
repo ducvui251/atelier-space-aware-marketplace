@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { PageContainer } from "@/components/layout/PageContainer";
-import { SearchInput } from "@/components/discovery/SearchInput";
 import { DualViewToggle } from "@/components/discovery/DualViewToggle";
 import { FilterableArtworks } from "@/components/discovery/FilterableArtworks";
 import { getArtworks } from "@/features/artworks/services/artwork.service";
@@ -28,11 +27,7 @@ export default async function ArtworksPage() {
         </div>
       </div>
 
-      <div id="search" className="mt-8">
-        <SearchInput className="max-w-xl" />
-      </div>
-
-      <div className="mt-5">
+      <div className="mt-8">
         <FilterableArtworks artworks={artworks} />
       </div>
     </PageContainer>

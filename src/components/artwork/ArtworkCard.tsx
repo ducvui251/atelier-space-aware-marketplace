@@ -1,9 +1,13 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import type { Artwork } from "@/types";
 import { cn } from "@/lib/utils";
 import { artworkAspect } from "@/lib/artwork-aspect";
+import { useAppState, useSaved } from "@/lib/store/hooks";
 import { PriceDisplay } from "./PriceDisplay";
 import { SaveButton } from "./SaveButton";
 
@@ -14,11 +18,24 @@ interface ArtworkCardProps {
 }
 
 export function ArtworkCard({ artwork, priority, className }: ArtworkCardProps) {
-  const verified = artwork.verificationStatus === "verified";
+  const router = useRouter();
+  const { db, currentUser } = useAppState();
+  const { isSaved, toggleSaved } = useSaved();
+  const live = db.artworks.find((a) => a.id === artwork.id) ?? artwork;
+  const verified = live.verificationStatus === "verified";
+  const unavailable = live.availability !== "available";
+
+  function handleSaveToggle() {
+    if (!currentUser) {
+      router.push("/login");
+      return;
+    }
+    toggleSaved(live.id);
+  }
 
   return (
     <Link
-      href={`/artworks/${artwork.id}`}
+      href={`/artworks/${live.id}`}
       className={cn(
         "group focus-ring flex flex-col rounded-lg",
         className,
@@ -27,32 +44,40 @@ export function ArtworkCard({ artwork, priority, className }: ArtworkCardProps) 
       <div
         className={cn(
           "relative w-full overflow-hidden rounded-lg bg-muted",
-          artworkAspect(artwork.orientation),
+          artworkAspect(live.orientation),
         )}
       >
         <Image
-          src={artwork.imageUrl}
-          alt={artwork.title}
+          src={live.imageUrl}
+          alt={live.title}
           fill
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          className="object-cover transition-transform duration-normal [transition-timing-function:var(--ease-out)] group-hover:scale-[1.02]"
+          className={cn(
+            "object-cover transition-transform duration-normal [transition-timing-function:var(--ease-out)] group-hover:scale-[1.02]",
+            unavailable && "opacity-70 grayscale-[35%]",
+          )}
           priority={priority}
         />
-        <SaveButton />
+        <SaveButton saved={isSaved(live.id)} onToggle={handleSaveToggle} />
+        {unavailable ? (
+          <span className="absolute left-3 top-3 rounded-full bg-foreground/85 px-2.5 py-1 text-metadata font-medium capitalize text-background">
+            {live.availability}
+          </span>
+        ) : null}
       </div>
 
       <div className="mt-4 flex flex-col gap-0.5">
-        <h3 className="font-display text-h3 text-foreground">{artwork.title}</h3>
-        <p className="text-body-sm text-muted-foreground">{artwork.artist}</p>
+        <h3 className="font-display text-h3 text-foreground">{live.title}</h3>
+        <p className="text-body-sm text-muted-foreground">{live.artist}</p>
         <div className="mt-1.5">
-          <PriceDisplay price={artwork.price} currency={artwork.currency} />
+          <PriceDisplay price={live.price} currency={live.currency} />
         </div>
         <p className="mt-1 text-caption text-subdued">
-          {artwork.widthCm} × {artwork.heightCm} cm
+          {live.widthCm} × {live.heightCm} cm
         </p>
         <div className="mt-2 flex items-center gap-1.5 text-caption text-muted-foreground">
           <span className="capitalize">
-            {artwork.editionType === "original" ? "Original" : "Limited edition"}
+            {live.editionType === "original" ? "Original" : "Limited edition"}
           </span>
           <span aria-hidden>·</span>
           <span

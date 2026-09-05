@@ -8,6 +8,7 @@ import { SectionHeader } from "@/components/layout/SectionHeader";
 import { Grid } from "@/components/layout/Grid";
 import { ArtworkCard } from "@/components/artwork/ArtworkCard";
 import { Badge } from "@/components/ui/badge";
+import { FollowButton } from "@/components/artist/FollowButton";
 import { artists } from "@/data";
 import { getArtworks } from "@/features/artworks/services/artwork.service";
 
@@ -77,6 +78,9 @@ export default async function ArtistProfilePage({
               <MapPin className="size-4" />
               {artist.location} · {artist.nationality}
             </p>
+            <div className="mt-4">
+              <FollowButton artistId={artist.id} />
+            </div>
             <p className="mt-6 text-body-lg text-muted-foreground text-balance">
               {artist.bio}
             </p>

@@ -9,6 +9,7 @@ import { Eye, EyeOff, Loader2, LogIn } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/store/hooks";
 
 const loginSchema = z.object({
   email: z.string().trim().email("Enter a valid email address"),
@@ -17,28 +18,17 @@ const loginSchema = z.object({
 
 export type LoginFormValues = z.infer<typeof loginSchema>;
 
-type SubmitResult = { error: string } | { success: true } | void;
-
 export interface LoginFormProps {
-  onSubmit?: (values: LoginFormValues) => Promise<SubmitResult>;
-  submitLabel?: string;
   redirectTo?: string;
-  disabled?: boolean;
   className?: string;
 }
 
-export function LoginForm({
-  onSubmit,
-  submitLabel = "Sign in",
-  redirectTo = "/account",
-  disabled = false,
-  className,
-}: LoginFormProps) {
+export function LoginForm({ redirectTo = "/account", className }: LoginFormProps) {
   const router = useRouter();
+  const { login } = useAuth();
   const [showPassword, setShowPassword] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [authError, setAuthError] = React.useState<string | null>(null);
-  const isBusy = submitting || disabled;
 
   const {
     register,
@@ -53,12 +43,9 @@ export function LoginForm({
     setSubmitting(true);
     setAuthError(null);
     try {
-      if (!onSubmit) {
-        await new Promise((resolve) => setTimeout(resolve, 700));
-        return;
-      }
-      const result = await onSubmit(values);
-      if (result && "error" in result) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const result = login(values.email, values.password);
+      if ("error" in result) {
         setAuthError(result.error);
         return;
       }
@@ -93,7 +80,7 @@ export function LoginForm({
           type="email"
           autoComplete="email"
           placeholder="you@example.com"
-          disabled={isBusy}
+          disabled={submitting}
           aria-invalid={errors.email ? true : undefined}
           aria-describedby={errors.email ? "login-email-error" : undefined}
           className={cn(errors.email && "border-destructive")}
@@ -116,12 +103,6 @@ export function LoginForm({
           <label htmlFor="login-password" className="text-label text-foreground">
             Password
           </label>
-          <button
-            type="button"
-            className="focus-ring text-caption text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
-          >
-            Forgot password?
-          </button>
         </div>
 
         <div className="relative">
@@ -130,7 +111,7 @@ export function LoginForm({
             type={showPassword ? "text" : "password"}
             autoComplete="current-password"
             placeholder="••••••••"
-            disabled={isBusy}
+            disabled={submitting}
             aria-invalid={errors.password ? true : undefined}
             aria-describedby={errors.password ? "login-password-error" : undefined}
             className={cn("pr-12", errors.password && "border-destructive")}
@@ -140,7 +121,7 @@ export function LoginForm({
             type="button"
             aria-label={showPassword ? "Hide password" : "Show password"}
             aria-pressed={showPassword}
-            disabled={isBusy}
+            disabled={submitting}
             onClick={() => setShowPassword((value) => !value)}
             className="focus-ring absolute right-2 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-subdued transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
           >
@@ -163,7 +144,7 @@ export function LoginForm({
         ) : null}
       </div>
 
-      <Button type="submit" size="lg" className="mt-2 w-full" disabled={isBusy}>
+      <Button type="submit" size="lg" className="mt-2 w-full" disabled={submitting}>
         {submitting ? (
           <>
             <Loader2 className="size-4 animate-spin" />
@@ -172,7 +153,7 @@ export function LoginForm({
         ) : (
           <>
             <LogIn className="size-4" />
-            {submitLabel}
+            Sign in
           </>
         )}
       </Button>
