@@ -1,16 +1,11 @@
 import type { NextRequest } from "next/server";
-import { getServerDb } from "@/lib/gateway/runtime";
+import { getVerificationQueue } from "@/lib/gateway/clients/admin.client";
 import { getAuthUser, requireRole } from "@/lib/server/auth";
 import { json, errorResponse } from "@/lib/server/respond";
 
 export async function GET(request: NextRequest) {
-  const user = getAuthUser(request);
+  const user = await getAuthUser(request);
   const roleError = requireRole(user, ["admin"]);
   if (roleError) return errorResponse(roleError, user ? 403 : 401);
-
-  const db = getServerDb();
-  return json({
-    artists: db.artists.filter((a) => a.verificationStatus === "pending"),
-    artworks: db.artworks.filter((a) => a.verificationStatus === "pending"),
-  });
+  return json(await getVerificationQueue());
 }

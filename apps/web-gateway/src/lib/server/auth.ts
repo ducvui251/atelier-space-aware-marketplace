@@ -1,30 +1,35 @@
 import type { NextRequest } from "next/server";
 import type { MockUser, UserRole } from "@/types";
-import { getServerDb } from "./store";
+import { createClient } from "@/lib/supabase/server";
+import { requestService } from "@/lib/gateway/http-client";
 
-/**
- * Deliberately trivial "auth": the bearer token is just the user id,
- * base64url-encoded. There is no signing, expiry, or secret — this is a demo
- * API for exercising the mock business logic, not a real auth system.
- */
-export function createToken(userId: string): string {
-  return Buffer.from(userId, "utf-8").toString("base64url");
+function bearerToken(request: NextRequest | Request): string | null {
+  const header = request.headers.get("authorization") ?? "";
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match?.[1] ?? null;
 }
 
-export function verifyToken(token: string): MockUser | null {
+export async function getAuthUser(request: NextRequest | Request): Promise<MockUser | null> {
   try {
-    const userId = Buffer.from(token, "base64url").toString("utf-8");
-    return getServerDb().users.find((u) => u.id === userId) ?? null;
+    const supabase = await createClient();
+    const token = bearerToken(request);
+    const result = token ? await supabase.auth.getUser(token) : await supabase.auth.getUser();
+    if (result.error || !result.data.user?.id || !result.data.user.email) return null;
+    const authUser = result.data.user;
+    const profile = await requestService<{ user: Omit<MockUser, "password"> }>("account", "/v1/account/users/sync", {
+      method: "POST",
+      body: {
+        authUserId: authUser.id,
+        email: authUser.email,
+        fullName: (authUser.user_metadata?.full_name as string | undefined) ?? authUser.email,
+        phone: authUser.phone,
+      },
+      headers: { ...(token ? { authorization: `Bearer ${token}` } : {}) },
+    });
+    return { ...profile.user, password: "" };
   } catch {
     return null;
   }
-}
-
-export function getAuthUser(request: NextRequest | Request): MockUser | null {
-  const header = request.headers.get("authorization") ?? "";
-  const match = header.match(/^Bearer\s+(.+)$/i);
-  if (!match) return null;
-  return verifyToken(match[1]);
 }
 
 export function requireRole(user: MockUser | null, roles: UserRole[]): string | null {

@@ -1,9 +1,7 @@
-import { getServerDb } from "@/lib/gateway/runtime";
-import { getArtists } from "@atelier/artist-artwork-service";
+import { listArtists } from "@/lib/gateway/clients/artwork.client";
 import { json } from "@/lib/server/respond";
 
 export async function GET() {
-  const db = getServerDb();
-  const items = getArtists(db.artists);
+  const items = await listArtists();
   return json({ items, total: items.length });
 }

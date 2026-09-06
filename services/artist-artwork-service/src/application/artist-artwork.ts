@@ -1,5 +1,5 @@
 import type { Artist, Artwork, Availability } from "@atelier/contracts";
-import { getArtistById, getArtists, getArtworkById, getArtworks, getFeaturedArtworks, updateAvailability } from "../domain/artwork-rules";
+import { getArtistById, getArtists, getArtworkById, getArtworks, getFeaturedArtworks, updateAvailability } from "../domain/artwork-rules.ts";
 
 export { getArtistById, getArtists, getArtworkById, getArtworks, getFeaturedArtworks };
 export function setArtworkAvailability(artwork: Artwork, availability: Availability): Artwork { return updateAvailability(artwork, availability); }

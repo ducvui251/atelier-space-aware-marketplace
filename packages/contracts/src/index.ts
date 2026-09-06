@@ -83,4 +83,4 @@ export interface DomainEvent<TPayload = unknown> {
   correlationId: string; source: ServiceName; payload: TPayload;
 }
 export interface ApiError { code: string; message: string; correlationId: string; }
-export * from "./v1";
+export * from "./v1.ts";

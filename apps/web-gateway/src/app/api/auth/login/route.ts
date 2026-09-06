@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
-import { getServerDb } from "@/lib/gateway/runtime";
-import { createToken, publicUser } from "@/lib/server/auth";
+import { createClient } from "@/lib/supabase/server";
+import { requestService } from "@/lib/gateway/http-client";
 import { json, errorResponse } from "@/lib/server/respond";
 
 export async function POST(request: NextRequest) {
@@ -11,11 +11,23 @@ export async function POST(request: NextRequest) {
     return errorResponse("email and password are required", 400);
   }
 
-  const db = getServerDb();
-  const user = db.users.find((u) => u.email.toLowerCase() === email);
-  if (!user || user.password !== password) {
-    return errorResponse("Invalid email or password", 401);
-  }
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error || !data.user || !data.session) return errorResponse("Invalid email or password", 401);
 
-  return json({ token: createToken(user.id), user: publicUser(user) });
+    const profile = await requestService<{ user: Record<string, unknown> }>("account", "/v1/account/users/sync", {
+      method: "POST",
+      body: {
+        authUserId: data.user.id,
+        email: data.user.email,
+        fullName: (data.user.user_metadata?.full_name as string | undefined) ?? email,
+        phone: data.user.phone,
+      },
+      headers: { authorization: `Bearer ${data.session.access_token}` },
+    });
+    return json({ token: data.session.access_token, user: profile.user });
+  } catch {
+    return errorResponse("Authentication service unavailable", 503);
+  }
 }

@@ -1,5 +1,5 @@
 import type { Artwork } from "@atelier/contracts";
-import { landscapeImage, portraitImage, squareImage } from "./images";
+import { landscapeImage, portraitImage, squareImage } from "./images.ts";
 
 export const artworks: Artwork[] = [
   {

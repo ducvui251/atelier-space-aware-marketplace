@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 
 /**
  * Permissive CORS for the mock REST API only, so the OpenAPI spec in
@@ -14,12 +15,21 @@ function corsHeaders(): Record<string, string> {
   };
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   if (request.method === "OPTIONS") {
     return new NextResponse(null, { status: 204, headers: corsHeaders() });
   }
 
-  const response = NextResponse.next();
+  const response = NextResponse.next({ request });
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+      cookies: {
+        getAll: () => request.cookies.getAll(),
+        setAll: (cookiesToSet) => cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options)),
+      },
+    });
+    await supabase.auth.getUser();
+  }
   for (const [key, value] of Object.entries(corsHeaders())) {
     response.headers.set(key, value);
   }

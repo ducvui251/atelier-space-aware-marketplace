@@ -16,5 +16,8 @@
     "onlyBuiltDependencies": [
       "unrs-resolver"
     ]
+  },
+  "devDependencies": {
+    "@types/node": "22.10.0"
   }
 }

@@ -1,1 +1,1 @@
-export { addToCart, getCart, removeFromCart } from "../domain/cart-rules";
+export { addToCart, getCart, removeFromCart } from "../domain/cart-rules.ts";

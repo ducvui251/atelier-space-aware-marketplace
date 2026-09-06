@@ -1,5 +1,5 @@
 import type { MockUser } from "@atelier/contracts";
-import { findUserByEmail, getUserById } from "../domain/account-rules";
+import { findUserByEmail, getUserById } from "../domain/account-rules.ts";
 
 export function authenticate(users: readonly MockUser[], email: string, password: string): MockUser | undefined {
   return findUserByEmail(users, email, password);

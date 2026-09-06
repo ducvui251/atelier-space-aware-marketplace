@@ -1,0 +1,3 @@
+services:
+  verification-service:
+    ports: !override ["14106:4106"]
