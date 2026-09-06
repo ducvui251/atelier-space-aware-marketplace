@@ -1,8 +1,8 @@
 # Atelier — Art Discovery & Commerce Platform
 
 An art discovery and marketplace experience. This is an early-stage build: it ships the
-visual shell, design tokens, and mock/placeholder data — no live backend, auth, payments,
-or recommendation engine yet. Data lives in `src/data/` as typed placeholders.
+visual shell, design tokens, and service-owned mock data — no live backend or external
+payment provider yet.
 
 ## Tech stack
 
@@ -38,7 +38,7 @@ pnpm install
 
 ### 3. Configure environment
 
-The app uses Supabase client auth plumbing (see `pnpm-workspace.yaml` and `src/lib/supabase/server.ts`), but the current shell runs fully on mock data. Copy the example env and fill in your Supabase project values if you want the client-side auth wiring to resolve:
+The app uses Supabase client auth plumbing (see `pnpm-workspace.yaml` and `apps/web-gateway/src/lib/supabase/server.ts`), but the current shell runs fully on mock data. Copy the example env and fill in your Supabase project values if you want the client-side auth wiring to resolve:
 
 ```sh
 cp .env.example .env.local
@@ -74,24 +74,26 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Monorepo scaffold
 
-The repository now uses a microservices monorepo layout. The current Next.js application
-at the root acts as the web application and API Gateway/BFF. Eight domain-service package
-boundaries live under `services/`; shared contracts and configuration live under
-`packages/`. The boundaries are scaffolded only and do not contain live runtimes yet.
+The repository uses a microservices monorepo layout. The Next.js application under
+`apps/web-gateway/` is the web application and API Gateway/BFF. Eight domain-service
+packages under `services/` own domain logic and publish versioned entry points; shared
+contracts and configuration live under `packages/`. The gateway currently composes the
+service modules in-process for the mock MVP, so each boundary can later be deployed as
+an independent runtime without moving domain logic again.
 
-- `services/` — eight internal service boundaries
+- `services/` — eight internal service boundaries and domain modules
 - `packages/` — versioned contracts and shared configuration primitives
-- `apps/` — reserved for future applications
+- `apps/web-gateway/` — Next.js web app and API Gateway/BFF
 - `docs/architecture/MONOREPO.md` — runtime and ownership rules
 
 ## Project structure
 
-- `src/app/` — App Router pages (`/`, `/artworks`, `/artworks/[id]`, `/artists`, `/artists/[id]`, `/saved`, `/rooms`, `/account`, `/login`)
-- `src/components/` — presentational components (`layout`, `ui`, `artwork`, `home`, `discovery`, …)
-- `src/data/` — typed mock/placeholder content (artworks, artists, collections, rooms, images)
-- `src/features/` — feature modules (e.g. `artworks/services`)
-- `src/lib/` — utilities (Supabase server client, `cn()` helper)
-- `src/types/` — shared TypeScript types
+- `apps/web-gateway/src/app/` — App Router pages and public `/api/*` Gateway/BFF routes
+- `apps/web-gateway/src/components/` — presentational components
+- `apps/web-gateway/src/data/` — typed mock/placeholder content for the gateway adapter
+- `apps/web-gateway/src/lib/gateway/` — service registry and composition boundary
+- `apps/web-gateway/src/lib/` — UI and infrastructure utilities
+- `packages/contracts/` — shared versioned domain types and service contracts
 
 ## Notes
 

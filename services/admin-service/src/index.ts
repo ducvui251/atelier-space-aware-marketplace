@@ -1,7 +1,7 @@
 import type { ServiceDefinition } from "@atelier/contracts";
-export { getAdminStats, getOpenComplaints } from "./application/admin";
-export { health } from "./health";
-export { complaints } from "./infrastructure/complaints";
+export { getAdminStats, getOpenComplaints } from "./application/admin.ts";
+export { health } from "./health.ts";
+export { complaints } from "./infrastructure/complaints.ts";
 
 export const ADMIN_SERVICE: ServiceDefinition = {
   name: "admin",

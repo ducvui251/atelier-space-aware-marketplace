@@ -1,8 +1,8 @@
 import type { ServiceDefinition } from "@atelier/contracts";
-export { artists } from "./infrastructure/artists";
-export { artworks } from "./infrastructure/artworks";
-export { getArtistById, getArtists, getArtworkById, getArtworks, getFeaturedArtworks, getArtistArtworks, setArtworkAvailability } from "./application/artist-artwork";
-export { health } from "./health";
+export { artists } from "./infrastructure/artists.ts";
+export { artworks } from "./infrastructure/artworks.ts";
+export { getArtistById, getArtists, getArtworkById, getArtworks, getFeaturedArtworks, getArtistArtworks, setArtworkAvailability } from "./application/artist-artwork.ts";
+export { health } from "./health.ts";
 
 export const ARTIST_ARTWORK_SERVICE: ServiceDefinition = {
   name: "artist-artwork",

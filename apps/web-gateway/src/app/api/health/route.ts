@@ -1,22 +1,16 @@
 import { GATEWAY_SERVICES } from "@/lib/gateway/services";
+import { requestService } from "@/lib/gateway/http-client";
 import { json } from "@/lib/server/respond";
-import { health as accountHealth } from "@atelier/account-service";
-import { health as adminHealth } from "@atelier/admin-service";
-import { health as artistArtworkHealth } from "@atelier/artist-artwork-service";
-import { health as catalogHealth } from "@atelier/catalog-discovery-service";
-import { health as commerceHealth } from "@atelier/commerce-service";
-import { health as recommendationHealth } from "@atelier/recommendation-service";
-import { health as roomPreviewHealth } from "@atelier/room-preview-service";
-import { health as verificationHealth } from "@atelier/verification-service";
 
-const downstreamHealth = [accountHealth, catalogHealth, artistArtworkHealth, commerceHealth, recommendationHealth, verificationHealth, roomPreviewHealth, adminHealth];
-
-export function GET() {
-  return json({
-    service: "web-gateway",
-    version: "v1",
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    downstreamServices: GATEWAY_SERVICES.map(({ name, version }, index) => ({ ...downstreamHealth[index](), name, version })),
-  });
+export async function GET() {
+  const downstreamServices = await Promise.all(GATEWAY_SERVICES.map(async ({ name, version }) => {
+    try {
+      const health = await requestService<{ status: "ok"; timestamp: string }>(name, "/health", { timeoutMs: 1000 });
+      return { name, version, status: health.status, timestamp: health.timestamp, reachable: true };
+    } catch (error) {
+      return { name, version, status: "unavailable", reachable: false, error: error instanceof Error ? error.message : "Health check failed" };
+    }
+  }));
+  const status = downstreamServices.every((service) => service.reachable) ? "ok" : "degraded";
+  return json({ service: "web-gateway", version: "v1", status, timestamp: new Date().toISOString(), downstreamServices });
 }

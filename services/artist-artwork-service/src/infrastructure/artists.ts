@@ -1,5 +1,5 @@
 import type { Artist } from "@atelier/contracts";
-import { artistPortrait } from "./images";
+import { artistPortrait } from "./images.ts";
 
 export const artists: Artist[] = [
   {

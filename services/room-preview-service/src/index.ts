@@ -1,7 +1,7 @@
 import type { ServiceDefinition } from "@atelier/contracts";
-export { rooms } from "./infrastructure/rooms";
-export { getRoomPresets } from "./application/room-preview";
-export { health } from "./health";
+export { rooms } from "./infrastructure/rooms.ts";
+export { getRoomPresets } from "./application/room-preview.ts";
+export { health } from "./health.ts";
 
 export const ROOM_PREVIEW_SERVICE: ServiceDefinition = {
   name: "room-preview",

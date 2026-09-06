@@ -1,0 +1,178 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: atelier
+      POSTGRES_USER: atelier
+      POSTGRES_PASSWORD: atelier_local_dev
+    ports: ["5432:5432"]
+    volumes:
+      - atelier-postgres-data:/var/lib/postgresql/data
+      - ./supabase/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atelier -d atelier"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  account-service:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.service
+      args:
+        SERVICE_NAME: account-service
+    environment:
+      ACCOUNT_PORT: 4101
+      DATABASE_URL: postgresql://atelier:atelier_local_dev@postgres:5432/atelier
+      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:-dev-only-internal-token}
+    ports: ["4101:4101"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4101/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  catalog-discovery-service:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.service
+      args:
+        SERVICE_NAME: catalog-discovery-service
+    environment:
+      CATALOG_DISCOVERY_PORT: 4102
+      DATABASE_URL: postgresql://atelier:atelier_local_dev@postgres:5432/atelier
+      ARTIST_ARTWORK_SERVICE_URL: http://artist-artwork-service:4103
+      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:-dev-only-internal-token}
+    ports: ["4102:4102"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4102/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      artist-artwork-service: { condition: service_healthy }
+
+  artist-artwork-service:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.service
+      args:
+        SERVICE_NAME: artist-artwork-service
+    environment:
+      ARTIST_ARTWORK_PORT: 4103
+      DATABASE_URL: postgresql://atelier:atelier_local_dev@postgres:5432/atelier
+      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:-dev-only-internal-token}
+    ports: ["4103:4103"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4103/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  commerce-service:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.service
+      args:
+        SERVICE_NAME: commerce-service
+    environment:
+      COMMERCE_PORT: 4104
+      DATABASE_URL: postgresql://atelier:atelier_local_dev@postgres:5432/atelier
+      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:-dev-only-internal-token}
+    ports: ["4104:4104"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4104/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  recommendation-service:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.service
+      args:
+        SERVICE_NAME: recommendation-service
+    environment:
+      RECOMMENDATION_PORT: 4105
+      DATABASE_URL: postgresql://atelier:atelier_local_dev@postgres:5432/atelier
+      ARTIST_ARTWORK_SERVICE_URL: http://artist-artwork-service:4103
+      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:-dev-only-internal-token}
+    ports: ["4105:4105"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4105/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      artist-artwork-service: { condition: service_healthy }
+
+  verification-service:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.service
+      args:
+        SERVICE_NAME: verification-service
+    environment:
+      VERIFICATION_PORT: 4106
+      DATABASE_URL: postgresql://atelier:atelier_local_dev@postgres:5432/atelier
+      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:-dev-only-internal-token}
+    ports: ["4106:4106"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4106/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  room-preview-service:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.service
+      args:
+        SERVICE_NAME: room-preview-service
+    environment:
+      ROOM_PREVIEW_PORT: 4107
+      DATABASE_URL: postgresql://atelier:atelier_local_dev@postgres:5432/atelier
+      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:-dev-only-internal-token}
+    ports: ["4107:4107"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4107/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  admin-service:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.service
+      args:
+        SERVICE_NAME: admin-service
+    environment:
+      ADMIN_PORT: 4108
+      DATABASE_URL: postgresql://atelier:atelier_local_dev@postgres:5432/atelier
+      ARTIST_ARTWORK_SERVICE_URL: http://artist-artwork-service:4103
+      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:-dev-only-internal-token}
+    ports: ["4108:4108"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4108/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      artist-artwork-service: { condition: service_healthy }
+
+  web-gateway:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.gateway
+    environment:
+      ACCOUNT_SERVICE_URL: http://account-service:4101
+      CATALOG_DISCOVERY_SERVICE_URL: http://catalog-discovery-service:4102
+      ARTIST_ARTWORK_SERVICE_URL: http://artist-artwork-service:4103
+      COMMERCE_SERVICE_URL: http://commerce-service:4104
+      RECOMMENDATION_SERVICE_URL: http://recommendation-service:4105
+      VERIFICATION_SERVICE_URL: http://verification-service:4106
+      ROOM_PREVIEW_SERVICE_URL: http://room-preview-service:4107
+      ADMIN_SERVICE_URL: http://admin-service:4108
+      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:-dev-only-internal-token}
+    ports: ["3000:3000"]
+    depends_on:
+      account-service: { condition: service_healthy }
+      catalog-discovery-service: { condition: service_healthy }
+      artist-artwork-service: { condition: service_healthy }
+      commerce-service: { condition: service_healthy }
+      recommendation-service: { condition: service_healthy }
+      verification-service: { condition: service_healthy }
+      room-preview-service: { condition: service_healthy }
+      admin-service: { condition: service_healthy }
+
+volumes:
+  atelier-postgres-data:

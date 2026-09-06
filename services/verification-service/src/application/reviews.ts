@@ -1,1 +1,1 @@
-export { reviewArtist, reviewArtwork } from "../domain/review-rules";
+export { reviewArtist, reviewArtwork } from "../domain/review-rules.ts";

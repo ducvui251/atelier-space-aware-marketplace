@@ -35,6 +35,7 @@ next-env.d.ts
 .turbo
 
 # project docs (not part of app source)
+*.md
 AGENTS.md
 PROJECT_PROMPT.md
 /docs/

@@ -1,0 +1,11 @@
+{
+  "name": "@atelier/persistence",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared PostgreSQL pool and repository primitives for Atelier services.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "pg": "^8.13.1" },
+  "devDependencies": { "@types/node": "^22.10.0", "@types/pg": "^8.11.10", "typescript": "^5.7.0" },
+  "scripts": { "type-check": "tsc --noEmit" }
+}

@@ -1,5 +1,5 @@
 import type { Artwork } from "@atelier/contracts";
-import type { ArtworkSearchFilters } from "../transport/v1";
+import type { ArtworkSearchFilters } from "../transport/v1.ts";
 
 export function searchArtworks(artworks: readonly Artwork[], filters: ArtworkSearchFilters): Artwork[] {
   let result = [...artworks];

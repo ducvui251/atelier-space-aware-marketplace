@@ -1,5 +1,5 @@
 import type { RoomPreset } from "@atelier/contracts";
-import { artworkImage } from "./images";
+import { artworkImage } from "./images.ts";
 
 export const rooms: RoomPreset[] = [
   { id: "room-living", name: "Living Room", imageUrl: artworkImage("room-living", 1400, 900) },
