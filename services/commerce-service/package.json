@@ -3,5 +3,22 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Atelier cart, checkout, orders, and payment orchestration service."
+  "description": "Atelier cart, checkout, orders, and payment orchestration service.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@atelier/config": "workspace:*",
+    "@atelier/contracts": "workspace:*",
+    "@atelier/persistence": "workspace:*",
+    "stripe": "^17.5.0"
+  },
+  "scripts": {
+    "dev": "node --experimental-strip-types src/server.ts",
+    "start": "node --experimental-strip-types src/server.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
 }

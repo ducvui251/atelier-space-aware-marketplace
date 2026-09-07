@@ -1,0 +1,23 @@
+FROM node:24-bookworm-slim
+
+WORKDIR /app
+RUN npm install --global pnpm@10.34.5
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages ./packages
+COPY services ./services
+COPY apps ./apps
+
+RUN pnpm install --frozen-lockfile
+
+# Next.js inlines NEXT_PUBLIC_* variables into the build output at build
+# time, even in server-side code — setting them at runtime (docker-compose
+# `environment:`) is too late. They must be passed as build args instead.
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+
+RUN pnpm --filter @atelier/web-gateway build
+
+CMD ["pnpm", "--filter", "@atelier/web-gateway", "start"]

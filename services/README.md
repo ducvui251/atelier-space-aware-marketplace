@@ -19,5 +19,10 @@ integrations, not additional Atelier services.
 | `room-preview-service` | Room templates, artwork placement, and optional 3D/AR preview |
 | `admin-service` | Moderation, incidents, audit records, and reporting |
 
-This commit creates boundaries and package metadata only; it does not add live APIs,
-databases, queues, or authentication.
+Each service exposes a health/readiness HTTP process through `src/server.ts`. The v1
+Gateway paths now use network clients. PostgreSQL-backed repositories currently cover
+account profiles, artist/artwork catalog, saved/follow signals, cart, checkout/orders,
+verification, and admin complaints/reporting. Room presets are intentionally static
+service configuration. Payment-provider settlement, event delivery/consumers, and
+production seed/auth environment setup remain deployment work; fixture imports are not
+authoritative backend state.

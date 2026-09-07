@@ -1,0 +1,14 @@
+FROM node:24-bookworm-slim
+
+WORKDIR /app
+RUN npm install --global pnpm@10.34.5
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages ./packages
+COPY services ./services
+
+RUN pnpm install --frozen-lockfile
+
+ARG SERVICE_NAME
+ENV SERVICE_NAME=${SERVICE_NAME}
+CMD ["sh", "-c", "pnpm --filter @atelier/${SERVICE_NAME} start"]

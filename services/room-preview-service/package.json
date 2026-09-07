@@ -3,5 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Atelier room templates, artwork placement, and optional 3D/AR preview service."
+  "description": "Atelier room templates, artwork placement, and optional 3D/AR preview service.",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@atelier/config": "workspace:*", "@atelier/contracts": "workspace:*", "@atelier/persistence": "workspace:*" },
+  "scripts": { "dev": "node --experimental-strip-types src/server.ts", "start": "node --experimental-strip-types src/server.ts", "type-check": "tsc --noEmit" },
+  "devDependencies": { "typescript": "^5.7.0" }
 }

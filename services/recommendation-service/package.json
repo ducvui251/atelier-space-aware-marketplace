@@ -3,5 +3,21 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Atelier taste signals, room-aware ranking, and recommendation service."
+  "description": "Atelier taste signals, room-aware ranking, and recommendation service.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@atelier/config": "workspace:*",
+    "@atelier/contracts": "workspace:*",
+    "@atelier/persistence": "workspace:*"
+  },
+  "scripts": {
+    "dev": "node --experimental-strip-types src/server.ts",
+    "start": "node --experimental-strip-types src/server.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
 }
