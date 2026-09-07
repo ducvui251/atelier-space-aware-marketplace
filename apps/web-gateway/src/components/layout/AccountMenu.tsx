@@ -3,7 +3,7 @@
 import Link from "next/link";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { LayoutDashboard, LogOut, Package, ShieldCheck, User } from "lucide-react";
-import { useAuth } from "@/lib/store/hooks";
+import { useAuth } from "@/lib/client/hooks";
 import { cn } from "@/lib/utils";
 
 export function AccountMenu({ className }: { className?: string }) {

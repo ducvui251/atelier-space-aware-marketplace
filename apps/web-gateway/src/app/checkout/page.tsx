@@ -14,7 +14,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn, formatPrice } from "@/lib/utils";
-import { useAppState, useCart } from "@/lib/store/hooks";
+import { useAuth, useCart } from "@/lib/client/hooks";
+import { apiFetch, ApiError } from "@/lib/client/api";
 
 const checkoutSchema = z.object({
   fullName: z.string().trim().min(1, "Bắt buộc"),
@@ -22,16 +23,16 @@ const checkoutSchema = z.object({
   city: z.string().trim().min(1, "Bắt buộc"),
   phone: z.string().trim().min(1, "Bắt buộc"),
   method: z.enum(["card", "wallet"]),
-  simulateFailure: z.boolean(),
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 
 function CheckoutView() {
   const router = useRouter();
-  const { items, total, cartArtworkIds } = useCart();
-  const { checkout, currentUser } = useAppState();
+  const { items, total, refresh: refreshCart } = useCart();
+  const { currentUser } = useAuth();
   const [formError, setFormError] = React.useState<string | null>(null);
+  const [submitting, setSubmitting] = React.useState(false);
   const [unavailableIds, setUnavailableIds] = React.useState<string[]>([]);
 
   const {
@@ -46,7 +47,6 @@ function CheckoutView() {
       address: "",
       city: "",
       method: "card",
-      simulateFailure: false,
     },
   });
 
@@ -65,26 +65,36 @@ function CheckoutView() {
     );
   }
 
-  function onSubmit(values: CheckoutFormValues) {
+  async function onSubmit(values: CheckoutFormValues) {
     setFormError(null);
     setUnavailableIds([]);
-    const result = checkout({
-      artworkIds: cartArtworkIds,
-      shippingAddress: {
-        fullName: values.fullName,
-        address: values.address,
-        city: values.city,
-        phone: values.phone,
-      },
-      method: values.method,
-      simulateFailure: values.simulateFailure,
-    });
-    if (!result.success) {
-      setFormError(result.error);
-      if (result.unavailableArtworkIds) setUnavailableIds(result.unavailableArtworkIds);
-      return;
+    setSubmitting(true);
+    try {
+      const result = await apiFetch<{ checkoutUrl?: string }>("/api/checkout", {
+        method: "POST",
+        body: JSON.stringify({
+          shippingAddress: {
+            fullName: values.fullName,
+            address: values.address,
+            city: values.city,
+            phone: values.phone,
+          },
+          method: values.method,
+        }),
+      });
+      await refreshCart();
+      if (result.checkoutUrl) {
+        window.location.href = result.checkoutUrl;
+        return;
+      }
+      router.push("/orders?success=1");
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Checkout thất bại. Vui lòng thử lại.";
+      setFormError(message);
+      if (error instanceof ApiError && error.status === 409) setUnavailableIds(items.map((item) => item.id));
+    } finally {
+      setSubmitting(false);
     }
-    router.push("/orders?success=1");
   }
 
   return (
@@ -129,13 +139,8 @@ function CheckoutView() {
           </select>
         </Field>
 
-        <label className="mt-1 flex items-center gap-2 text-body-sm text-muted-foreground">
-          <input type="checkbox" {...register("simulateFailure")} className="size-4" />
-          Giả lập thanh toán thất bại (demo luồng ngoại lệ)
-        </label>
-
-        <Button type="submit" size="lg" className="mt-4 w-fit">
-          Đặt hàng — {formatPrice(total, items[0]?.currency ?? "USD")}
+        <Button type="submit" size="lg" className="mt-4 w-fit" disabled={submitting}>
+          {submitting ? "Đang xử lý…" : `Đặt hàng — ${formatPrice(total, items[0]?.currency ?? "USD")}`}
         </Button>
       </form>
 

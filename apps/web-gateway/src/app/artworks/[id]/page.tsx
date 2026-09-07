@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { ArtworkDetailClient } from "@/components/artwork/ArtworkDetailClient";
 import {
+  findArtist,
   findArtwork,
   listArtworks,
 } from "@/lib/gateway/clients/artwork.client";
@@ -31,5 +33,16 @@ export default async function ArtworkDetailPage({
   params,
 }: ArtworkDetailPageProps) {
   const { id } = await params;
-  return <ArtworkDetailClient id={id} />;
+  const artwork = await findArtwork(id);
+  if (!artwork) notFound();
+
+  const artist = await findArtist(artwork.artistId);
+  const related = (await listArtworks()).filter(
+    (item) =>
+      item.id !== artwork.id &&
+      item.availability === "available" &&
+      item.style.some((style) => artwork.style.includes(style)),
+  ).slice(0, 3);
+
+  return <ArtworkDetailClient artwork={artwork} artist={artist} related={related} />;
 }

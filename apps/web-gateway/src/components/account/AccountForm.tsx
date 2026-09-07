@@ -4,7 +4,7 @@ import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useAuth } from "@/lib/store/hooks";
+import { useAuth } from "@/lib/client/hooks";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,10 +45,10 @@ export function AccountForm() {
 
   if (!currentUser) return null;
 
-  function onSubmit(values: AccountFormValues) {
+  async function onSubmit(values: AccountFormValues) {
     setSavedMessage(null);
     setFormError(null);
-    const result = updateProfile({
+    const result = await updateProfile({
       fullName: values.fullName,
       phone: values.phone,
       bio: values.bio,

@@ -1,8 +1,9 @@
-import { createServiceServer, getPort, readJson, writeServiceJson, type ServiceRouteHandler } from "@atelier/config/http";
+import { createServiceServer, getPort, readJson, writeServiceError, writeServiceJson, type ServiceRouteHandler } from "@atelier/config/http";
+import { ToggleFollowRequestSchema, ToggleSavedRequestSchema, parseBody, type Artwork } from "@atelier/contracts";
+import { ping } from "@atelier/persistence";
 import { health } from "./health.ts";
 import { getRecommendations } from "./application/recommendations.ts";
-import { getSignals, listSavedArtworkIds, toggleFollow, toggleSaved } from "./infrastructure/recommendation-repository.ts";
-import type { Artwork } from "@atelier/contracts";
+import { getSignals, listFollowedArtistIds, listSavedArtworkIds, toggleFollow, toggleSaved } from "./infrastructure/recommendation-repository.ts";
 
 async function sourceArtworks(): Promise<Artwork[]> {
   const baseUrl = process.env.ARTIST_ARTWORK_SERVICE_URL ?? "http://localhost:4103";
@@ -21,21 +22,32 @@ const routes: Record<string, ServiceRouteHandler> = {
   },
   "GET /v1/recommendation/saved": async ({ url, response, correlationId }) => {
     const buyerId = url.searchParams.get("buyerId");
-    if (!buyerId) return writeServiceJson(response, 400, { error: "buyerId is required" }, correlationId);
+    if (!buyerId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "buyerId is required", correlationId, field: "buyerId" });
     const ids = new Set(await listSavedArtworkIds(buyerId));
     const items = (await sourceArtworks()).filter((artwork) => ids.has(artwork.id));
     return writeServiceJson(response, 200, { items, total: items.length }, correlationId);
   },
   "POST /v1/recommendation/saved": async ({ request, response, correlationId }) => {
-    const body = await readJson<{ buyerId?: string; artworkId?: string }>(request);
-    if (!body?.buyerId || !body.artworkId) return writeServiceJson(response, 400, { error: "buyerId and artworkId are required" }, correlationId);
-    return writeServiceJson(response, 200, { saved: await toggleSaved(body.buyerId, body.artworkId) }, correlationId);
+    const parsed = parseBody(ToggleSavedRequestSchema, await readJson(request));
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field });
+    return writeServiceJson(response, 200, { saved: await toggleSaved(parsed.data.buyerId, parsed.data.artworkId) }, correlationId);
+  },
+  "GET /v1/recommendation/follows": async ({ url, response, correlationId }) => {
+    const buyerId = url.searchParams.get("buyerId");
+    if (!buyerId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "buyerId is required", correlationId, field: "buyerId" });
+    const artistIds = await listFollowedArtistIds(buyerId);
+    return writeServiceJson(response, 200, { artistIds, total: artistIds.length }, correlationId);
   },
   "POST /v1/recommendation/follows": async ({ request, response, correlationId }) => {
-    const body = await readJson<{ buyerId?: string; artistId?: string }>(request);
-    if (!body?.buyerId || !body.artistId) return writeServiceJson(response, 400, { error: "buyerId and artistId are required" }, correlationId);
-    return writeServiceJson(response, 200, { following: await toggleFollow(body.buyerId, body.artistId) }, correlationId);
+    const parsed = parseBody(ToggleFollowRequestSchema, await readJson(request));
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field });
+    return writeServiceJson(response, 200, { following: await toggleFollow(parsed.data.buyerId, parsed.data.artistId) }, correlationId);
   },
 };
 
-createServiceServer({ name: "recommendation", version: "v1", port: getPort("RECOMMENDATION_PORT", 4105), health, routes, internalToken: process.env.ATELIER_INTERNAL_SERVICE_TOKEN }).listen(getPort("RECOMMENDATION_PORT", 4105));
+async function ready() {
+  const database = (await ping()) ? ("ok" as const) : ("unavailable" as const);
+  return { status: database, dependencies: { database } };
+}
+
+createServiceServer({ name: "recommendation", version: "v1", port: getPort("RECOMMENDATION_PORT", 4105), health, ready, routes, internalToken: process.env.ATELIER_INTERNAL_SERVICE_TOKEN }).listen(getPort("RECOMMENDATION_PORT", 4105));

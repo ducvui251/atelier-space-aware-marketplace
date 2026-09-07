@@ -3,12 +3,21 @@
 import { useRouter } from "next/navigation";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { RequireRole } from "@/components/auth/RequireRole";
-import { ArtworkForm } from "@/components/artwork/ArtworkForm";
-import { useAppState } from "@/lib/store/hooks";
+import { ArtworkForm, type ArtworkFormInput } from "@/components/artwork/ArtworkForm";
+import { apiFetch, ApiError } from "@/lib/client/api";
+import type { Artwork } from "@/types";
 
 function NewArtworkView() {
   const router = useRouter();
-  const { createArtwork } = useAppState();
+
+  async function onSubmit(input: ArtworkFormInput) {
+    try {
+      const artwork = await apiFetch<Artwork>("/api/artist/artworks", { method: "POST", body: JSON.stringify(input) });
+      return { success: true as const, id: artwork.id };
+    } catch (error) {
+      return { error: error instanceof ApiError ? error.message : "Không thể tạo tác phẩm." };
+    }
+  }
 
   return (
     <>
@@ -19,11 +28,7 @@ function NewArtworkView() {
       </p>
 
       <div className="mt-8">
-        <ArtworkForm
-          submitLabel="Tạo listing"
-          onSubmit={(input) => createArtwork(input)}
-          onSuccess={() => router.push("/artist")}
-        />
+        <ArtworkForm submitLabel="Tạo listing" onSubmit={onSubmit} onSuccess={() => router.push("/artist")} />
       </div>
     </>
   );

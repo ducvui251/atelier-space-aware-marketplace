@@ -1,4 +1,5 @@
 import { query } from "@atelier/persistence";
+import { InternalServiceError, requestInternalService } from "@atelier/config/service-client";
 
 export interface AccountUser {
   id: string;
@@ -11,16 +12,32 @@ export interface AccountUser {
 }
 
 type AccountRow = {
+  internal_id: string;
   id: string;
   full_name: string;
   email: string;
   phone: string | null;
   role: AccountUser["role"];
   created_at: string;
-  artist_id: string | null;
 };
 
-function mapUser(row: AccountRow): AccountUser {
+/**
+ * Artist & Artwork owns the artist_profiles table; Account only owns the
+ * association's *existence*, resolved by calling that service rather than
+ * joining across schemas from this process.
+ */
+async function findArtistIdForUser(internalUserId: string): Promise<string | undefined> {
+  try {
+    const artist = await requestInternalService<{ id: string }>("artist-artwork", `/v1/artist-artwork/artists/by-user/${encodeURIComponent(internalUserId)}`);
+    return artist.id;
+  } catch (error) {
+    if (error instanceof InternalServiceError && error.status === 404) return undefined;
+    throw error;
+  }
+}
+
+async function mapUser(row: AccountRow): Promise<AccountUser> {
+  const artistId = await findArtistIdForUser(row.internal_id);
   return {
     id: row.id,
     fullName: row.full_name,
@@ -28,20 +45,19 @@ function mapUser(row: AccountRow): AccountUser {
     ...(row.phone ? { phone: row.phone } : {}),
     role: row.role,
     createdAt: row.created_at,
-    ...(row.artist_id ? { artistId: row.artist_id } : {}),
+    ...(artistId ? { artistId } : {}),
   };
 }
 
 const userSelect = `
-  select u.auth_user_id::text as id, u.full_name, u.email, u.phone, u.role,
-         u.created_at::text as created_at, ap.id::text as artist_id
+  select u.id::text as internal_id, u.auth_user_id::text as id, u.full_name, u.email, u.phone, u.role,
+         u.created_at::text as created_at
   from account.users u
-  left join artist_artwork.artist_profiles ap on ap.user_id = u.id
 `;
 
 export async function findByAuthUserId(authUserId: string): Promise<AccountUser | null> {
   const rows = await query<AccountRow>(`${userSelect} where u.auth_user_id = $1::uuid`, [authUserId]);
-  return rows[0] ? mapUser(rows[0]) : null;
+  return rows[0] ? await mapUser(rows[0]) : null;
 }
 
 export async function syncAuthUser(input: {
@@ -61,14 +77,13 @@ export async function syncAuthUser(input: {
         updated_at = now()
       returning *
     )
-    select u.auth_user_id::text as id, u.full_name, u.email, u.phone, u.role,
-           u.created_at::text as created_at, ap.id::text as artist_id
-    from upserted u
-    left join artist_artwork.artist_profiles ap on ap.user_id = u.id`,
+    select u.id::text as internal_id, u.auth_user_id::text as id, u.full_name, u.email, u.phone, u.role,
+           u.created_at::text as created_at
+    from upserted u`,
     [input.authUserId, input.email, input.fullName ?? "", input.phone ?? null],
   );
   if (!upserted[0]) throw new Error("Account profile was not persisted");
-  return mapUser(upserted[0]);
+  return await mapUser(upserted[0]);
 }
 
 export async function updateProfile(authUserId: string, input: { fullName: string; phone?: string }): Promise<AccountUser | null> {

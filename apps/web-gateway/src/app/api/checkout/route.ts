@@ -15,7 +15,8 @@ export async function POST(request: NextRequest) {
 
   if (simulateFailure) return errorResponse("Payment simulation is no longer supported", 400);
   try {
-    return json(await checkout(user.id, { shippingAddress, method }, request.headers.get("idempotency-key") ?? crypto.randomUUID()), 201);
+    const result = await checkout(user.id, { shippingAddress, method }, request.headers.get("idempotency-key") ?? crypto.randomUUID());
+    return json(result, 201);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Checkout failed";
     return errorResponse(message, message.includes("available") ? 409 : 503);

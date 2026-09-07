@@ -7,7 +7,7 @@ import { ShieldCheck } from "lucide-react";
 import type { Artwork } from "@/types";
 import { cn } from "@/lib/utils";
 import { artworkAspect } from "@/lib/artwork-aspect";
-import { useAppState, useSaved } from "@/lib/store/hooks";
+import { useAppState, useSaved } from "@/lib/client/hooks";
 import { PriceDisplay } from "./PriceDisplay";
 import { SaveButton } from "./SaveButton";
 
@@ -19,9 +19,9 @@ interface ArtworkCardProps {
 
 export function ArtworkCard({ artwork, priority, className }: ArtworkCardProps) {
   const router = useRouter();
-  const { db, currentUser } = useAppState();
+  const { currentUser } = useAppState();
   const { isSaved, toggleSaved } = useSaved();
-  const live = db.artworks.find((a) => a.id === artwork.id) ?? artwork;
+  const live = artwork;
   const verified = live.verificationStatus === "verified";
   const unavailable = live.availability !== "available";
 

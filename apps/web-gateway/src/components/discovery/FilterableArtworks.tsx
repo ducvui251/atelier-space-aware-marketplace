@@ -8,7 +8,6 @@ import { SearchInput } from "@/components/discovery/SearchInput";
 import { ArtworkGrid } from "@/components/artwork/ArtworkGrid";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
-import { useAppState } from "@/lib/store/hooks";
 
 type FilterKey = "style" | "medium" | "edition" | "orientation" | "color" | "price";
 
@@ -77,12 +76,11 @@ interface FilterableArtworksProps {
 }
 
 export function FilterableArtworks({ artworks: initialArtworks }: FilterableArtworksProps) {
-  const { db } = useAppState();
   const [filters, setFilters] = React.useState<FilterState>(emptyFilterState);
   const [query, setQuery] = React.useState("");
 
   const artworks = React.useMemo(() => {
-    const source = db.artworks.length > 0 ? db.artworks : initialArtworks ?? [];
+    const source = initialArtworks ?? [];
     const q = query.trim().toLowerCase();
     if (!q) return source;
     return source.filter((artwork) =>
@@ -91,7 +89,7 @@ export function FilterableArtworks({ artworks: initialArtworks }: FilterableArtw
         .toLowerCase()
         .includes(q),
     );
-  }, [db.artworks, initialArtworks, query]);
+  }, [initialArtworks, query]);
 
   const groups = React.useMemo<FilterDefinition[]>(() => {
     const styleOptions = deriveOptions(artworks, (a) => a.style);

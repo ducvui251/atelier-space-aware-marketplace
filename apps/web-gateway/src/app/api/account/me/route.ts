@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { requestService } from "@/lib/gateway/http-client";
 import { getAuthUser, publicUser } from "@/lib/server/auth";
+import { findArtist } from "@/lib/gateway/clients/artwork.client";
 import { json, errorResponse } from "@/lib/server/respond";
 
 export async function GET(request: NextRequest) {
@@ -10,7 +11,8 @@ export async function GET(request: NextRequest) {
   const profile = await requestService<{ user: typeof user }>("account", `/v1/account/me?authUserId=${encodeURIComponent(user.id)}`, {
     headers: { ...(request.headers.get("authorization") ? { authorization: request.headers.get("authorization")! } : {}) },
   });
-  return json({ user: publicUser(profile.user), artistProfile: null });
+  const artistProfile = profile.user.artistId ? await findArtist(profile.user.artistId) : null;
+  return json({ user: publicUser(profile.user), artistProfile });
 }
 
 export async function PATCH(request: NextRequest) {
@@ -26,5 +28,6 @@ export async function PATCH(request: NextRequest) {
     body: { fullName, phone: body.phone },
     headers: { ...(request.headers.get("authorization") ? { authorization: request.headers.get("authorization")! } : {}) },
   });
-  return json({ user: publicUser(profile.user), artistProfile: null });
+  const artistProfile = profile.user.artistId ? await findArtist(profile.user.artistId) : null;
+  return json({ user: publicUser(profile.user), artistProfile });
 }

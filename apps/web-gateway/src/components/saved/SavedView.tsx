@@ -6,7 +6,7 @@ import { ArtworkGrid } from "@/components/artwork/ArtworkGrid";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { RecommendationSection } from "@/components/discovery/RecommendationSection";
-import { useSaved } from "@/lib/store/hooks";
+import { useSaved } from "@/lib/client/hooks";
 
 export function SavedView() {
   const { items } = useSaved();

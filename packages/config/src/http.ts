@@ -15,13 +15,33 @@ export type ServiceRouteHandler = (context: {
   url: URL;
 }) => void | Promise<void>;
 
+export interface ReadinessResult {
+  status: "ok" | "unavailable";
+  dependencies?: Record<string, "ok" | "unavailable">;
+}
+
 interface ServiceServerOptions {
   name: string;
   version: string;
   port?: number;
   health: () => ServiceHealth;
+  ready?: () => Promise<ReadinessResult> | ReadinessResult;
   routes?: Record<string, ServiceRouteHandler>;
   internalToken?: string;
+}
+
+/**
+ * Outside test mode, every service must be started with an internal token.
+ * A service silently accepting unauthenticated business calls is worse than
+ * one that refuses to start, so this fails closed rather than warning.
+ */
+function assertInternalTokenConfigured(options: ServiceServerOptions) {
+  if (options.internalToken) return;
+  if (process.env.NODE_ENV === "test" || process.env.ATELIER_ALLOW_INSECURE_LOCAL === "true") return;
+  throw new Error(
+    `[${options.name}] ATELIER_INTERNAL_SERVICE_TOKEN is required to start this service outside test mode. ` +
+      `Set it in the environment, or set ATELIER_ALLOW_INSECURE_LOCAL=true for an explicit insecure local run.`,
+  );
 }
 
 export function writeServiceJson(response: ServerResponse, statusCode: number, body: unknown, correlationId: string) {
@@ -29,6 +49,30 @@ export function writeServiceJson(response: ServerResponse, statusCode: number, b
   response.setHeader("content-type", "application/json; charset=utf-8");
   response.setHeader("x-correlation-id", correlationId);
   response.end(JSON.stringify(body));
+}
+
+/**
+ * Standard error shape (MICROSERVICE_100_PLAN.md section 5.1). `error` is
+ * kept as the message field — not renamed to `message` — so every existing
+ * Gateway client (`body?.error`) keeps working without a matching update;
+ * `code`/`retryable`/`field` are additive.
+ */
+export interface ServiceErrorParams {
+  code: string;
+  message: string;
+  correlationId: string;
+  field?: string;
+  retryable?: boolean;
+}
+
+export function writeServiceError(response: ServerResponse, statusCode: number, params: ServiceErrorParams) {
+  writeServiceJson(response, statusCode, {
+    error: params.message,
+    code: params.code,
+    correlationId: params.correlationId,
+    ...(params.field ? { field: params.field } : {}),
+    ...(params.retryable !== undefined ? { retryable: params.retryable } : {}),
+  }, params.correlationId);
 }
 
 export async function readJson<T = unknown>(request: IncomingMessage): Promise<T | null> {
@@ -44,6 +88,8 @@ function getCorrelationId(request: IncomingMessage): string {
 }
 
 export function createServiceServer(options: ServiceServerOptions): Server {
+  assertInternalTokenConfigured(options);
+
   return createServer(async (request, response) => {
     const correlationId = getCorrelationId(request);
     const url = new URL(request.url ?? "/", "http://service.local");
@@ -55,10 +101,12 @@ export function createServiceServer(options: ServiceServerOptions): Server {
     }
 
     if (request.method === "GET" && path === "/ready") {
-      writeServiceJson(response, 200, {
+      const readiness = options.ready ? await options.ready() : { status: "ok" as const };
+      writeServiceJson(response, readiness.status === "ok" ? 200 : 503, {
         service: options.name,
         version: options.version,
-        status: "ok",
+        status: readiness.status,
+        dependencies: readiness.dependencies,
         timestamp: new Date().toISOString(),
         correlationId,
       }, correlationId);
@@ -66,7 +114,7 @@ export function createServiceServer(options: ServiceServerOptions): Server {
     }
 
     if (options.internalToken && request.headers["x-service-token"] !== options.internalToken) {
-      writeServiceJson(response, 401, { error: "Unauthorized", correlationId }, correlationId);
+      writeServiceError(response, 401, { code: "UNAUTHORIZED", message: "Unauthorized", correlationId, retryable: false });
       return;
     }
 
@@ -81,15 +129,17 @@ export function createServiceServer(options: ServiceServerOptions): Server {
       try {
         await handler({ request, response, correlationId, url });
       } catch (error) {
-        writeServiceJson(response, 500, {
-          error: error instanceof Error ? error.message : "Internal service error",
+        writeServiceError(response, 500, {
+          code: "INTERNAL_ERROR",
+          message: error instanceof Error ? error.message : "Internal service error",
           correlationId,
-        }, correlationId);
+          retryable: true,
+        });
       }
       return;
     }
 
-    writeServiceJson(response, 404, { error: "Not Found", service: options.name, version: options.version, correlationId }, correlationId);
+    writeServiceError(response, 404, { code: "NOT_FOUND", message: "Not Found", correlationId, retryable: false });
   });
 }
 

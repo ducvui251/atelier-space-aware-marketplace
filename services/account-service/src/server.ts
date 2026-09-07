@@ -1,29 +1,37 @@
-import { createServiceServer, getPort, readJson, writeServiceJson, type ServiceRouteHandler } from "@atelier/config/http";
+import { createServiceServer, getPort, readJson, writeServiceError, writeServiceJson, type ServiceRouteHandler } from "@atelier/config/http";
+import { AccountSyncRequestSchema, AccountUpdateRequestSchema, parseBody } from "@atelier/contracts";
+import { ping } from "@atelier/persistence";
 import { health } from "./health.ts";
 import { findByAuthUserId, syncAuthUser, updateProfile } from "./infrastructure/account-repository.ts";
 
 const routes: Record<string, ServiceRouteHandler> = {
   "GET /v1/account/me": async ({ url, response, correlationId }) => {
     const authUserId = url.searchParams.get("authUserId");
-    if (!authUserId) return writeServiceJson(response, 400, { error: "authUserId is required" }, correlationId);
+    if (!authUserId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "authUserId is required", correlationId, field: "authUserId" });
     const user = await findByAuthUserId(authUserId);
-    if (!user) return writeServiceJson(response, 404, { error: "Account not found" }, correlationId);
+    if (!user) return writeServiceError(response, 404, { code: "NOT_FOUND", message: "Account not found", correlationId });
     return writeServiceJson(response, 200, { user }, correlationId);
   },
   "POST /v1/account/users/sync": async ({ request, response, correlationId }) => {
-    const body = await readJson<{ authUserId?: string; email?: string; fullName?: string; phone?: string }>(request);
-    if (!body?.authUserId || !body.email) return writeServiceJson(response, 400, { error: "authUserId and email are required" }, correlationId);
-    const user = await syncAuthUser({ ...body, authUserId: body.authUserId, email: body.email });
+    const parsed = parseBody(AccountSyncRequestSchema, await readJson(request));
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field });
+    const user = await syncAuthUser(parsed.data);
     return writeServiceJson(response, 200, { user }, correlationId);
   },
   "PATCH /v1/account/me": async ({ request, url, response, correlationId }) => {
     const authUserId = url.searchParams.get("authUserId");
-    const body = await readJson<{ fullName?: string; phone?: string }>(request);
-    if (!authUserId || !body?.fullName?.trim()) return writeServiceJson(response, 400, { error: "authUserId and fullName are required" }, correlationId);
-    const user = await updateProfile(authUserId, { fullName: body.fullName.trim(), phone: body.phone });
-    if (!user) return writeServiceJson(response, 404, { error: "Account not found" }, correlationId);
+    if (!authUserId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "authUserId is required", correlationId, field: "authUserId" });
+    const parsed = parseBody(AccountUpdateRequestSchema, await readJson(request));
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field });
+    const user = await updateProfile(authUserId, parsed.data);
+    if (!user) return writeServiceError(response, 404, { code: "NOT_FOUND", message: "Account not found", correlationId });
     return writeServiceJson(response, 200, { user }, correlationId);
   },
 };
 
-createServiceServer({ name: "account", version: "v1", health, routes, internalToken: process.env.ATELIER_INTERNAL_SERVICE_TOKEN }).listen(getPort("ACCOUNT_PORT", 4101));
+async function ready() {
+  const database = (await ping()) ? ("ok" as const) : ("unavailable" as const);
+  return { status: database, dependencies: { database } };
+}
+
+createServiceServer({ name: "account", version: "v1", health, ready, routes, internalToken: process.env.ATELIER_INTERNAL_SERVICE_TOKEN }).listen(getPort("ACCOUNT_PORT", 4101));

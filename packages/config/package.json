@@ -6,7 +6,8 @@
   "description": "Non-business shared configuration primitives for Atelier.",
   "exports": {
     ".": "./src/index.ts",
-    "./http": "./src/http.ts"
+    "./http": "./src/http.ts",
+    "./service-client": "./src/service-client.ts"
   },
   "dependencies": {
     "@atelier/contracts": "workspace:*"

@@ -9,12 +9,14 @@
     "build": "pnpm --filter @atelier/web-gateway build",
     "start": "pnpm --filter @atelier/web-gateway start",
     "lint": "pnpm --filter @atelier/web-gateway lint",
-    "type-check": "pnpm -r --if-present type-check"
+    "type-check": "pnpm -r --if-present type-check",
+    "test": "pnpm -r --if-present test"
   },
   "packageManager": "pnpm@10.34.5",
   "pnpm": {
     "onlyBuiltDependencies": [
-      "unrs-resolver"
+      "unrs-resolver",
+      "esbuild"
     ]
   },
   "devDependencies": {

@@ -10,12 +10,15 @@
     "./events": "./src/events.ts"
   },
   "scripts": {
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "openapi:generate": "node --experimental-strip-types scripts/generate-openapi.ts"
   },
   "dependencies": {
     "zod": "^4.5.2"
   },
   "devDependencies": {
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.4"
   }
 }

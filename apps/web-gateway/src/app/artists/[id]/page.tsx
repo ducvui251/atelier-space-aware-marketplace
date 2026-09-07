@@ -9,8 +9,8 @@ import { Grid } from "@/components/layout/Grid";
 import { ArtworkCard } from "@/components/artwork/ArtworkCard";
 import { Badge } from "@/components/ui/badge";
 import { FollowButton } from "@/components/artist/FollowButton";
+import { findArtist, listArtworks } from "@/lib/gateway/clients/artwork.client";
 import { artists } from "@atelier/artist-artwork-service";
-import { listArtworks } from "@/lib/gateway/clients/artwork.client";
 
 interface ArtistProfileProps {
   params: Promise<{ id: string }>;
@@ -41,7 +41,7 @@ export default async function ArtistProfilePage({
   params,
 }: ArtistProfileProps) {
   const { id } = await params;
-  const artist = artists.find((a) => a.id === id);
+  const artist = await findArtist(id);
   if (!artist) notFound();
 
   const works = (await listArtworks()).filter((a) => a.artistId === artist.id);

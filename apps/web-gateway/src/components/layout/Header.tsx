@@ -13,7 +13,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { AccountMenu } from "@/components/layout/AccountMenu";
-import { useCart, useSaved } from "@/lib/store/hooks";
+import { useCart, useSaved } from "@/lib/client/hooks";
 
 function isActive(href: string, pathname: string) {
   if (href === "/") return pathname === "/";

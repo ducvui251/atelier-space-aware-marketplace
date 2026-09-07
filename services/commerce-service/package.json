@@ -10,7 +10,8 @@
   "dependencies": {
     "@atelier/config": "workspace:*",
     "@atelier/contracts": "workspace:*",
-    "@atelier/persistence": "workspace:*"
+    "@atelier/persistence": "workspace:*",
+    "stripe": "^17.5.0"
   },
   "scripts": {
     "dev": "node --experimental-strip-types src/server.ts",

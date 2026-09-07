@@ -1,19 +1,24 @@
 "use client";
 
-import { useAppState } from "@/lib/store/hooks";
-import { getGatewayRecommendations } from "@/lib/gateway/clients/recommendation.client";
+import type { Artwork } from "@/types";
+import { useApiResource } from "@/lib/client/hooks";
 import { ArtworkGrid } from "@/components/artwork/ArtworkGrid";
 
+interface RecommendationsResponse {
+  items: Artwork[];
+  reason: "personalized" | "curated";
+}
+
 export function RecommendationSection() {
-  const { db, currentUser } = useAppState();
-  const { items, reason } = getGatewayRecommendations(db, currentUser?.id ?? null);
+  const { data } = useApiResource<RecommendationsResponse>("/api/recommendations");
+  const items = data?.items ?? [];
 
   if (items.length === 0) return null;
 
   return (
     <div>
       <p className="eyebrow mb-1">
-        {reason === "personalized" ? "Vì bạn đã lưu tác phẩm tương tự" : "Curated for you"}
+        {data?.reason === "personalized" ? "Vì bạn đã lưu tác phẩm tương tự" : "Curated for you"}
       </p>
       <h2 className="mb-6 font-display text-h2 text-foreground">Có thể bạn sẽ thích</h2>
       <ArtworkGrid artworks={items} columns={3} />

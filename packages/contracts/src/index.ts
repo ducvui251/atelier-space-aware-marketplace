@@ -45,6 +45,12 @@ export interface Artist {
 
 export interface Collection { id: string; title: string; description: string; imageUrl: string; artworkCount: number; }
 export interface RoomPreset { id: string; name: string; imageUrl: string; }
+export interface BuyerRoom {
+  id: string; buyerId: string; name: string; roomType: string; wallColor?: string; imageUrl?: string; createdAt: string;
+}
+export interface Placement {
+  id: string; roomId: string; artworkId: string; scale: number; positionX: number; positionY: number; rotation: number; createdAt: string;
+}
 export type DiscoveryView = "catalog" | "room";
 export type UserRole = "buyer" | "artist" | "admin";
 

@@ -8,23 +8,33 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
-import { useAppState } from "@/lib/store/hooks";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useApiResource } from "@/lib/client/hooks";
+import { apiFetch } from "@/lib/client/api";
 import type { Complaint } from "@/types";
 
-function ComplaintRow({ complaint }: { complaint: Complaint }) {
-  const { db, resolveComplaint } = useAppState();
-  const order = db.orders.find((o) => o.id === complaint.orderId);
-  const artwork = order ? db.artworks.find((a) => a.id === order.artworkId) : undefined;
+function ComplaintRow({ complaint, onChanged }: { complaint: Complaint; onChanged: () => void }) {
   const [note, setNote] = React.useState("");
+  const [submitting, setSubmitting] = React.useState(false);
+
+  async function resolve(status: "resolved" | "rejected") {
+    setSubmitting(true);
+    try {
+      await apiFetch(`/api/admin/complaints/${encodeURIComponent(complaint.id)}/resolve`, {
+        method: "POST",
+        body: JSON.stringify({ status, note: note.trim() || undefined }),
+      });
+      onChanged();
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <div className="rounded-lg border border-border bg-surface p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-body font-medium text-foreground">
-            {artwork?.title ?? complaint.orderId}
-          </p>
-          <p className="text-caption text-muted-foreground">Đơn {complaint.orderId}</p>
+          <p className="text-body font-medium text-foreground">Đơn {complaint.orderId}</p>
         </div>
         <Badge variant={complaint.status === "open" ? "warning" : complaint.status === "resolved" ? "success" : "destructive"} className="capitalize">
           {complaint.status}
@@ -43,14 +53,10 @@ function ComplaintRow({ complaint }: { complaint: Complaint }) {
             placeholder="Ghi chú xử lý"
             className="h-9 max-w-xs flex-1"
           />
-          <Button size="sm" onClick={() => resolveComplaint(complaint.id, "resolved", note.trim() || undefined)}>
+          <Button size="sm" disabled={submitting} onClick={() => resolve("resolved")}>
             Đánh dấu đã xử lý
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => resolveComplaint(complaint.id, "rejected", note.trim() || undefined)}
-          >
+          <Button size="sm" variant="outline" disabled={submitting} onClick={() => resolve("rejected")}>
             Từ chối
           </Button>
         </div>
@@ -60,11 +66,8 @@ function ComplaintRow({ complaint }: { complaint: Complaint }) {
 }
 
 function ComplaintsQueue() {
-  const { db } = useAppState();
-  const complaints = [...db.complaints].sort((a, b) => {
-    if (a.status === b.status) return 0;
-    return a.status === "open" ? -1 : 1;
-  });
+  const { data, loading, error, refresh } = useApiResource<{ items: Complaint[]; total: number }>("/api/admin/complaints");
+  const complaints = data?.items ?? [];
 
   return (
     <>
@@ -72,12 +75,29 @@ function ComplaintsQueue() {
       <h1 className="mt-2 font-display text-h2 text-foreground">Khiếu nại</h1>
 
       <div className="mt-8">
-        {complaints.length === 0 ? (
+        {loading ? (
+          <div className="flex flex-col gap-4">
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-24 w-full rounded-lg" />
+            ))}
+          </div>
+        ) : error ? (
+          <EmptyState
+            icon={AlertTriangle}
+            title="Không thể tải khiếu nại"
+            description={error}
+            action={
+              <Button variant="outline" onClick={refresh}>
+                Thử lại
+              </Button>
+            }
+          />
+        ) : complaints.length === 0 ? (
           <EmptyState icon={AlertTriangle} title="Không có khiếu nại" description="Khiếu nại từ người mua sẽ hiện ở đây." />
         ) : (
           <div className="flex flex-col gap-4">
             {complaints.map((complaint) => (
-              <ComplaintRow key={complaint.id} complaint={complaint} />
+              <ComplaintRow key={complaint.id} complaint={complaint} onChanged={refresh} />
             ))}
           </div>
         )}

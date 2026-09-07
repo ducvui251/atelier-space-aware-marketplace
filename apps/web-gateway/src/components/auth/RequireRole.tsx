@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Lock } from "lucide-react";
 import type { UserRole } from "@/types";
-import { useAuth } from "@/lib/store/hooks";
+import { useAuth } from "@/lib/client/hooks";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";

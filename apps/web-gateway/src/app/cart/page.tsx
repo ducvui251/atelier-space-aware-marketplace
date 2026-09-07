@@ -6,12 +6,26 @@ import { ShoppingBag, X } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { RequireRole } from "@/components/auth/RequireRole";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/utils";
-import { useCart } from "@/lib/store/hooks";
+import { useCart } from "@/lib/client/hooks";
 
 function CartView() {
-  const { items, total, removeFromCart } = useCart();
+  const { items, total, loading, removeFromCart } = useCart();
+
+  if (loading) {
+    return (
+      <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
+        <div className="flex flex-col gap-4">
+          {[0, 1].map((i) => (
+            <Skeleton key={i} className="h-32 w-full rounded-lg" />
+          ))}
+        </div>
+        <Skeleton className="h-40 w-full rounded-lg" />
+      </div>
+    );
+  }
 
   if (items.length === 0) {
     return (
