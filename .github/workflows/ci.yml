@@ -49,7 +49,16 @@ jobs:
         run: docker compose build
 
       - name: Install Trivy
-        run: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.56.2
+        # Pinned direct download instead of the convenience install.sh
+        # script — that script calls the GitHub API to resolve the tag,
+        # which both drifts (v0.56.2 stopped existing) and can hit
+        # unauthenticated rate limits. Bump TRIVY_VERSION deliberately.
+        env:
+          TRIVY_VERSION: "0.74.0"
+        run: |
+          curl -sL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" -o /tmp/trivy.tar.gz
+          tar -xzf /tmp/trivy.tar.gz -C /usr/local/bin trivy
+          trivy --version
 
       - name: Scan built images for known vulnerabilities
         # Report-only: base images we don't control (postgres, rabbitmq) can
