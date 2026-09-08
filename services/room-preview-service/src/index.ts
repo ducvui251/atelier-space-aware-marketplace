@@ -1,5 +1,4 @@
 import type { ServiceDefinition } from "@atelier/contracts";
-export { rooms } from "./infrastructure/rooms.ts";
 export { getRoomPresets } from "./application/room-preview.ts";
 export { health } from "./health.ts";
 

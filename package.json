@@ -10,6 +10,7 @@
     "start": "pnpm --filter @atelier/web-gateway start",
     "lint": "pnpm --filter @atelier/web-gateway lint",
     "type-check": "pnpm -r --if-present type-check",
+    "validate": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate.ps1",
     "test": "pnpm -r --if-present test"
   },
   "packageManager": "pnpm@10.34.5",
@@ -21,5 +22,9 @@
   },
   "devDependencies": {
     "@types/node": "22.10.0"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.116.0"
   }
 }

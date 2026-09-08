@@ -36,9 +36,12 @@ next-env.d.ts
 
 # project docs (not part of app source)
 *.md
+!MICROSERVICE_100_PLAN.md
 AGENTS.md
 PROJECT_PROMPT.md
-/docs/
+/docs/*
+!docs/adr/
+!docs/adr/*.md
 
 # local agent/tool artifacts
 /.token-optimizer/

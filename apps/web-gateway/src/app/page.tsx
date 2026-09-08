@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ImageOff } from "lucide-react";
 import { Hero } from "@/components/home/Hero";
 import { StyleTiles } from "@/components/home/StyleTiles";
 import { SpaceTeaser } from "@/components/home/SpaceTeaser";
@@ -11,14 +11,20 @@ import { Grid } from "@/components/layout/Grid";
 import { ArtworkCard } from "@/components/artwork/ArtworkCard";
 import { ArtistCard } from "@/components/artist/ArtistCard";
 import { CollectionCard } from "@/components/collection/CollectionCard";
-import { FilterChip } from "@/components/discovery/FilterChip";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
-import { collections } from "@/data";
-import { artists } from "@atelier/artist-artwork-service";
-import { listFeaturedArtworks } from "@/lib/gateway/clients/artwork.client";
+import { listCollections } from "@/lib/gateway/clients/catalog.client";
+import { listArtists, listFeaturedArtworks } from "@/lib/gateway/clients/artwork.client";
+import type { Artist, Artwork, Collection } from "@/types";
+
+export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const featured = await listFeaturedArtworks();
+  const [featured, collections, artists] = await Promise.all([
+    listFeaturedArtworks().catch(() => [] as Artwork[]),
+    listCollections().catch(() => [] as Collection[]),
+    listArtists().catch(() => [] as Artist[]),
+  ]);
 
   return (
     <>
@@ -33,11 +39,11 @@ export default async function HomePage() {
             description="Quick starting points for your search."
           />
           <div className="mt-8 flex flex-wrap items-center gap-2">
-            <FilterChip label="Abstract" selected />
-            <FilterChip label="Painting" selected />
-            <FilterChip label="Photography" />
-            <FilterChip label="Under $500" />
-            <FilterChip label="Large" disabled />
+            <FilterChipAsLink label="Abstract" href="/artworks?style=Abstract" />
+            <FilterChipAsLink label="Minimal" href="/artworks?style=Minimal" />
+            <FilterChipAsLink label="Photography" href="/artworks?style=Photography" />
+            <FilterChipAsLink label="Under $700" href="/artworks?price=under-700" />
+            <FilterChipAsLink label="Limited edition" href="/artworks?edition=limited-edition" />
           </div>
         </PageContainer>
       </Section>
@@ -58,11 +64,25 @@ export default async function HomePage() {
               </Button>
             }
           />
-          <Grid columns={3} className="mt-10">
-            {featured.map((artwork, idx) => (
-              <ArtworkCard key={artwork.id} artwork={artwork} priority={idx < 3} />
-            ))}
-          </Grid>
+          {featured.length > 0 ? (
+            <Grid columns={3} className="mt-10">
+              {featured.map((artwork, idx) => (
+                <ArtworkCard key={artwork.id} artwork={artwork} priority={idx < 3} />
+              ))}
+            </Grid>
+          ) : (
+            <EmptyState
+              icon={ImageOff}
+              className="mt-10"
+              title="No featured works yet"
+              description="The catalog is being prepared. Please check back soon."
+              action={
+                <Button variant="outline" asChild>
+                  <Link href="/artworks">Browse the catalog</Link>
+                </Button>
+              }
+            />
+          )}
         </PageContainer>
       </Section>
 
@@ -96,11 +116,20 @@ export default async function HomePage() {
               </Button>
             }
           />
-          <Grid columns={4} className="mt-10">
-            {collections.map((collection) => (
-              <CollectionCard key={collection.id} collection={collection} />
-            ))}
-          </Grid>
+          {collections.length > 0 ? (
+            <Grid columns={4} className="mt-10">
+              {collections.map((collection) => (
+                <CollectionCard key={collection.id} collection={collection} />
+              ))}
+            </Grid>
+          ) : (
+            <EmptyState
+              icon={ImageOff}
+              className="mt-10"
+              title="No collections yet"
+              description="Curated collections will appear here once the editorial team publishes them."
+            />
+          )}
         </PageContainer>
       </Section>
 
@@ -127,11 +156,20 @@ export default async function HomePage() {
               </Button>
             }
           />
-          <Grid columns={2} className="mt-10 lg:grid-cols-3">
-            {artists.slice(0, 3).map((artist) => (
-              <ArtistCard key={artist.id} artist={artist} />
-            ))}
-          </Grid>
+          {artists.length > 0 ? (
+            <Grid columns={2} className="mt-10 lg:grid-cols-3">
+              {artists.slice(0, 3).map((artist) => (
+                <ArtistCard key={artist.id} artist={artist} />
+              ))}
+            </Grid>
+          ) : (
+            <EmptyState
+              icon={ImageOff}
+              className="mt-10"
+              title="No artists yet"
+              description="Artist profiles will appear here as they join the platform."
+            />
+          )}
         </PageContainer>
       </Section>
 
@@ -142,5 +180,16 @@ export default async function HomePage() {
         </PageContainer>
       </Section>
     </>
+  );
+}
+
+function FilterChipAsLink({ label, href }: { label: string; href: string }) {
+  return (
+    <Link
+      href={href}
+      className="focus-ring inline-flex items-center rounded-full border border-border bg-surface px-3.5 py-1.5 text-label text-foreground transition-colors hover:border-border-strong hover:bg-muted"
+    >
+      {label}
+    </Link>
   );
 }

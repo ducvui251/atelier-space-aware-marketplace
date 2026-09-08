@@ -5,7 +5,7 @@ export function EditorialBand() {
     <div className="grid items-center gap-8 overflow-hidden rounded-xl border border-border bg-surface lg:grid-cols-2">
       <div className="relative aspect-[4/3] lg:aspect-auto lg:h-full">
         <Image
-          src="https://picsum.photos/seed/editorial-1/1000/750"
+          src="/img/editorial-1.jpg"
           alt="A quiet studio scene"
           fill
           sizes="(max-width: 1024px) 100vw, 50vw"

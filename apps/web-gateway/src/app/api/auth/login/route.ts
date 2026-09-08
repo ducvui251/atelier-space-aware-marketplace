@@ -2,8 +2,14 @@ import type { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requestService } from "@/lib/gateway/http-client";
 import { json, errorResponse } from "@/lib/server/respond";
+import { clientKey, rateLimit } from "@/lib/server/rate-limit";
 
 export async function POST(request: NextRequest) {
+  const limit = rateLimit(clientKey(request, "login"), 10, 60_000);
+  if (!limit.ok) {
+    return errorResponse("Too many login attempts. Try again later.", 429);
+  }
+
   const body = await request.json().catch(() => null);
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   const password = typeof body?.password === "string" ? body.password : "";

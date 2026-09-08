@@ -1,14 +1,14 @@
 "use client";
 
 import * as React from "react";
-import type { Artist, Artwork, MockUser } from "@/types";
+import type { AccountProfile, Artist, Artwork } from "@/types";
 import { apiFetch, ApiError } from "./api";
 
 type ActionResult = { success: true } | { error: string };
 
 export interface AppContextValue {
   ready: boolean;
-  currentUser: MockUser | null;
+  currentUser: AccountProfile | null;
   currentArtist: Artist | null;
   login(email: string, password: string): Promise<ActionResult>;
   logout(): Promise<void>;
@@ -43,13 +43,13 @@ export function useAppState(): AppContextValue {
 }
 
 interface MeResponse {
-  user: MockUser | null;
+  user: AccountProfile | null;
   artistProfile: Artist | null;
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = React.useState(false);
-  const [currentUser, setCurrentUser] = React.useState<MockUser | null>(null);
+  const [currentUser, setCurrentUser] = React.useState<AccountProfile | null>(null);
   const [currentArtist, setCurrentArtist] = React.useState<Artist | null>(null);
 
   const [cartItems, setCartItems] = React.useState<Artwork[]>([]);
