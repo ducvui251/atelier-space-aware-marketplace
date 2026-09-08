@@ -5,12 +5,14 @@ import type { Artist, Artwork, MockUser } from "@/types";
 import { apiFetch, ApiError } from "./api";
 
 type ActionResult = { success: true } | { error: string };
+type RegisterResult = { success: true } | { requiresEmailConfirmation: true } | { error: string };
 
 export interface AppContextValue {
   ready: boolean;
   currentUser: MockUser | null;
   currentArtist: Artist | null;
   login(email: string, password: string): Promise<ActionResult>;
+  register(email: string, password: string, fullName: string): Promise<RegisterResult>;
   logout(): Promise<void>;
   updateProfile(input: { fullName: string; phone?: string; bio?: string; portfolioUrl?: string }): Promise<ActionResult>;
   refreshUser(): Promise<void>;
@@ -134,6 +136,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [refreshUser],
   );
 
+  const register = React.useCallback(
+    async (email: string, password: string, fullName: string): Promise<RegisterResult> => {
+      try {
+        const result = await apiFetch<{ requiresEmailConfirmation?: true }>("/api/auth/register", {
+          method: "POST",
+          body: JSON.stringify({ email, password, fullName }),
+        });
+        if (result.requiresEmailConfirmation) return { requiresEmailConfirmation: true };
+        await refreshUser();
+        return { success: true };
+      } catch (error) {
+        return { error: error instanceof ApiError ? error.message : "Đăng ký thất bại." };
+      }
+    },
+    [refreshUser],
+  );
+
   const logout = React.useCallback(async () => {
     await apiFetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
     setCurrentUser(null);
@@ -209,6 +228,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     currentUser,
     currentArtist,
     login,
+    register,
     logout,
     updateProfile,
     refreshUser,
