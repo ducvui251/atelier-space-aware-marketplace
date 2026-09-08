@@ -20,6 +20,12 @@ export default function LoginPage() {
         <div className="mt-8">
           <LoginForm />
         </div>
+        <p className="mt-6 text-body-sm text-muted-foreground">
+          Chưa có tài khoản?{" "}
+          <Link href="/register" className="font-medium text-foreground underline underline-offset-2">
+            Đăng ký
+          </Link>
+        </p>
 
         <p className="mt-6 text-body-sm text-muted-foreground">
           New to Atelier?{" "}

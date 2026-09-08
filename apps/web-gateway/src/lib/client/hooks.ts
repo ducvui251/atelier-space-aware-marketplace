@@ -7,8 +7,8 @@ import { apiFetch, ApiError } from "./api";
 export { useAppState };
 
 export function useAuth() {
-  const { currentUser, currentArtist, login, register, logout, updateProfile, refreshUser, ready } = useAppState();
-  return { currentUser, currentArtist, login, register, logout, updateProfile, refreshUser, ready };
+  const { currentUser, currentArtist, login, register, logout, updateProfile, ready } = useAppState();
+  return { currentUser, currentArtist, login, register, logout, updateProfile, ready };
 }
 
 export function useCart() {
