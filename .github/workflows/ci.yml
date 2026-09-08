@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+  workflow_dispatch: {}
+
+jobs:
+  validate:
+    name: Type-check, lint, contract tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check
+        run: pnpm type-check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Contract tests
+        run: pnpm --filter @atelier/contracts test
+
+  compose-smoke:
+    name: Compose config + service startup smoke test
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate docker-compose config
+        run: docker compose config --quiet
+
+      - name: Build images
+        run: docker compose build
+
+      - name: Install Trivy
+        run: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.56.2
+
+      - name: Scan built images for known vulnerabilities
+        # Report-only: base images we don't control (postgres, rabbitmq) can
+        # carry upstream CRITICAL/HIGH CVEs with no fix available yet, and
+        # gating CI on those would just make the pipeline permanently red.
+        # Findings are printed to the log for a human to triage.
+        run: |
+          for image in $(docker compose config --images); do
+            echo "::group::trivy $image"
+            trivy image --severity CRITICAL,HIGH --ignore-unfixed --exit-code 0 "$image"
+            echo "::endgroup::"
+          done
+
+      - name: Start the stack
+        run: docker compose up -d
+        env:
+          ATELIER_INTERNAL_SERVICE_TOKEN: ci-smoke-test-token
+
+      - name: Wait for every service to report healthy
+        run: bash scripts/wait-for-healthy.sh
+
+      - name: Smoke-test health and readiness endpoints
+        run: bash scripts/smoke-test.sh
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
+
+  deploy:
+    name: Deploy to demo host
+    # Manual only — this runs on the demo machine itself (self-hosted
+    # runner) and restarts the live stack behind the Cloudflare Tunnel, so
+    # it must never fire on an ordinary push/PR. Trigger it from the
+    # Actions tab ("Run workflow") only when you deliberately want to
+    # redeploy. See runbooks/deployment.md.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: self-hosted
+    needs: [validate, compose-smoke]
+    steps:
+      - name: Pull latest and rebuild
+        working-directory: D:\DATN
+        shell: bash
+        run: |
+          git pull
+          docker compose build
+
+      - name: Restart the stack
+        working-directory: D:\DATN
+        shell: bash
+        run: docker compose up -d
+
+      - name: Wait for every service to report healthy
+        working-directory: D:\DATN
+        shell: bash
+        run: bash scripts/wait-for-healthy.sh
+
+      - name: Smoke-test health and readiness endpoints
+        working-directory: D:\DATN
+        shell: bash
+        run: |
+          export ATELIER_INTERNAL_SERVICE_TOKEN=$(grep ATELIER_INTERNAL_SERVICE_TOKEN .env | cut -d= -f2)
+          bash scripts/smoke-test.sh
