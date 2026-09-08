@@ -9,7 +9,7 @@ import { Eye, EyeOff, Loader2, LogIn } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/lib/store/hooks";
+import { useAuth } from "@/lib/client/hooks";
 
 const loginSchema = z.object({
   email: z.string().trim().email("Enter a valid email address"),
@@ -43,8 +43,7 @@ export function LoginForm({ redirectTo = "/account", className }: LoginFormProps
     setSubmitting(true);
     setAuthError(null);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      const result = login(values.email, values.password);
+      const result = await login(values.email, values.password);
       if ("error" in result) {
         setAuthError(result.error);
         return;

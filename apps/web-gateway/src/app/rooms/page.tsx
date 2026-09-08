@@ -3,13 +3,16 @@ import { Suspense } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { RoomPlaceholder } from "@/components/room/RoomPlaceholder";
 import { DualViewToggle } from "@/components/discovery/DualViewToggle";
+import { listArtworks } from "@/lib/gateway/clients/artwork.client";
 
 export const metadata: Metadata = {
   title: "View in a Room",
   description: "Preview an artwork against a room template and adjust its scale.",
 };
 
-export default function RoomsPage() {
+export default async function RoomsPage() {
+  const artworks = (await listArtworks()).filter((artwork) => artwork.availability === "available");
+
   return (
     <PageContainer className="py-10">
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
@@ -26,7 +29,7 @@ export default function RoomsPage() {
       </div>
 
       <Suspense fallback={null}>
-        <RoomPlaceholder />
+        <RoomPlaceholder artworks={artworks} />
       </Suspense>
     </PageContainer>
   );

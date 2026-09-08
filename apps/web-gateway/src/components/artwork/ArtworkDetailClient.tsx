@@ -8,7 +8,6 @@ import {
   BadgeCheck,
   FileCheck,
   Heart,
-  PackageSearch,
   ShieldCheck,
   ShoppingBag,
   Sofa,
@@ -23,50 +22,26 @@ import { PriceDisplay } from "@/components/artwork/PriceDisplay";
 import { VerificationBadge } from "@/components/artwork/VerificationBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { EmptyState } from "@/components/ui/empty-state";
 import { cn, formatPrice } from "@/lib/utils";
 import { artworkAspect } from "@/lib/artwork-aspect";
-import { useAppState, useSaved } from "@/lib/store/hooks";
+import { useAuth, useCart, useSaved } from "@/lib/client/hooks";
+import type { Artist, Artwork } from "@/types";
 
-export function ArtworkDetailClient({ id }: { id: string }) {
+interface ArtworkDetailClientProps {
+  artwork: Artwork;
+  artist: Artist | null;
+  related: Artwork[];
+}
+
+export function ArtworkDetailClient({ artwork, artist, related }: ArtworkDetailClientProps) {
   const router = useRouter();
-  const { ready, db, currentUser, cartArtworkIds, addToCart } = useAppState();
+  const { currentUser } = useAuth();
+  const { cartArtworkIds, addToCart } = useCart();
   const { isSaved, toggleSaved } = useSaved();
 
-  if (!ready) return null;
-
-  const artwork = db.artworks.find((a) => a.id === id);
-
-  if (!artwork) {
-    return (
-      <PageContainer className="py-16">
-        <EmptyState
-          icon={PackageSearch}
-          title="Không tìm thấy tác phẩm"
-          description="Tác phẩm này không tồn tại hoặc đã bị gỡ."
-          action={
-            <Button asChild variant="outline">
-              <Link href="/artworks">Quay lại danh sách</Link>
-            </Button>
-          }
-        />
-      </PageContainer>
-    );
-  }
-
-  const artist = db.artists.find((a) => a.id === artwork.artistId);
   const available = artwork.availability === "available";
   const inCart = cartArtworkIds.includes(artwork.id);
   const saved = isSaved(artwork.id);
-
-  const related = db.artworks
-    .filter(
-      (a) =>
-        a.id !== artwork.id &&
-        a.availability === "available" &&
-        a.style.some((s) => artwork.style.includes(s)),
-    )
-    .slice(0, 3);
 
   function requireAuth(action: () => void) {
     if (!currentUser) {

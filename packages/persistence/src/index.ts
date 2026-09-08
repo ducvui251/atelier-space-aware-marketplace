@@ -1,5 +1,7 @@
 import { Pool, type PoolClient, type QueryResultRow } from "pg";
 
+export type { PoolClient };
+
 let pool: Pool | undefined;
 
 export function getPool(): Pool {
@@ -33,4 +35,21 @@ export async function transaction<T>(work: (client: PoolClient) => Promise<T>): 
 
 export function isPersistenceConfigured(): boolean {
   return Boolean(process.env.DATABASE_URL);
+}
+
+/**
+ * Lightweight liveness check for /ready endpoints. Bounded so a stalled
+ * database connection cannot hang readiness checks indefinitely.
+ */
+export async function ping(timeoutMs = 1500): Promise<boolean> {
+  if (!isPersistenceConfigured()) return false;
+  try {
+    await Promise.race([
+      query("select 1"),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("ping timed out")), timeoutMs)),
+    ]);
+    return true;
+  } catch {
+    return false;
+  }
 }

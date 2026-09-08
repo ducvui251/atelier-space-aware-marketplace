@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Heart, HeartHandshake } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAppState } from "@/lib/store/hooks";
+import { useAppState } from "@/lib/client/hooks";
 
 export function FollowButton({ artistId }: { artistId: string }) {
   const router = useRouter();

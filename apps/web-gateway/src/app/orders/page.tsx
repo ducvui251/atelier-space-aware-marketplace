@@ -4,18 +4,19 @@ import * as React from "react";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { PackageOpen, Star } from "lucide-react";
+import { AlertTriangle, PackageOpen, Star } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { RequireRole } from "@/components/auth/RequireRole";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn, formatPrice } from "@/lib/utils";
-import { useAppState, ordersForBuyer } from "@/lib/store/hooks";
-import type { Order } from "@/types";
+import { useApiResource } from "@/lib/client/hooks";
+import { apiFetch } from "@/lib/client/api";
+import type { Artwork, Order } from "@/types";
 
 function ReviewForm({ orderId }: { orderId: string }) {
-  const { submitReview } = useAppState();
   const [rating, setRating] = React.useState(5);
   const [comment, setComment] = React.useState("");
   const [submitted, setSubmitted] = React.useState(false);
@@ -54,8 +55,11 @@ function ReviewForm({ orderId }: { orderId: string }) {
       <Button
         size="sm"
         className="w-fit"
-        onClick={() => {
-          submitReview(orderId, rating, comment || undefined);
+        onClick={async () => {
+          await apiFetch(`/api/orders/${encodeURIComponent(orderId)}/reviews`, {
+            method: "POST",
+            body: JSON.stringify({ rating, comment: comment || undefined }),
+          });
           setSubmitted(true);
         }}
       >
@@ -66,7 +70,6 @@ function ReviewForm({ orderId }: { orderId: string }) {
 }
 
 function ComplaintForm({ orderId }: { orderId: string }) {
-  const { fileComplaint } = useAppState();
   const [reason, setReason] = React.useState("");
   const [open, setOpen] = React.useState(false);
   const [submitted, setSubmitted] = React.useState(false);
@@ -97,8 +100,11 @@ function ComplaintForm({ orderId }: { orderId: string }) {
         variant="outline"
         className="w-fit"
         disabled={!reason.trim()}
-        onClick={() => {
-          fileComplaint(orderId, reason.trim());
+        onClick={async () => {
+          await apiFetch(`/api/orders/${encodeURIComponent(orderId)}/complaints`, {
+            method: "POST",
+            body: JSON.stringify({ reason: reason.trim() }),
+          });
           setSubmitted(true);
         }}
       >
@@ -108,12 +114,19 @@ function ComplaintForm({ orderId }: { orderId: string }) {
   );
 }
 
-function OrderRow({ order }: { order: Order }) {
-  const { db, confirmReceived } = useAppState();
-  const artwork = db.artworks.find((a) => a.id === order.artworkId);
-  const shipment = db.shipments.find((s) => s.orderId === order.id);
-  const review = db.reviews.find((r) => r.orderId === order.id);
-  const complaint = db.complaints.find((c) => c.orderId === order.id);
+function OrderRow({ order, onChanged }: { order: Order; onChanged: () => void }) {
+  const { data: artwork } = useApiResource<Artwork>(`/api/artworks/${encodeURIComponent(order.artworkId)}`);
+  const [confirming, setConfirming] = React.useState(false);
+
+  async function confirmReceived() {
+    setConfirming(true);
+    try {
+      await apiFetch(`/api/orders/${encodeURIComponent(order.id)}/confirm-received`, { method: "POST" });
+      onChanged();
+    } finally {
+      setConfirming(false);
+    }
+  }
 
   return (
     <div className="rounded-lg border border-border bg-surface p-5">
@@ -130,38 +143,18 @@ function OrderRow({ order }: { order: Order }) {
         </Badge>
       </div>
 
-      {shipment ? (
-        <p className="mt-3 text-body-sm text-muted-foreground">
-          Vận chuyển: {shipment.carrier ?? "—"} · {shipment.trackingNumber ?? "—"} ·{" "}
-          <span className="capitalize">{shipment.status.replace("_", " ")}</span>
-        </p>
-      ) : null}
-
       <div className="mt-4 flex flex-wrap items-center gap-3">
         {order.status === "shipped" ? (
-          <Button size="sm" onClick={() => confirmReceived(order.id)}>
-            Đã nhận hàng
+          <Button size="sm" disabled={confirming} onClick={confirmReceived}>
+            {confirming ? "Đang xác nhận…" : "Đã nhận hàng"}
           </Button>
         ) : null}
-        {(order.status === "shipped" || order.status === "completed") && !complaint ? (
-          <ComplaintForm orderId={order.id} />
-        ) : null}
-        {complaint ? (
-          <span className="text-caption text-muted-foreground">
-            Khiếu nại: <span className="capitalize">{complaint.status}</span>
-          </span>
-        ) : null}
+        {order.status === "shipped" || order.status === "completed" ? <ComplaintForm orderId={order.id} /> : null}
       </div>
 
       {order.status === "completed" ? (
         <div className="mt-4 border-t border-border pt-4">
-          {review ? (
-            <p className="text-caption text-muted-foreground">
-              Bạn đã đánh giá {review.rating}/5 {review.comment ? `— "${review.comment}"` : ""}
-            </p>
-          ) : (
-            <ReviewForm orderId={order.id} />
-          )}
+          <ReviewForm orderId={order.id} />
         </div>
       ) : null}
     </div>
@@ -169,11 +162,10 @@ function OrderRow({ order }: { order: Order }) {
 }
 
 function OrdersView() {
-  const { db, currentUser } = useAppState();
+  const { data, loading, error, refresh } = useApiResource<{ items: Order[]; total: number }>("/api/orders");
   const searchParams = useSearchParams();
   const justPlaced = searchParams.get("success") === "1";
-  if (!currentUser) return null;
-  const orders = ordersForBuyer(db, currentUser.id);
+  const orders = data?.items ?? [];
 
   return (
     <>
@@ -186,7 +178,24 @@ function OrdersView() {
         </p>
       ) : null}
 
-      {orders.length === 0 ? (
+      {loading ? (
+        <div className="flex flex-col gap-4">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-28 w-full rounded-lg" />
+          ))}
+        </div>
+      ) : error ? (
+        <EmptyState
+          icon={AlertTriangle}
+          title="Không thể tải đơn hàng"
+          description={error}
+          action={
+            <Button variant="outline" onClick={refresh}>
+              Thử lại
+            </Button>
+          }
+        />
+      ) : orders.length === 0 ? (
         <EmptyState
           icon={PackageOpen}
           title="Chưa có đơn hàng"
@@ -200,7 +209,7 @@ function OrdersView() {
       ) : (
         <div className="flex flex-col gap-4">
           {orders.map((order) => (
-            <OrderRow key={order.id} order={order} />
+            <OrderRow key={order.id} order={order} onChanged={refresh} />
           ))}
         </div>
       )}

@@ -8,7 +8,23 @@ import type { Artwork } from "@/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { ArtworkFormInput } from "@/lib/store/AppProvider";
+
+export interface ArtworkFormInput {
+  title: string;
+  medium: string;
+  widthCm: number;
+  heightCm: number;
+  price: number;
+  currency: string;
+  dominantColors: string[];
+  style: string[];
+  orientation: Artwork["orientation"];
+  editionType: Artwork["editionType"];
+  year: number;
+  imageUrl: string;
+  coaUrl?: string;
+  description?: string;
+}
 
 const artworkSchema = z.object({
   title: z.string().trim().min(1, "Bắt buộc"),
@@ -33,12 +49,13 @@ type ArtworkFormValues = z.output<typeof artworkSchema>;
 interface ArtworkFormProps {
   initial?: Artwork;
   submitLabel: string;
-  onSubmit: (input: ArtworkFormInput) => { error: string } | { success: true; id?: string };
+  onSubmit: (input: ArtworkFormInput) => Promise<{ error: string } | { success: true; id?: string }>;
   onSuccess: () => void;
 }
 
 export function ArtworkForm({ initial, submitLabel, onSubmit, onSuccess }: ArtworkFormProps) {
   const [formError, setFormError] = React.useState<string | null>(null);
+  const [submitting, setSubmitting] = React.useState(false);
 
   const {
     register,
@@ -71,8 +88,9 @@ export function ArtworkForm({ initial, submitLabel, onSubmit, onSuccess }: Artwo
         },
   });
 
-  function submit(values: ArtworkFormValues) {
+  async function submit(values: ArtworkFormValues) {
     setFormError(null);
+    setSubmitting(true);
     const input: ArtworkFormInput = {
       title: values.title,
       medium: values.medium,
@@ -89,12 +107,16 @@ export function ArtworkForm({ initial, submitLabel, onSubmit, onSuccess }: Artwo
       coaUrl: values.coaUrl || undefined,
       description: values.description || undefined,
     };
-    const result = onSubmit(input);
-    if ("error" in result) {
-      setFormError(result.error);
-      return;
+    try {
+      const result = await onSubmit(input);
+      if ("error" in result) {
+        setFormError(result.error);
+        return;
+      }
+      onSuccess();
+    } finally {
+      setSubmitting(false);
     }
-    onSuccess();
   }
 
   return (
@@ -187,8 +209,8 @@ export function ArtworkForm({ initial, submitLabel, onSubmit, onSuccess }: Artwo
         />
       </Field>
 
-      <Button type="submit" className="mt-2 w-fit">
-        {submitLabel}
+      <Button type="submit" className="mt-2 w-fit" disabled={submitting}>
+        {submitting ? "Đang lưu…" : submitLabel}
       </Button>
     </form>
   );

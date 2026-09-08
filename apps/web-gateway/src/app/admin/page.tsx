@@ -5,7 +5,17 @@ import { AlertTriangle, ShieldQuestion, Package, DollarSign } from "lucide-react
 import { PageContainer } from "@/components/layout/PageContainer";
 import { RequireRole } from "@/components/auth/RequireRole";
 import { formatPrice } from "@/lib/utils";
-import { useAppState } from "@/lib/store/hooks";
+import { useApiResource } from "@/lib/client/hooks";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+
+interface AdminStats {
+  pendingArtists: number;
+  pendingArtworks: number;
+  openComplaints: number;
+  totalOrders: number;
+  revenue: number;
+}
 
 function StatCard({
   icon: Icon,
@@ -37,24 +47,33 @@ function StatCard({
 }
 
 function AdminOverview() {
-  const { db } = useAppState();
-  const pendingArtists = db.artists.filter((a) => a.verificationStatus === "pending").length;
-  const pendingArtworks = db.artworks.filter((a) => a.verificationStatus === "pending").length;
-  const openComplaints = db.complaints.filter((c) => c.status === "open").length;
-  const revenue = db.orders
-    .filter((o) => o.status !== "cancelled")
-    .reduce((sum, o) => sum + o.totalAmount, 0);
+  const { data, loading, error, refresh } = useApiResource<AdminStats>("/api/admin/stats");
 
   return (
     <>
       <p className="eyebrow">Admin</p>
       <h1 className="mt-2 font-display text-h2 text-foreground">Quản trị hệ thống</h1>
 
+      {error ? (
+        <div className="mt-6 flex items-center justify-between gap-3 rounded-md border border-destructive bg-destructive-soft px-4 py-3 text-body-sm text-destructive-foreground">
+          <span>Không thể tải số liệu: {error}</span>
+          <Button size="sm" variant="outline" onClick={refresh}>
+            Thử lại
+          </Button>
+        </div>
+      ) : null}
+
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={ShieldQuestion} label="Nghệ sĩ chờ duyệt" value={String(pendingArtists)} href="/admin/verification" />
-        <StatCard icon={Package} label="Tác phẩm chờ duyệt" value={String(pendingArtworks)} href="/admin/verification" />
-        <StatCard icon={AlertTriangle} label="Khiếu nại đang mở" value={String(openComplaints)} href="/admin/complaints" />
-        <StatCard icon={DollarSign} label="Tổng doanh thu (đơn đã tạo)" value={formatPrice(revenue, "USD")} />
+        {loading ? (
+          [0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[104px] w-full rounded-lg" />)
+        ) : (
+          <>
+            <StatCard icon={ShieldQuestion} label="Nghệ sĩ chờ duyệt" value={String(data?.pendingArtists ?? 0)} href="/admin/verification" />
+            <StatCard icon={Package} label="Tác phẩm chờ duyệt" value={String(data?.pendingArtworks ?? 0)} href="/admin/verification" />
+            <StatCard icon={AlertTriangle} label="Khiếu nại đang mở" value={String(data?.openComplaints ?? 0)} href="/admin/complaints" />
+            <StatCard icon={DollarSign} label="Tổng doanh thu (đơn đã tạo)" value={formatPrice(data?.revenue ?? 0, "USD")} />
+          </>
+        )}
       </div>
     </>
   );

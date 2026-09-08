@@ -1,5 +1,8 @@
 import type { Artist, Artwork } from "@atelier/contracts";
 import { query, transaction } from "@atelier/persistence";
+import { writeOutboxEvent } from "@atelier/events";
+
+const SCHEMA = "artist_artwork";
 
 type ArtworkRow = {
   id: string; title: string; artist_id: string; artist: string; price: string; currency: string;
@@ -59,15 +62,22 @@ export async function createPersistedArtwork(input: {
   artistId: string; title: string; description?: string; medium: string; widthCm: number; heightCm: number;
   year: number; price: number; currency: string; editionType: Artwork["editionType"]; orientation: Artwork["orientation"];
   dominantColors: string[]; style: string[]; imageUrl: string;
-}): Promise<Artwork> {
+}, correlationId: string): Promise<Artwork> {
   const id = await transaction(async (client) => {
     const inserted = await client.query<{ id: string }>(
       `insert into artist_artwork.artworks (artist_id, title, description, medium, width_cm, height_cm, creation_year, price, currency, edition_type, availability, verification_status, orientation, dominant_colors, styles)
        values ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'available', 'pending', $11, $12::jsonb, $13::jsonb) returning id::text`,
       [input.artistId, input.title, input.description ?? null, input.medium, input.widthCm, input.heightCm, input.year, input.price, input.currency, input.editionType, input.orientation, JSON.stringify(input.dominantColors), JSON.stringify(input.style)],
     );
-    await client.query(`insert into artist_artwork.artwork_images (artwork_id, image_url, is_primary) values ($1::uuid, $2, true)`, [inserted.rows[0].id, input.imageUrl]);
-    return inserted.rows[0].id;
+    const artworkId = inserted.rows[0].id;
+    await client.query(`insert into artist_artwork.artwork_images (artwork_id, image_url, is_primary) values ($1::uuid, $2, true)`, [artworkId, input.imageUrl]);
+    await writeOutboxEvent(client, SCHEMA, {
+      type: "ArtworkPublished",
+      aggregateId: artworkId,
+      correlationId,
+      payload: { artworkId, artistId: input.artistId },
+    });
+    return artworkId;
   });
   const artwork = await findPersistedArtwork(id);
   if (!artwork) throw new Error("Artwork was not persisted");
@@ -98,10 +108,169 @@ export async function findPersistedArtist(id: string): Promise<Artist | null> {
   return rows[0] ? mapArtist(rows[0]) : null;
 }
 
-export async function updatePersistedAvailability(id: string, availability: Artwork["availability"]): Promise<boolean> {
-  const rows = await query<{ id: string }>(
-    `update artist_artwork.artworks set availability = $2, updated_at = now()
-     where id::text = $1 and ($2 <> 'sold' or availability = 'available') returning id::text`, [id, availability],
+/**
+ * Looks up the artist profile owned by an Account user id. This is the only
+ * legitimate way for other services (Account, in particular) to learn
+ * whether a user has an artist profile — no other service may query
+ * artist_artwork.artist_profiles directly.
+ */
+export async function findPersistedArtistByUserId(userId: string): Promise<Artist | null> {
+  const rows = await query<ArtistRow>(
+    `select id::text, user_id::text, display_name, location, nationality, bio, verification_status, image_url, portfolio_url
+     from artist_artwork.artist_profiles where user_id::text = $1`,
+    [userId],
   );
-  return Boolean(rows[0]);
+  return rows[0] ? mapArtist(rows[0]) : null;
+}
+
+export async function updatePersistedArtworkVerification(
+  id: string,
+  input: { status: Artwork["verificationStatus"]; note?: string; reviewerId?: string },
+  correlationId: string,
+): Promise<Artwork | null> {
+  const updated = await transaction(async (client) => {
+    const rows = await client.query<{ id: string }>(
+      `update artist_artwork.artworks set verification_status = $2, updated_at = now() where id::text = $1 returning id::text`,
+      [id, input.status],
+    );
+    if (!rows.rows[0]) return false;
+    await writeOutboxEvent(client, SCHEMA, {
+      type: "ArtworkVerified",
+      aggregateId: id,
+      correlationId,
+      payload: { artworkId: id, status: input.status },
+    });
+    return true;
+  });
+  if (!updated) return null;
+  return findPersistedArtwork(id);
+}
+
+export async function updatePersistedArtistVerification(
+  id: string,
+  input: { status: Artist["verificationStatus"]; note?: string },
+): Promise<Artist | null> {
+  const rows = await query<{ id: string }>(
+    `update artist_artwork.artist_profiles set verification_status = $2, updated_at = now() where id::text = $1 returning id::text`,
+    [id, input.status],
+  );
+  if (!rows[0]) return null;
+  return findPersistedArtist(id);
+}
+
+export interface Reservation {
+  id: string;
+  artworkId: string;
+  status: "pending" | "committed" | "released" | "expired";
+  expiresAt: string;
+}
+
+const RESERVATION_LEASE_MS = Number(process.env.RESERVATION_LEASE_MS ?? 10 * 60_000);
+
+/**
+ * Atomic available -> reserved, guarded the same way
+ * updatePersistedAvailability always was (a conditional UPDATE only one
+ * concurrent caller can match) plus a reservation row recording who holds
+ * the lease and until when (MICROSERVICE_100_PLAN.md section 7.3).
+ */
+export async function reserveArtwork(artworkId: string, buyerId: string, correlationId: string): Promise<Reservation | null> {
+  return transaction(async (client) => {
+    const artwork = await client.query<{ id: string }>(
+      `update artist_artwork.artworks set availability = 'reserved', updated_at = now()
+       where id::text = $1 and availability = 'available' returning id::text`,
+      [artworkId],
+    );
+    if (!artwork.rows[0]) return null;
+    const expiresAt = new Date(Date.now() + RESERVATION_LEASE_MS).toISOString();
+    const reservation = await client.query<{ id: string }>(
+      `insert into artist_artwork.inventory_reservations (artwork_id, reserved_by, expires_at)
+       values ($1::uuid, $2::uuid, $3) returning id::text`,
+      [artworkId, buyerId, expiresAt],
+    );
+    await writeOutboxEvent(client, SCHEMA, {
+      type: "ArtworkReserved",
+      aggregateId: artworkId,
+      correlationId,
+      payload: { artworkId, reservationId: reservation.rows[0].id, expiresAt },
+    });
+    return { id: reservation.rows[0].id, artworkId, status: "pending", expiresAt };
+  });
+}
+
+/** Atomic reserved -> sold, only for the matching, unexpired reservation. */
+export async function commitReservation(reservationId: string, correlationId: string): Promise<boolean> {
+  return transaction(async (client) => {
+    const reservation = await client.query<{ artwork_id: string }>(
+      `update artist_artwork.inventory_reservations set status = 'committed', updated_at = now()
+       where id::text = $1 and status = 'pending' and expires_at > now() returning artwork_id::text`,
+      [reservationId],
+    );
+    if (!reservation.rows[0]) return false;
+    const artworkId = reservation.rows[0].artwork_id;
+    const artwork = await client.query<{ id: string }>(
+      `update artist_artwork.artworks set availability = 'sold', updated_at = now()
+       where id::text = $1 and availability = 'reserved' returning id::text`,
+      [artworkId],
+    );
+    if (!artwork.rows[0]) return false;
+    await writeOutboxEvent(client, SCHEMA, { type: "ArtworkSold", aggregateId: artworkId, correlationId, payload: { artworkId } });
+    return true;
+  });
+}
+
+/** Release an uncommitted reservation back to available. Idempotent: releasing an already-released/committed/expired reservation is a no-op, not an error. */
+export async function releaseReservation(reservationId: string): Promise<void> {
+  await transaction(async (client) => {
+    const reservation = await client.query<{ artwork_id: string }>(
+      `update artist_artwork.inventory_reservations set status = 'released', updated_at = now()
+       where id::text = $1 and status = 'pending' returning artwork_id::text`,
+      [reservationId],
+    );
+    if (!reservation.rows[0]) return;
+    await client.query(
+      `update artist_artwork.artworks set availability = 'available', updated_at = now()
+       where id::text = $1 and availability = 'reserved'`,
+      [reservation.rows[0].artwork_id],
+    );
+  });
+}
+
+/**
+ * Background sweep for reservations whose lease ran out without a
+ * commit/release (e.g. the buyer's process crashed mid-checkout). Run on an
+ * interval from server.ts, the same pattern as the outbox publisher.
+ */
+export async function releaseExpiredReservations(): Promise<number> {
+  const expired = await query<{ id: string; artwork_id: string }>(
+    `update artist_artwork.inventory_reservations set status = 'expired', updated_at = now()
+     where status = 'pending' and expires_at <= now()
+     returning id::text, artwork_id::text`,
+  );
+  for (const row of expired) {
+    await query(
+      `update artist_artwork.artworks set availability = 'available', updated_at = now()
+       where id::text = $1 and availability = 'reserved'`,
+      [row.artwork_id],
+    );
+  }
+  return expired.length;
+}
+
+export async function updatePersistedAvailability(id: string, availability: Artwork["availability"], correlationId: string): Promise<boolean> {
+  return transaction(async (client) => {
+    const rows = await client.query<{ id: string }>(
+      `update artist_artwork.artworks set availability = $2, updated_at = now()
+       where id::text = $1 and ($2 <> 'sold' or availability = 'available') returning id::text`, [id, availability],
+    );
+    if (!rows.rows[0]) return false;
+    if (availability === "sold") {
+      await writeOutboxEvent(client, SCHEMA, {
+        type: "ArtworkSold",
+        aggregateId: id,
+        correlationId,
+        payload: { artworkId: id },
+      });
+    }
+    return true;
+  });
 }

@@ -6,7 +6,10 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { RequireRole } from "@/components/auth/RequireRole";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAppState } from "@/lib/store/hooks";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useApiResource } from "@/lib/client/hooks";
+import { apiFetch } from "@/lib/client/api";
+import type { Artist, Artwork } from "@/types";
 
 function ReviewRow({
   title,
@@ -63,15 +66,42 @@ function ReviewRow({
 }
 
 function VerificationQueue() {
-  const { db, reviewArtist, reviewArtwork } = useAppState();
-  const pendingArtists = db.artists.filter((a) => a.verificationStatus === "pending");
-  const pendingArtworks = db.artworks.filter((a) => a.verificationStatus === "pending");
+  const { data, loading, error, refresh } = useApiResource<{ artists: Artist[]; artworks: Artwork[] }>("/api/admin/verification-queue");
+  const pendingArtists = data?.artists ?? [];
+  const pendingArtworks = data?.artworks ?? [];
+
+  async function reviewArtist(id: string, status: "verified" | "rejected", note?: string) {
+    await apiFetch(`/api/admin/artists/${encodeURIComponent(id)}/review`, { method: "POST", body: JSON.stringify({ status, note }) });
+    refresh();
+  }
+
+  async function reviewArtwork(id: string, status: "verified" | "rejected", note?: string) {
+    await apiFetch(`/api/admin/artworks/${encodeURIComponent(id)}/review`, { method: "POST", body: JSON.stringify({ status, note }) });
+    refresh();
+  }
 
   return (
     <>
       <p className="eyebrow">Admin</p>
       <h1 className="mt-2 font-display text-h2 text-foreground">Hàng chờ xác thực</h1>
 
+      {error ? (
+        <div className="mt-6 flex items-center justify-between gap-3 rounded-md border border-destructive bg-destructive-soft px-4 py-3 text-body-sm text-destructive-foreground">
+          <span>Không thể tải hàng chờ: {error}</span>
+          <Button size="sm" variant="outline" onClick={refresh}>
+            Thử lại
+          </Button>
+        </div>
+      ) : null}
+
+      {loading ? (
+        <div className="mt-8 flex flex-col gap-3">
+          {[0, 1].map((i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-lg" />
+          ))}
+        </div>
+      ) : (
+        <>
       <section className="mt-8">
         <h2 className="mb-3 font-display text-h3 text-foreground">
           Nghệ sĩ ({pendingArtists.length})
@@ -115,6 +145,8 @@ function VerificationQueue() {
           </div>
         )}
       </section>
+        </>
+      )}
     </>
   );
 }

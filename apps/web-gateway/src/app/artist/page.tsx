@@ -6,8 +6,9 @@ import { RequireRole } from "@/components/auth/RequireRole";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/utils";
-import { useAppState } from "@/lib/store/hooks";
-import { artworksForArtist } from "@/lib/store/hooks";
+import { useAuth, useApiResource } from "@/lib/client/hooks";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { Artwork } from "@/types";
 
 function verificationVariant(status: string) {
   if (status === "verified") return "success" as const;
@@ -16,9 +17,10 @@ function verificationVariant(status: string) {
 }
 
 function ArtistDashboard() {
-  const { currentArtist, db } = useAppState();
+  const { currentArtist } = useAuth();
+  const { data, loading, error, refresh } = useApiResource<{ items: Artwork[]; total: number }>("/api/artist/artworks");
+  const listings = data?.items ?? [];
   if (!currentArtist) return null;
-  const listings = artworksForArtist(db, currentArtist.id);
 
   return (
     <>
@@ -40,6 +42,20 @@ function ArtistDashboard() {
         </div>
       </div>
 
+      {loading ? (
+        <div className="mt-10 flex flex-col gap-2">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-12 w-full rounded-md" />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="mt-10 flex items-center justify-between gap-3 rounded-md border border-destructive bg-destructive-soft px-4 py-3 text-body-sm text-destructive-foreground">
+          <span>Không thể tải danh sách tác phẩm: {error}</span>
+          <Button size="sm" variant="outline" onClick={refresh}>
+            Thử lại
+          </Button>
+        </div>
+      ) : (
       <div className="mt-10 overflow-x-auto rounded-lg border border-border">
         <table className="w-full text-body-sm">
           <thead className="bg-muted text-caption text-muted-foreground">
@@ -87,6 +103,7 @@ function ArtistDashboard() {
           </tbody>
         </table>
       </div>
+      )}
     </>
   );
 }

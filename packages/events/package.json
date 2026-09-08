@@ -1,0 +1,22 @@
+{
+  "name": "@atelier/events",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared outbox writer, publisher, and durable consumer for Atelier domain events.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@atelier/contracts": "workspace:*",
+    "@atelier/persistence": "workspace:*",
+    "amqplib": "^0.10.4"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/amqplib": "^0.10.5",
+    "typescript": "^5.7.0"
+  }
+}

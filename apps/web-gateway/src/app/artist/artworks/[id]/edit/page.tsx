@@ -4,19 +4,23 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { RequireRole } from "@/components/auth/RequireRole";
-import { ArtworkForm } from "@/components/artwork/ArtworkForm";
+import { ArtworkForm, type ArtworkFormInput } from "@/components/artwork/ArtworkForm";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { PackageSearch } from "lucide-react";
-import { useAppState } from "@/lib/store/hooks";
+import { useAuth, useApiResource } from "@/lib/client/hooks";
+import { apiFetch, ApiError } from "@/lib/client/api";
+import type { Artwork } from "@/types";
 
 function EditArtworkView() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const { db, currentArtist, updateArtwork } = useAppState();
-  const artwork = db.artworks.find((a) => a.id === params.id && a.artistId === currentArtist?.id);
+  const { currentArtist } = useAuth();
+  const { data: artwork, loading } = useApiResource<Artwork>(`/api/artworks/${encodeURIComponent(params.id)}`);
 
-  if (!artwork) {
+  if (loading) return null;
+
+  if (!artwork || artwork.artistId !== currentArtist?.id) {
     return (
       <EmptyState
         icon={PackageSearch}
@@ -31,6 +35,15 @@ function EditArtworkView() {
     );
   }
 
+  async function onSubmit(input: ArtworkFormInput) {
+    try {
+      await apiFetch<Artwork>(`/api/artist/artworks/${encodeURIComponent(params.id)}`, { method: "PATCH", body: JSON.stringify(input) });
+      return { success: true as const };
+    } catch (error) {
+      return { error: error instanceof ApiError ? error.message : "Không thể lưu thay đổi." };
+    }
+  }
+
   return (
     <>
       <p className="eyebrow">Artist dashboard</p>
@@ -40,12 +53,7 @@ function EditArtworkView() {
       </p>
 
       <div className="mt-8">
-        <ArtworkForm
-          initial={artwork}
-          submitLabel="Lưu thay đổi"
-          onSubmit={(input) => updateArtwork(artwork.id, input)}
-          onSuccess={() => router.push("/artist")}
-        />
+        <ArtworkForm initial={artwork} submitLabel="Lưu thay đổi" onSubmit={onSubmit} onSuccess={() => router.push("/artist")} />
       </div>
     </>
   );
