@@ -5,14 +5,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Trash2 } from "lucide-react";
-import { rooms } from "@/data";
 import { FilterChip } from "@/components/discovery/FilterChip";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { artworkAspect } from "@/lib/artwork-aspect";
 import { useAuth, useApiResource } from "@/lib/client/hooks";
 import { apiFetch, ApiError } from "@/lib/client/api";
-import type { Artwork, BuyerRoom, Placement } from "@/types";
+import type { Artwork, BuyerRoom, Placement, RoomPreset } from "@/types";
 
 interface SavedRoomEntry {
   room: BuyerRoom;
@@ -20,14 +19,14 @@ interface SavedRoomEntry {
   artwork: Artwork | null;
 }
 
-export function RoomPlaceholder({ artworks }: { artworks: Artwork[] }) {
+export function RoomPlaceholder({ artworks, rooms }: { artworks: Artwork[]; rooms: RoomPreset[] }) {
   const router = useRouter();
   const { currentUser } = useAuth();
   const searchParams = useSearchParams();
   const queryArtworkId = searchParams.get("artwork");
   const available = artworks;
 
-  const [roomId, setRoomId] = React.useState(rooms[0].id);
+  const [roomId, setRoomId] = React.useState(rooms[0]?.id ?? "");
   const [artworkId, setArtworkId] = React.useState<string>(queryArtworkId ?? available[0]?.id ?? "");
   const [scale, setScale] = React.useState(1);
   const [saving, setSaving] = React.useState(false);

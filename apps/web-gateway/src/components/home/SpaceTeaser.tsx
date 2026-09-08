@@ -7,7 +7,7 @@ export function SpaceTeaser() {
   return (
     <div className="relative overflow-hidden rounded-xl">
       <Image
-        src="https://picsum.photos/seed/space-teaser/1600/900"
+        src="/img/space-teaser.jpg"
         alt="Art hanging in a warm interior"
         fill
         sizes="100vw"

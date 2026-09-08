@@ -73,11 +73,25 @@ function deriveOptions(artworks: Artwork[], pick: (artwork: Artwork) => string[]
 
 interface FilterableArtworksProps {
   artworks?: Artwork[];
+  /** URL-seeded initial filter selections, e.g. from /artworks?style=Abstract. */
+  initialSelection?: Partial<Record<FilterKey, string[]>>;
+  initialQuery?: string;
 }
 
-export function FilterableArtworks({ artworks: initialArtworks }: FilterableArtworksProps) {
-  const [filters, setFilters] = React.useState<FilterState>(emptyFilterState);
-  const [query, setQuery] = React.useState("");
+export function FilterableArtworks({ artworks: initialArtworks, initialSelection, initialQuery }: FilterableArtworksProps) {
+  const [filters, setFilters] = React.useState<FilterState>(() => {
+    const state = emptyFilterState();
+    if (initialSelection) {
+      for (const key of Object.keys(state) as FilterKey[]) {
+        const values = initialSelection[key];
+        if (Array.isArray(values)) {
+          state[key] = new Set(values);
+        }
+      }
+    }
+    return state;
+  });
+  const [query, setQuery] = React.useState(initialQuery ?? "");
 
   const artworks = React.useMemo(() => {
     const source = initialArtworks ?? [];

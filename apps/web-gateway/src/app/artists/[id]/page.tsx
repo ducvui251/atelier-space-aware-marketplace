@@ -10,21 +10,18 @@ import { ArtworkCard } from "@/components/artwork/ArtworkCard";
 import { Badge } from "@/components/ui/badge";
 import { FollowButton } from "@/components/artist/FollowButton";
 import { findArtist, listArtworks } from "@/lib/gateway/clients/artwork.client";
-import { artists } from "@atelier/artist-artwork-service";
 
 interface ArtistProfileProps {
   params: Promise<{ id: string }>;
 }
 
-export function generateStaticParams() {
-  return artists.map((artist) => ({ id: artist.id }));
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
 }: ArtistProfileProps): Promise<Metadata> {
   const { id } = await params;
-  const artist = artists.find((a) => a.id === id);
+  const artist = await findArtist(id);
   return {
     title: artist ? artist.displayName : "Artist",
     description: artist?.bio,

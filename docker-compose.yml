@@ -45,7 +45,7 @@ services:
       ACCOUNT_PORT: 4101
       DATABASE_URL: postgresql://account_service:account_service_dev_pw@postgres:5432/atelier
       ARTIST_ARTWORK_SERVICE_URL: http://artist-artwork-service:4103
-      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:-dev-only-internal-token}
+      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:?required}
     ports: ["4101:4101"]
     restart: unless-stopped
     deploy:
@@ -69,7 +69,7 @@ services:
       ARTIST_ARTWORK_SERVICE_URL: http://artist-artwork-service:4103
       EVENT_BROKER_URL: amqp://atelier_events:atelier_events_dev_pw@message-broker:5672
       EVENT_EXCHANGE: atelier.events.v1
-      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:-dev-only-internal-token}
+      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:?required}
     ports: ["4102:4102"]
     restart: unless-stopped
     deploy:
@@ -93,7 +93,7 @@ services:
       DATABASE_URL: postgresql://artist_artwork_service:artist_artwork_service_dev_pw@postgres:5432/atelier
       EVENT_BROKER_URL: amqp://atelier_events:atelier_events_dev_pw@message-broker:5672
       EVENT_EXCHANGE: atelier.events.v1
-      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:-dev-only-internal-token}
+      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:?required}
     ports: ["4103:4103"]
     restart: unless-stopped
     deploy:
@@ -115,7 +115,7 @@ services:
       COMMERCE_PORT: 4104
       DATABASE_URL: postgresql://commerce_service:commerce_service_dev_pw@postgres:5432/atelier
       ARTIST_ARTWORK_SERVICE_URL: http://artist-artwork-service:4103
-      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:-dev-only-internal-token}
+      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:?required}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       WEB_GATEWAY_URL: ${WEB_GATEWAY_URL:-http://localhost:3000}
     ports: ["4104:4104"]
@@ -139,7 +139,7 @@ services:
       RECOMMENDATION_PORT: 4105
       DATABASE_URL: postgresql://recommendation_service:recommendation_service_dev_pw@postgres:5432/atelier
       ARTIST_ARTWORK_SERVICE_URL: http://artist-artwork-service:4103
-      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:-dev-only-internal-token}
+      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:?required}
     ports: ["4105:4105"]
     restart: unless-stopped
     deploy:
@@ -161,7 +161,7 @@ services:
       VERIFICATION_PORT: 4106
       DATABASE_URL: postgresql://verification_service:verification_service_dev_pw@postgres:5432/atelier
       ARTIST_ARTWORK_SERVICE_URL: http://artist-artwork-service:4103
-      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:-dev-only-internal-token}
+      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:?required}
     ports: ["4106:4106"]
     restart: unless-stopped
     deploy:
@@ -182,7 +182,7 @@ services:
     environment:
       ROOM_PREVIEW_PORT: 4107
       DATABASE_URL: postgresql://room_preview_service:room_preview_service_dev_pw@postgres:5432/atelier
-      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:-dev-only-internal-token}
+      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:?required}
     ports: ["4107:4107"]
     restart: unless-stopped
     deploy:
@@ -204,7 +204,7 @@ services:
       DATABASE_URL: postgresql://admin_service:admin_service_dev_pw@postgres:5432/atelier
       ARTIST_ARTWORK_SERVICE_URL: http://artist-artwork-service:4103
       COMMERCE_SERVICE_URL: http://commerce-service:4104
-      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:-dev-only-internal-token}
+      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:?required}
     ports: ["4108:4108"]
     restart: unless-stopped
     deploy:
@@ -223,6 +223,7 @@ services:
       dockerfile: infra/Dockerfile.gateway
       args:
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
     environment:
       ACCOUNT_SERVICE_URL: http://account-service:4101
@@ -233,7 +234,7 @@ services:
       VERIFICATION_SERVICE_URL: http://verification-service:4106
       ROOM_PREVIEW_SERVICE_URL: http://room-preview-service:4107
       ADMIN_SERVICE_URL: http://admin-service:4108
-      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:-dev-only-internal-token}
+      ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:?required}
     ports: ["3000:3000"]
     restart: unless-stopped
     deploy:

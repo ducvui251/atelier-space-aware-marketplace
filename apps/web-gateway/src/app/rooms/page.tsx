@@ -4,6 +4,10 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { RoomPlaceholder } from "@/components/room/RoomPlaceholder";
 import { DualViewToggle } from "@/components/discovery/DualViewToggle";
 import { listArtworks } from "@/lib/gateway/clients/artwork.client";
+import { listRooms } from "@/lib/gateway/clients/room-preview.client";
+import type { Artwork, RoomPreset } from "@/types";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "View in a Room",
@@ -11,7 +15,11 @@ export const metadata: Metadata = {
 };
 
 export default async function RoomsPage() {
-  const artworks = (await listArtworks()).filter((artwork) => artwork.availability === "available");
+  const [artworks, rooms] = await Promise.all([
+    listArtworks().catch(() => [] as Artwork[]),
+    listRooms().catch(() => [] as RoomPreset[]),
+  ]);
+  const available = artworks.filter((artwork) => artwork.availability === "available");
 
   return (
     <PageContainer className="py-10">
@@ -29,7 +37,7 @@ export default async function RoomsPage() {
       </div>
 
       <Suspense fallback={null}>
-        <RoomPlaceholder artworks={artworks} />
+        <RoomPlaceholder artworks={available} rooms={rooms} />
       </Suspense>
     </PageContainer>
   );

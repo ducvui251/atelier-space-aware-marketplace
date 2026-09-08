@@ -54,8 +54,13 @@ export interface Placement {
 export type DiscoveryView = "catalog" | "room";
 export type UserRole = "buyer" | "artist" | "admin";
 
-export interface MockUser {
-  id: string; fullName: string; email: string; password: string; phone?: string;
+/**
+ * Account profile synchronized from a verified Supabase identity.
+ * `password` exists only because the legacy demo auth path used it; new
+ * consumers must treat this shape as a profile, never as credentials.
+ */
+export interface AccountProfile {
+  id: string; fullName: string; email: string; phone?: string;
   role: UserRole; createdAt: string; artistId?: string;
 }
 

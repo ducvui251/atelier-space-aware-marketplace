@@ -46,10 +46,10 @@ cp .env.example .env.local
 
 ```dotenv
 NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 ```
 
-> The anon key is public and safe for `NEXT_PUBLIC_`; never expose the service-role key.
+> The publishable key is public and safe for `NEXT_PUBLIC_`; never expose a secret/service-role key.
 
 The placeholder UI works without a Supabase project. If you don't set the keys, the
 existing server-component flows that reference the client are left to your own usage.

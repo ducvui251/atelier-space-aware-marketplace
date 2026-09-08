@@ -2,20 +2,13 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   transpilePackages: [
-    "@atelier/account-service",
-    "@atelier/admin-service",
-    "@atelier/artist-artwork-service",
-    "@atelier/catalog-discovery-service",
-    "@atelier/commerce-service",
     "@atelier/config",
     "@atelier/contracts",
-    "@atelier/recommendation-service",
-    "@atelier/room-preview-service",
-    "@atelier/verification-service",
   ],
   images: {
     remotePatterns: [
-      { protocol: "https", hostname: "picsum.photos" },
+      // Added per-deployment when artwork imagery moves to Supabase Storage
+      // or a CDN; local demo assets live in public/img (ADR 0001 D7).
       { protocol: "https", hostname: "images.unsplash.com" },
     ],
   },

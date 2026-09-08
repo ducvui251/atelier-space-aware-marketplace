@@ -1,9 +1,9 @@
 insert into artist_artwork.artist_profiles
   (id, user_id, display_name, bio, location, nationality, portfolio_url, verification_status, image_url)
 values
-  ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000101', 'Lena Moreau', 'Abstraction and the memory of place.', 'Paris, France', 'French', 'https://lenamoreau.example.com', 'verified', 'https://picsum.photos/seed/artist-lena/800/1000'),
-  ('00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000102', 'Aki Tanaka', 'Mineral pigments and meditative field works.', 'Kyoto, Japan', 'Japanese', null, 'verified', 'https://picsum.photos/seed/artist-aki/800/1000'),
-  ('00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000103', 'Maria Wood', 'Photographs of the built environment.', 'Melbourne, Australia', 'Australian', 'https://mariawood.example.com', 'pending', 'https://picsum.photos/seed/artist-maria/800/1000')
+  ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000101', 'Lena Moreau', 'Abstraction and the memory of place.', 'Paris, France', 'French', 'https://lenamoreau.example.com', 'verified', '/img/artist-lena.jpg'),
+  ('00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000102', 'Aki Tanaka', 'Mineral pigments and meditative field works.', 'Kyoto, Japan', 'Japanese', null, 'verified', '/img/artist-aki.jpg'),
+  ('00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000103', 'Maria Wood', 'Photographs of the built environment.', 'Melbourne, Australia', 'Australian', 'https://mariawood.example.com', 'pending', '/img/artist-maria.jpg')
 on conflict (id) do nothing;
 
 insert into artist_artwork.artworks
@@ -18,9 +18,9 @@ on conflict (id) do nothing;
 
 insert into artist_artwork.artwork_images (artwork_id, image_url, alt_text, is_primary)
 values
-  ('00000000-0000-4000-8000-000000001001', 'https://picsum.photos/seed/art-01/900/1100', 'Morning Tide', true),
-  ('00000000-0000-4000-8000-000000001002', 'https://picsum.photos/seed/art-02/1200/900', 'Ember Field', true),
-  ('00000000-0000-4000-8000-000000001003', 'https://picsum.photos/seed/art-05/1000/1000', 'Infinite Courtyard', true),
-  ('00000000-0000-4000-8000-000000001004', 'https://picsum.photos/seed/art-06/800/1000', 'Vermilion Study', true),
-  ('00000000-0000-4000-8000-000000001005', 'https://picsum.photos/seed/art-07/1200/900', 'Concrete Light', true)
+  ('00000000-0000-4000-8000-000000001001', '/img/art-01.jpg', 'Morning Tide', true),
+  ('00000000-0000-4000-8000-000000001002', '/img/art-02.jpg', 'Ember Field', true),
+  ('00000000-0000-4000-8000-000000001003', '/img/art-05.jpg', 'Infinite Courtyard', true),
+  ('00000000-0000-4000-8000-000000001004', '/img/art-06.jpg', 'Vermilion Study', true),
+  ('00000000-0000-4000-8000-000000001005', '/img/art-07.jpg', 'Concrete Light', true)
 on conflict do nothing;

@@ -15,7 +15,7 @@ export function StyleTiles() {
       {moods.map((mood) => (
         <Link
           key={mood.label}
-          href="/artworks"
+          href={`/artworks?style=${encodeURIComponent(mood.label)}`}
           className={`focus-ring flex aspect-[4/5] flex-col items-center justify-center gap-1 rounded-lg transition-transform duration-normal hover:-translate-y-1 ${mood.className}`}
         >
           <span className="font-display text-h3">{mood.label}</span>

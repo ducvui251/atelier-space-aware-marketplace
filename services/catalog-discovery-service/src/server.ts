@@ -5,6 +5,7 @@ import { consumeEvents } from "@atelier/events";
 import { ping } from "@atelier/persistence";
 import { health } from "./health.ts";
 import { searchArtworks } from "./domain/search-rules.ts";
+import { listCollections } from "./infrastructure/collections-repository.ts";
 import { listReadModel, syncReadModel, upsertReadModelArtwork } from "./infrastructure/read-model-repository.ts";
 
 async function sourceArtworks(): Promise<Artwork[]> {
@@ -62,6 +63,10 @@ const routes: Record<string, ServiceRouteHandler> = {
     const parsed = parseBody(ArtworkSearchQuerySchema, Object.fromEntries(url.searchParams.entries()));
     if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field });
     const items = searchArtworks(await listReadModel(), parsed.data);
+    return writeServiceJson(response, 200, { items, total: items.length }, correlationId);
+  },
+  "GET /v1/catalog/collections": async ({ response, correlationId }) => {
+    const items = await listCollections();
     return writeServiceJson(response, 200, { items, total: items.length }, correlationId);
   },
 };

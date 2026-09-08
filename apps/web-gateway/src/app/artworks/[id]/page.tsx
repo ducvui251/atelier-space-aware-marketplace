@@ -11,10 +11,10 @@ interface ArtworkDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
-export async function generateStaticParams() {
-  const artworks = await listArtworks();
-  return artworks.map((artwork) => ({ id: artwork.id }));
-}
+// Catalog data is service-backed, so prerendering cannot enumerate params
+// at build time (the old fixture fallback was removed in Phase 1 of
+// MICROSERVICE_100_PLAN.md). Params are resolved per-request instead.
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
