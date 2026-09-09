@@ -169,7 +169,7 @@ const routes: Record<string, ServiceRouteHandler> = {
   "POST /v1/commerce/orders/:id/ship": async ({ request, url, response, correlationId }) => {
     const parsed = parseBody(ShipOrderRequestSchema, await readJson(request));
     if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
-    const shipment = await shipOrder(url.pathname.split("/")[4] ?? "", parsed.data.artistId, { carrier: parsed.data.carrier, trackingNumber: parsed.data.trackingNumber });
+    const shipment = await shipOrder(url.pathname.split("/")[4] ?? "", parsed.data.artistId, { carrier: parsed.data.carrier, trackingNumber: parsed.data.trackingNumber }, correlationId);
     return shipment ? writeServiceJson(response, 200, shipment, correlationId) : writeServiceError(response, 403, { code: "FORBIDDEN", message: "This order does not belong to the artist", correlationId, retryable: false });
   },
   "POST /v1/commerce/orders/:id/confirm-received": async ({ request, url, response, correlationId }) => {

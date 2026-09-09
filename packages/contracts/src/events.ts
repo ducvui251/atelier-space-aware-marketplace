@@ -87,6 +87,14 @@ export const PaymentSucceededPayloadSchema = z.object({
   currency: z.string(),
 });
 
+// Also Commerce (from shipOrder) -> Admin (marks admin.order_feed shipped).
+export const OrderShippedPayloadSchema = z.object({
+  orderId: z.string().uuid(),
+  shipmentId: z.string().uuid(),
+  carrier: z.string(),
+  trackingNumber: z.string(),
+});
+
 export type ArtworkPublishedPayload = z.infer<typeof ArtworkPublishedPayloadSchema>;
 export type ArtworkVerifiedPayload = z.infer<typeof ArtworkVerifiedPayloadSchema>;
 export type ArtistVerifiedPayload = z.infer<typeof ArtistVerifiedPayloadSchema>;
@@ -94,3 +102,4 @@ export type ArtworkSoldPayload = z.infer<typeof ArtworkSoldPayloadSchema>;
 export type ArtworkReservedPayload = z.infer<typeof ArtworkReservedPayloadSchema>;
 export type OrderCreatedPayload = z.infer<typeof OrderCreatedPayloadSchema>;
 export type PaymentSucceededPayload = z.infer<typeof PaymentSucceededPayloadSchema>;
+export type OrderShippedPayload = z.infer<typeof OrderShippedPayloadSchema>;

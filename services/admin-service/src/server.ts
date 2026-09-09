@@ -1,10 +1,10 @@
 import { createServiceServer, getPort, readJson, writeServiceError, writeServiceJson, type ServiceRouteHandler } from "@atelier/config/http";
 import { CreateComplaintRequestSchema, ResolveComplaintRequestSchema, parseBody } from "@atelier/contracts";
-import { OrderCreatedPayloadSchema, PaymentSucceededPayloadSchema } from "@atelier/contracts/events";
+import { OrderCreatedPayloadSchema, OrderShippedPayloadSchema, PaymentSucceededPayloadSchema } from "@atelier/contracts/events";
 import { consumeEvents, type ConsumedEvent } from "@atelier/events";
 import { ping } from "@atelier/persistence";
 import { health } from "./health.ts";
-import { createComplaint, getStats, listComplaints, markOrderFeedPaid, resolveComplaint, upsertOrderFeedCreated } from "./infrastructure/admin-repository.ts";
+import { createComplaint, getStats, listComplaints, markOrderFeedPaid, markOrderFeedShipped, resolveComplaint, upsertOrderFeedCreated } from "./infrastructure/admin-repository.ts";
 
 async function source<T>(path: string): Promise<T> {
   const baseUrl = process.env.ARTIST_ARTWORK_SERVICE_URL ?? "http://localhost:4103";
@@ -63,6 +63,11 @@ async function handleCommerceEvent(event: ConsumedEvent): Promise<void> {
   if (event.type === "PaymentSucceeded") {
     const paid = PaymentSucceededPayloadSchema.safeParse(event.payload);
     if (paid.success) await markOrderFeedPaid(paid.data);
+    return;
+  }
+  if (event.type === "OrderShipped") {
+    const shipped = OrderShippedPayloadSchema.safeParse(event.payload);
+    if (shipped.success) await markOrderFeedShipped(shipped.data);
   }
 }
 
@@ -71,7 +76,7 @@ if (process.env.EVENT_BROKER_URL) {
     brokerUrl: process.env.EVENT_BROKER_URL,
     exchange: process.env.EVENT_EXCHANGE ?? "atelier.events.v1",
     queue: "atelier.admin.v1",
-    routingKeys: ["order.created", "payment.succeeded"],
+    routingKeys: ["order.created", "payment.succeeded", "order.shipped"],
     dedupSchema: "admin",
     handler: handleCommerceEvent,
   }).catch(() => undefined);
