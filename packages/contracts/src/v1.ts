@@ -18,6 +18,26 @@ export function parseBody<T>(schema: ZodType<T>, body: unknown): ParsedRequest<T
   return { success: false, code: "VALIDATION_ERROR", message: issue?.message ?? "Invalid request body", field };
 }
 
+// --- Catalog & Discovery: collections (G-17) --------------------------------
+// Response contract, not a request schema — GET /v1/catalog/collections
+// takes no input. Validated at the route boundary so a shape drift between
+// the repository and the documented contract fails loudly instead of
+// silently shipping wrong data to the Gateway (MICROSERVICE_100_PLAN.md
+// Phase 1, G-17: "executable response contract").
+
+export const CollectionSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string().trim().min(1),
+  description: z.string(),
+  imageUrl: z.string().trim().min(1),
+  artworkCount: z.number().int().nonnegative(),
+});
+
+export const CollectionsListResponseSchema = z.object({
+  items: z.array(CollectionSchema),
+  total: z.number().int().nonnegative(),
+});
+
 export const ArtworkSearchQuerySchema = z.object({
   q: z.string().trim().optional(),
   style: z.string().trim().optional(),
@@ -42,11 +62,21 @@ export const CheckoutRequestSchema = z.object({
 
 // --- Account ---------------------------------------------------------------
 
+export const SignupRequestSchema = z.object({
+  email: z.string().trim().email(),
+  password: z.string().min(8),
+  fullName: z.string().trim().min(1),
+  role: z.enum(["buyer", "artist"]).default("buyer"),
+});
+
 export const AccountSyncRequestSchema = z.object({
   authUserId: z.string().uuid(),
   email: z.string().email(),
   fullName: z.string().trim().optional(),
   phone: z.string().trim().optional(),
+  // Only honored on first insert (see syncAuthUser) — never lets a repeat
+  // sync call change an existing account's role.
+  role: z.enum(["buyer", "artist"]).optional(),
 });
 
 export const AccountUpdateRequestSchema = z.object({
@@ -55,6 +85,10 @@ export const AccountUpdateRequestSchema = z.object({
 });
 
 // --- Artist & Artwork --------------------------------------------------------
+
+export const EnsureArtistProfileRequestSchema = z.object({
+  displayName: z.string().trim().min(1),
+});
 
 const orientationEnum = z.enum(["portrait", "landscape", "square"]);
 const editionTypeEnum = z.enum(["original", "limited-edition"]);
@@ -203,6 +237,9 @@ export type ArtworkSearchQuery = z.infer<typeof ArtworkSearchQuerySchema>;
 export type CheckoutRequest = z.infer<typeof CheckoutRequestSchema>;
 export type AccountSyncRequest = z.infer<typeof AccountSyncRequestSchema>;
 export type AccountUpdateRequest = z.infer<typeof AccountUpdateRequestSchema>;
+export type SignupRequest = z.infer<typeof SignupRequestSchema>;
+export type CollectionResponse = z.infer<typeof CollectionSchema>;
+export type EnsureArtistProfileRequest = z.infer<typeof EnsureArtistProfileRequestSchema>;
 export type ArtworkCreateRequest = z.infer<typeof ArtworkCreateRequestSchema>;
 export type ArtworkUpdateRequest = z.infer<typeof ArtworkUpdateRequestSchema>;
 export type ArtworkAvailabilityRequest = z.infer<typeof ArtworkAvailabilityRequestSchema>;

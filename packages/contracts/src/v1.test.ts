@@ -16,6 +16,8 @@ import {
   CreateComplaintRequestSchema,
   CreatePlacementRequestSchema,
   CreateReservationRequestSchema,
+  CollectionSchema,
+  CollectionsListResponseSchema,
   OrderReviewRequestSchema,
   ResolveComplaintRequestSchema,
   ShipOrderRequestSchema,
@@ -45,6 +47,32 @@ describe("parseBody", () => {
   it("handles a completely malformed body (null / non-object) without throwing", () => {
     const result = parseBody(CartAddRequestSchema, null);
     expect(result.success).toBe(false);
+  });
+});
+
+describe("CollectionsListResponseSchema", () => {
+  const validCollection = {
+    id: uuid1,
+    title: "Warm Minimal",
+    description: "Quiet, sunlit works in bone, clay, and sand for calm, spacious rooms.",
+    imageUrl: "/img/col-warm.jpg",
+    artworkCount: 3,
+  };
+
+  it("accepts a well-formed collections list response", () => {
+    expect(CollectionsListResponseSchema.safeParse({ items: [validCollection], total: 1 }).success).toBe(true);
+  });
+
+  it("accepts an empty collections list", () => {
+    expect(CollectionsListResponseSchema.safeParse({ items: [], total: 0 }).success).toBe(true);
+  });
+
+  it("rejects a negative artworkCount (a live-read bug, not a valid state)", () => {
+    expect(CollectionSchema.safeParse({ ...validCollection, artworkCount: -1 }).success).toBe(false);
+  });
+
+  it("rejects a non-uuid id", () => {
+    expect(CollectionSchema.safeParse({ ...validCollection, id: "warm-minimal" }).success).toBe(false);
   });
 });
 
