@@ -879,20 +879,20 @@ Exit gate: eight HTTP processes start independently, health/readiness behavior i
 
 ### Phase 3 — Enforce persistence ownership
 
-Status: **partial foundation; not accepted**. Most cross-service SQL violations were removed, but identity, RLS/query-ownership tests and migration/restart proof remain open.
+Status: **partial foundation; not accepted** (2026-09-09). Schema isolation is now proven at both the source-code and live-database level. Identity/principal validation (G-19) remains genuinely open — deliberately not rushed, see below.
 
 Tasks:
 
-- [ ] Inventory every SQL query by owning schema; record the map in the PR.
-- [ ] Prove schema isolation through SQL inventory and restricted-role integration tests; do not recreate obsolete fixes for Verification cross-schema SQL or Commerce `account.users` joins (G-22).
-- [ ] Verify Account identity mapping through existing HTTP contracts; close principal validation without adding redundant account endpoints.
+- [x] Inventory every SQL query by owning schema; record the map in the PR. *(2026-09-09: grepped every `services/*/src` for schema-qualified table references, excluding comments. Every one of the 8 services touches only its own schema — account→account, catalog-discovery→catalog_discovery, artist-artwork→artist_artwork, commerce→commerce, recommendation→recommendation, verification→verification, room-preview→room_preview, admin→admin. Zero cross-schema SQL found.)*
+- [x] Prove schema isolation through SQL inventory and restricted-role integration tests; do not recreate obsolete fixes for Verification cross-schema SQL or Commerce `account.users` joins (G-22). *(The G-22 fixes are already in place — the only "hits" for `account.users` outside the account schema are code comments explicitly documenting that the cross-schema join was removed, not real SQL. New `scripts/test-schema-isolation.sh` live-tests all 8 roles against all 8 schemas: 64/64 checks pass — every role reads its own schema and is rejected with `permission denied for schema` by every other one. A follow-up test that would have proven RLS as a second layer independent of the schema-level GRANT (temporarily granting a role table access it shouldn't have, to confirm the `FORCE ROW LEVEL SECURITY` policy from migration 0006 still blocks it) was blocked by this session's safety controls before any change was made — not attempted around. RLS enforcement here is evidenced by code review (migration 0006's `force row level security` + `to <owning_role>` policies) plus the fact schema-level isolation already fully passes, not by a live bypass test.)*
+- [ ] Verify Account identity mapping through existing HTTP contracts; close principal validation without adding redundant account endpoints. *(G-19, confirmed still open: `GET`/`PATCH /v1/account/me` trust a caller-supplied `authUserId` query param rather than deriving it from the `Authorization` bearer token they already receive and forward. Not exploitable through the Gateway today — `apps/web-gateway/src/app/api/account/me/route.ts` already validates identity via Supabase before ever calling account-service — but account-service itself doesn't verify the JWT, so anything else holding the internal service token could impersonate any user. Fixing this properly needs JWT signature verification added to account-service (a new dependency + the Supabase JWT secret), which deserves its own careful pass rather than a rushed partial fix in this one — left open on purpose.)*
 - [ ] Reuse existing Artist & Artwork verification PATCH and reserve/commit/release commands; test ownership, conflicts and retry safety. Verification decision/projection atomic delivery is tracked in Phase 5.
 - [ ] Confirm/complete the catalog read-model backfill path.
-- [ ] Confirm Room Preview room/placement migrations match the implemented repositories (0004).
-- [ ] Add schema-specific database roles and query-level tests that reject unauthorized schema access.
-- [ ] Add RLS policy enforcement tests on top of migration 0006.
-- [ ] Remove production use of module-level mock arrays and browser localStorage for business state (G-21 follow-through).
-- [ ] Verify migration/seed output uses local or Storage imagery. Preserve the narrow legacy picsum URL rewrite in migration 0011; do not misreport its literal compatibility match as production imagery.
+- [x] Confirm Room Preview room/placement migrations match the implemented repositories (0004). *(Verified: `room_preview.rooms` (0001) and `room_preview.placements` (0004) columns — `buyer_id`/`name`/`room_type`/`wall_color`/`image_url` and `room_id`/`artwork_id`/`scale`/`position_x`/`position_y`/`rotation` respectively — match `room-repository.ts`'s queries exactly.)*
+- [x] Add schema-specific database roles and query-level tests that reject unauthorized schema access. *(Same `scripts/test-schema-isolation.sh` as above — this is the same evidence satisfying both this task and the one above.)*
+- [ ] Add RLS policy enforcement tests on top of migration 0006. *(See the RLS note above — a true bypass test was blocked by session safety controls, so this is not yet independently proven beyond code review.)*
+- [x] Remove production use of module-level mock arrays and browser localStorage for business state (G-21 follow-through). *(Confirmed clean: no `localStorage` usage anywhere in `apps/web-gateway/src`, no mock/fixture data files remaining in the tree.)*
+- [ ] Verify migration/seed output uses local or Storage imagery. Preserve the narrow legacy picsum URL rewrite in migration 0011; do not misreport its literal compatibility match as production imagery. *(Already covered by the existing "Boundary grep gates" CI step's picsum check — not independently re-verified this pass.)*
 
 Exit gate: a repository scan shows no cross-service table writes and no production route depends on process memory or client storage for business state.
 
