@@ -116,6 +116,8 @@ services:
       COMMERCE_PORT: 4104
       DATABASE_URL: postgresql://commerce_service:commerce_service_dev_pw@postgres:5432/atelier
       ARTIST_ARTWORK_SERVICE_URL: http://artist-artwork-service:4103
+      EVENT_BROKER_URL: amqp://atelier_events:atelier_events_dev_pw@message-broker:5672
+      EVENT_EXCHANGE: atelier.events.v1
       ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:?required}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       WEB_GATEWAY_URL: ${WEB_GATEWAY_URL:-http://localhost:3000}
@@ -129,6 +131,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       artist-artwork-service: { condition: service_healthy }
+      message-broker: { condition: service_healthy }
 
   recommendation-service:
     build:
@@ -208,6 +211,8 @@ services:
       DATABASE_URL: postgresql://admin_service:admin_service_dev_pw@postgres:5432/atelier
       ARTIST_ARTWORK_SERVICE_URL: http://artist-artwork-service:4103
       COMMERCE_SERVICE_URL: http://commerce-service:4104
+      EVENT_BROKER_URL: amqp://atelier_events:atelier_events_dev_pw@message-broker:5672
+      EVENT_EXCHANGE: atelier.events.v1
       ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:?required}
     ports: ["4108:4108"]
     restart: unless-stopped
@@ -220,6 +225,7 @@ services:
       postgres: { condition: service_healthy }
       artist-artwork-service: { condition: service_healthy }
       commerce-service: { condition: service_healthy }
+      message-broker: { condition: service_healthy }
 
   web-gateway:
     build:

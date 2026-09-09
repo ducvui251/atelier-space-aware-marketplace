@@ -114,14 +114,14 @@ if (process.env.EVENT_BROKER_URL) {
  * a re-delivered event is just a repeat of the same idempotent UPDATE.
  */
 async function handleVerificationEvent(event: ConsumedEvent): Promise<void> {
-  const artwork = ArtworkVerifiedPayloadSchema.safeParse(event.payload);
-  if (artwork.success) {
-    await updatePersistedArtworkVerification(artwork.data.artworkId, artwork.data, event.correlationId, { emitEvent: false });
+  if (event.type === "ArtworkVerified") {
+    const artwork = ArtworkVerifiedPayloadSchema.safeParse(event.payload);
+    if (artwork.success) await updatePersistedArtworkVerification(artwork.data.artworkId, artwork.data, event.correlationId, { emitEvent: false });
     return;
   }
-  const artist = ArtistVerifiedPayloadSchema.safeParse(event.payload);
-  if (artist.success) {
-    await updatePersistedArtistVerification(artist.data.artistId, artist.data, event.correlationId, { emitEvent: false });
+  if (event.type === "ArtistVerified") {
+    const artist = ArtistVerifiedPayloadSchema.safeParse(event.payload);
+    if (artist.success) await updatePersistedArtistVerification(artist.data.artistId, artist.data, event.correlationId, { emitEvent: false });
   }
 }
 

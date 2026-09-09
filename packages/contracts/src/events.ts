@@ -45,8 +45,10 @@ export const ArtworkVerifiedPayloadSchema = z.object({
 
 // Verification's own outbox event (Phase 5, G-22) — Artist & Artwork
 // consumes this to update its projection instead of being PATCHed
-// synchronously; it then re-emits its own ArtworkVerifiedPayloadSchema
-// event once the projection actually changes (see catalog-repository.ts).
+// synchronously. It deliberately does NOT re-publish under this same type
+// afterward (that caused a self-consumption loop — see catalog-repository.ts
+// and server.ts's `emitEvent` option); Catalog gets the update by directly
+// consuming this same event on the shared routing key instead.
 export const ArtistVerifiedPayloadSchema = z.object({
   artistId: z.string().uuid(),
   status: z.enum(["verified", "rejected"]),
@@ -63,8 +65,32 @@ export const ArtworkReservedPayloadSchema = z.object({
   expiresAt: z.string(),
 });
 
+// Commerce's outbox events (Phase 5) — Admin consumes both to populate
+// admin.order_feed. Each payload carries enough fields (buyerId, artworkId,
+// amount, currency) to upsert a complete row on its own, so the read model
+// self-heals correctly regardless of which of the two events a consumer
+// processes first (see admin-repository.ts).
+export const OrderCreatedPayloadSchema = z.object({
+  orderId: z.string().uuid(),
+  buyerId: z.string().uuid(),
+  artworkId: z.string().uuid(),
+  amount: z.number(),
+  currency: z.string(),
+});
+
+export const PaymentSucceededPayloadSchema = z.object({
+  paymentId: z.string().uuid(),
+  orderId: z.string().uuid(),
+  buyerId: z.string().uuid(),
+  artworkId: z.string().uuid(),
+  amount: z.number(),
+  currency: z.string(),
+});
+
 export type ArtworkPublishedPayload = z.infer<typeof ArtworkPublishedPayloadSchema>;
 export type ArtworkVerifiedPayload = z.infer<typeof ArtworkVerifiedPayloadSchema>;
 export type ArtistVerifiedPayload = z.infer<typeof ArtistVerifiedPayloadSchema>;
 export type ArtworkSoldPayload = z.infer<typeof ArtworkSoldPayloadSchema>;
 export type ArtworkReservedPayload = z.infer<typeof ArtworkReservedPayloadSchema>;
+export type OrderCreatedPayload = z.infer<typeof OrderCreatedPayloadSchema>;
+export type PaymentSucceededPayload = z.infer<typeof PaymentSucceededPayloadSchema>;
