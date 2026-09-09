@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
+import { createLogger } from "./logger.ts";
 
 export interface ServiceHealth {
   service: string;
@@ -75,11 +76,58 @@ export function writeServiceError(response: ServerResponse, statusCode: number, 
   }, params.correlationId);
 }
 
-export async function readJson<T = unknown>(request: IncomingMessage): Promise<T | null> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of request) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  if (chunks.length === 0) return null;
-  try { return JSON.parse(Buffer.concat(chunks).toString("utf8")) as T; } catch { return null; }
+const DEFAULT_MAX_BODY_BYTES = 1_000_000; // 1MB — every request body in this API is small JSON; image bytes go through Supabase Storage, not this path.
+
+export class PayloadTooLargeError extends Error {
+  constructor(limitBytes: number) {
+    super(`Request body exceeds the ${limitBytes} byte limit`);
+    this.name = "PayloadTooLargeError";
+  }
+}
+
+/**
+ * Body-size bound (MICROSERVICE_100_PLAN.md Phase 2) — without this, a
+ * client (malicious or just buggy) can stream an unbounded body and exhaust
+ * process memory before JSON.parse ever runs. Aborts the connection as soon
+ * as the limit is crossed rather than buffering the whole oversized body
+ * first.
+ */
+export function readJson<T = unknown>(request: IncomingMessage, maxBytes = DEFAULT_MAX_BODY_BYTES): Promise<T | null> {
+  // Deliberately NOT `for await...of request`: Node's async-iterator
+  // protocol for Readable streams calls `destroy()` on early exit (break,
+  // return, or a throw inside the loop) — see Node's stream docs. Since the
+  // request and response share one TCP socket, that destroy takes the
+  // response down with it, so a thrown PayloadTooLargeError never reaches
+  // the client — the connection just hangs. Plain 'data'/'end' listeners
+  // don't have that behavior, so pausing here leaves the socket able to
+  // carry the 413 response normally.
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let received = 0;
+    let rejected = false;
+
+    request.on("data", (chunk: Buffer) => {
+      if (rejected) return;
+      received += chunk.byteLength;
+      if (received > maxBytes) {
+        rejected = true;
+        request.pause();
+        reject(new PayloadTooLargeError(maxBytes));
+        return;
+      }
+      chunks.push(chunk);
+    });
+
+    request.on("end", () => {
+      if (rejected) return;
+      if (chunks.length === 0) return resolve(null);
+      try { resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")) as T); } catch { resolve(null); }
+    });
+
+    request.on("error", (error) => {
+      if (!rejected) reject(error);
+    });
+  });
 }
 
 function getCorrelationId(request: IncomingMessage): string {
@@ -89,8 +137,9 @@ function getCorrelationId(request: IncomingMessage): string {
 
 export function createServiceServer(options: ServiceServerOptions): Server {
   assertInternalTokenConfigured(options);
+  const logger = createLogger(options.name);
 
-  return createServer(async (request, response) => {
+  const server = createServer(async (request, response) => {
     const correlationId = getCorrelationId(request);
     const url = new URL(request.url ?? "/", "http://service.local");
     const path = url.pathname;
@@ -129,9 +178,18 @@ export function createServiceServer(options: ServiceServerOptions): Server {
       try {
         await handler({ request, response, correlationId, url });
       } catch (error) {
+        if (error instanceof PayloadTooLargeError) {
+          logger.warn("request rejected: payload too large", { correlationId, path, maxBytes: DEFAULT_MAX_BODY_BYTES });
+          writeServiceError(response, 413, { code: "PAYLOAD_TOO_LARGE", message: error.message, correlationId, retryable: false });
+          return;
+        }
+        // The real error (which may carry internal details — SQL text,
+        // stack traces, dependency URLs) is logged server-side only; the
+        // client gets a generic message ("safe errors", Phase 2).
+        logger.error("unhandled route error", { correlationId, path, method: request.method, error });
         writeServiceError(response, 500, {
           code: "INTERNAL_ERROR",
-          message: error instanceof Error ? error.message : "Internal service error",
+          message: "Internal service error",
           correlationId,
           retryable: true,
         });
@@ -141,6 +199,14 @@ export function createServiceServer(options: ServiceServerOptions): Server {
 
     writeServiceError(response, 404, { code: "NOT_FOUND", message: "Not Found", correlationId, retryable: false });
   });
+
+  server.on("listening", () => {
+    const address = server.address();
+    const port = typeof address === "object" && address ? address.port : address;
+    logger.info("service listening", { port });
+  });
+
+  return server;
 }
 
 export function getPort(environmentName: string, fallback: number): number {

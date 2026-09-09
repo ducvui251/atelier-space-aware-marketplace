@@ -1,4 +1,5 @@
 import { createServiceServer, getPort, writeServiceError, writeServiceJson, type ServiceRouteHandler } from "@atelier/config/http";
+import { createLogger } from "@atelier/config/logger";
 import { ArtworkSearchQuerySchema, CollectionsListResponseSchema, parseBody, type Artwork } from "@atelier/contracts";
 import { ArtworkPublishedPayloadSchema, ArtworkReservedPayloadSchema, ArtworkSoldPayloadSchema, ArtworkVerifiedPayloadSchema } from "@atelier/contracts/events";
 import { consumeEvents } from "@atelier/events";
@@ -58,6 +59,8 @@ async function handleArtworkEvent(event: { type: string; payload: unknown }): Pr
   if (artwork) await upsertReadModelArtwork(artwork);
 }
 
+const logger = createLogger("catalog-discovery");
+
 const routes: Record<string, ServiceRouteHandler> = {
   "GET /v1/catalog/artworks": async ({ url, response, correlationId }) => {
     const parsed = parseBody(ArtworkSearchQuerySchema, Object.fromEntries(url.searchParams.entries()));
@@ -73,7 +76,7 @@ const routes: Record<string, ServiceRouteHandler> = {
       // A shape drift between this repository and the documented contract
       // is a bug in this service, not a client error — fail loudly instead
       // of shipping a response the Gateway's contract doesn't expect.
-      console.error("[catalog-discovery] collections response failed its own contract", validated.error.issues);
+      logger.error("collections response failed its own contract", { correlationId, issues: validated.error.issues });
       return writeServiceError(response, 500, { code: "CONTRACT_VIOLATION", message: "Collections response did not match its contract", correlationId });
     }
     return writeServiceJson(response, 200, validated.data, correlationId);
