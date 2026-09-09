@@ -4,6 +4,7 @@ import { CorrelationIdSchema } from "./transport.ts";
 export const DomainEventTypeSchema = z.enum([
   "ArtworkPublished",
   "ArtworkVerified",
+  "ArtistVerified",
   "ArtworkReserved",
   "ArtworkSold",
   "ArtworkSaved",
@@ -39,6 +40,17 @@ export const ArtworkPublishedPayloadSchema = z.object({
 export const ArtworkVerifiedPayloadSchema = z.object({
   artworkId: z.string().uuid(),
   status: z.enum(["verified", "rejected"]),
+  reviewerId: z.string().uuid().optional(),
+});
+
+// Verification's own outbox event (Phase 5, G-22) — Artist & Artwork
+// consumes this to update its projection instead of being PATCHed
+// synchronously; it then re-emits its own ArtworkVerifiedPayloadSchema
+// event once the projection actually changes (see catalog-repository.ts).
+export const ArtistVerifiedPayloadSchema = z.object({
+  artistId: z.string().uuid(),
+  status: z.enum(["verified", "rejected"]),
+  reviewerId: z.string().uuid().optional(),
 });
 
 export const ArtworkSoldPayloadSchema = z.object({
@@ -53,5 +65,6 @@ export const ArtworkReservedPayloadSchema = z.object({
 
 export type ArtworkPublishedPayload = z.infer<typeof ArtworkPublishedPayloadSchema>;
 export type ArtworkVerifiedPayload = z.infer<typeof ArtworkVerifiedPayloadSchema>;
+export type ArtistVerifiedPayload = z.infer<typeof ArtistVerifiedPayloadSchema>;
 export type ArtworkSoldPayload = z.infer<typeof ArtworkSoldPayloadSchema>;
 export type ArtworkReservedPayload = z.infer<typeof ArtworkReservedPayloadSchema>;

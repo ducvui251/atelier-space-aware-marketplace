@@ -321,6 +321,9 @@ importers:
       '@atelier/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@atelier/events':
+        specifier: workspace:*
+        version: link:../../packages/events
       '@atelier/persistence':
         specifier: workspace:*
         version: link:../../packages/persistence
