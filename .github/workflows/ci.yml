@@ -43,6 +43,9 @@ jobs:
         # 2. ATELIER_INTERNAL_SERVICE_TOKEN must never have a working
         #    (:-) default in compose files — it must fail closed.
         # 3. Every runbooks/*.md referenced by tracked files must exist.
+        # 4. ATELIER_ALLOW_INSECURE_LOCAL (the auth bypass for running a
+        #    single service directly on the host) must never be set in any
+        #    compose file — Compose always runs with real internal auth.
         run: |
           failed=0
           if grep -RIn "picsum" apps/web-gateway/src services/*/src supabase/migrations --include='*.ts' --include='*.tsx' --include='*.sql' \
@@ -52,6 +55,10 @@ jobs:
           fi
           if grep -RInE 'ATELIER_INTERNAL_SERVICE_TOKEN[^}]*:-' docker-compose.yml docker-compose.*.yml .docker-compose*.yml 2>/dev/null; then
             echo "::error::working default for ATELIER_INTERNAL_SERVICE_TOKEN in compose (G-18)"
+            failed=1
+          fi
+          if grep -RIn 'ATELIER_ALLOW_INSECURE_LOCAL' docker-compose.yml docker-compose.*.yml .docker-compose*.yml 2>/dev/null; then
+            echo "::error::ATELIER_ALLOW_INSECURE_LOCAL must never appear in a compose file"
             failed=1
           fi
           for ref in $(grep -RhoE 'runbooks/[a-z0-9-]+\.md' --include='*.yml' --include='*.md' --include='*.example' .github .env.example runbooks apps services scripts docs 2>/dev/null | sort -u); do

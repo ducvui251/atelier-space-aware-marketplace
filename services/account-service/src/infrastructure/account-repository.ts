@@ -26,9 +26,9 @@ type AccountRow = {
  * association's *existence*, resolved by calling that service rather than
  * joining across schemas from this process.
  */
-async function findArtistIdForUser(internalUserId: string): Promise<string | undefined> {
+async function findArtistIdForUser(internalUserId: string, correlationId: string): Promise<string | undefined> {
   try {
-    const artist = await requestInternalService<{ id: string }>("artist-artwork", `/v1/artist-artwork/artists/by-user/${encodeURIComponent(internalUserId)}`);
+    const artist = await requestInternalService<{ id: string }>("artist-artwork", `/v1/artist-artwork/artists/by-user/${encodeURIComponent(internalUserId)}`, { correlationId });
     return artist.id;
   } catch (error) {
     if (error instanceof InternalServiceError && error.status === 404) return undefined;
@@ -37,15 +37,16 @@ async function findArtistIdForUser(internalUserId: string): Promise<string | und
 }
 
 /** Idempotent — safe to call on every sync of an artist-role account, not just the first. */
-async function ensureArtistProfileForUser(internalUserId: string, displayName: string): Promise<void> {
+async function ensureArtistProfileForUser(internalUserId: string, displayName: string, correlationId: string): Promise<void> {
   await requestInternalService("artist-artwork", `/v1/artist-artwork/artists/by-user/${encodeURIComponent(internalUserId)}`, {
     method: "POST",
     body: { displayName },
+    correlationId,
   });
 }
 
-async function mapUser(row: AccountRow): Promise<AccountUser> {
-  const artistId = await findArtistIdForUser(row.internal_id);
+async function mapUser(row: AccountRow, correlationId: string): Promise<AccountUser> {
+  const artistId = await findArtistIdForUser(row.internal_id, correlationId);
   return {
     id: row.id,
     fullName: row.full_name,
@@ -63,9 +64,9 @@ const userSelect = `
   from account.users u
 `;
 
-export async function findByAuthUserId(authUserId: string): Promise<AccountUser | null> {
+export async function findByAuthUserId(authUserId: string, correlationId: string): Promise<AccountUser | null> {
   const rows = await query<AccountRow>(`${userSelect} where u.auth_user_id = $1::uuid`, [authUserId]);
-  return rows[0] ? await mapUser(rows[0]) : null;
+  return rows[0] ? await mapUser(rows[0], correlationId) : null;
 }
 
 export async function syncAuthUser(input: {
@@ -74,7 +75,7 @@ export async function syncAuthUser(input: {
   fullName?: string;
   phone?: string;
   role?: "buyer" | "artist";
-}): Promise<AccountUser> {
+}, correlationId: string): Promise<AccountUser> {
   const upserted = await query<AccountRow>(
     `with upserted as (
       insert into account.users (auth_user_id, full_name, email, phone, role)
@@ -97,12 +98,12 @@ export async function syncAuthUser(input: {
   // freshly-provisioned artist still needs their artist_profiles row, and a
   // profile lost to a prior partial failure should self-heal on next login.
   if (upserted[0].role === "artist") {
-    await ensureArtistProfileForUser(upserted[0].internal_id, upserted[0].full_name || input.email);
+    await ensureArtistProfileForUser(upserted[0].internal_id, upserted[0].full_name || input.email, correlationId);
   }
-  return await mapUser(upserted[0]);
+  return await mapUser(upserted[0], correlationId);
 }
 
-export async function updateProfile(authUserId: string, input: { fullName: string; phone?: string }): Promise<AccountUser | null> {
+export async function updateProfile(authUserId: string, input: { fullName: string; phone?: string }, correlationId: string): Promise<AccountUser | null> {
   const rows = await query<AccountRow>(
     `${userSelect}
      where u.auth_user_id = $1::uuid`,
@@ -114,5 +115,5 @@ export async function updateProfile(authUserId: string, input: { fullName: strin
      where auth_user_id = $1::uuid`,
     [authUserId, input.fullName, input.phone ?? null],
   );
-  return findByAuthUserId(authUserId);
+  return findByAuthUserId(authUserId, correlationId);
 }

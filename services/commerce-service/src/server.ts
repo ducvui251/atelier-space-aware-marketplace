@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { createServiceServer, getPort, readJson, writeServiceError, writeServiceJson, type ServiceRouteHandler } from "@atelier/config/http";
+import { createLogger } from "@atelier/config/logger";
 import { CartAddRequestSchema, CheckoutRequestSchema, ConfirmReceivedRequestSchema, OrderReviewRequestSchema, ShipOrderRequestSchema, parseBody, type Artwork } from "@atelier/contracts";
 import { ping } from "@atelier/persistence";
 import { health } from "./health.ts";
@@ -54,6 +55,8 @@ async function releaseReservationRemote(reservationId: string): Promise<void> {
 function hashCheckoutRequest(buyerId: string, shippingAddress: unknown, method: string): string {
   return createHash("sha256").update(JSON.stringify({ buyerId, shippingAddress, method })).digest("hex");
 }
+
+const logger = createLogger("commerce");
 
 const routes: Record<string, ServiceRouteHandler> = {
   "GET /v1/commerce/cart": async ({ url, response, correlationId }) => {
@@ -146,7 +149,7 @@ const routes: Record<string, ServiceRouteHandler> = {
       // logged: a reservation lease expired between reserving and Stripe
       // confirming payment. The order is already paid, so this is now a
       // mismatched-inventory alert, not something to roll back from.
-      console.error(`[commerce] checkout confirm ${sessionId}: one or more reservation commits failed after payment`);
+      logger.error("one or more reservation commits failed after payment", { correlationId, sessionId, orderIds: confirmed.orderIds });
     }
     return writeServiceJson(response, 200, { orders: await listOrdersByIds(confirmed.orderIds) }, correlationId);
   },
