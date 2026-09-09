@@ -49,7 +49,15 @@ export const ArtworkSearchQuerySchema = z.object({
   maxPrice: z.coerce.number().finite().nonnegative().optional(),
 });
 
-export const CheckoutRequestSchema = z.object({
+// The Gateway boundary (what the browser submits) and the internal-service
+// boundary (what commerce-service requires) are different contracts: the
+// browser never supplies buyerId — it's derived from the caller's validated
+// session — while the internal call must carry it explicitly. Keeping one
+// schema for both let a stale `buyerId`-less body slip past the Gateway's
+// own validation once the internal schema grew a required buyerId field, so
+// the client-facing shape is now its own schema and the internal one extends
+// it (MICROSERVICE_100_PLAN.md Phase 4 / G-19-adjacent boundary hygiene).
+export const CheckoutClientRequestSchema = z.object({
   shippingAddress: z.object({
     fullName: z.string().trim().min(1),
     address: z.string().trim().min(1),
@@ -58,6 +66,10 @@ export const CheckoutRequestSchema = z.object({
   }),
   method: z.enum(["card", "wallet"]).default("card"),
   simulateFailure: z.boolean().optional(),
+});
+
+export const CheckoutRequestSchema = CheckoutClientRequestSchema.extend({
+  buyerId: z.string().uuid(),
 });
 
 export const CheckoutConfirmRequestSchema = z.object({
@@ -238,6 +250,7 @@ export const ResolveComplaintRequestSchema = z.object({
 });
 
 export type ArtworkSearchQuery = z.infer<typeof ArtworkSearchQuerySchema>;
+export type CheckoutClientRequest = z.infer<typeof CheckoutClientRequestSchema>;
 export type CheckoutRequest = z.infer<typeof CheckoutRequestSchema>;
 export type CheckoutConfirmRequest = z.infer<typeof CheckoutConfirmRequestSchema>;
 export type AccountSyncRequest = z.infer<typeof AccountSyncRequestSchema>;

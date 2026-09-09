@@ -22,25 +22,25 @@ const routes: Record<string, ServiceRouteHandler> = {
   },
   "GET /v1/recommendation/saved": async ({ url, response, correlationId }) => {
     const buyerId = url.searchParams.get("buyerId");
-    if (!buyerId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "buyerId is required", correlationId, field: "buyerId" });
+    if (!buyerId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "buyerId is required", correlationId, field: "buyerId", retryable: false });
     const ids = new Set(await listSavedArtworkIds(buyerId));
     const items = (await sourceArtworks()).filter((artwork) => ids.has(artwork.id));
     return writeServiceJson(response, 200, { items, total: items.length }, correlationId);
   },
   "POST /v1/recommendation/saved": async ({ request, response, correlationId }) => {
     const parsed = parseBody(ToggleSavedRequestSchema, await readJson(request));
-    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field });
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
     return writeServiceJson(response, 200, { saved: await toggleSaved(parsed.data.buyerId, parsed.data.artworkId) }, correlationId);
   },
   "GET /v1/recommendation/follows": async ({ url, response, correlationId }) => {
     const buyerId = url.searchParams.get("buyerId");
-    if (!buyerId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "buyerId is required", correlationId, field: "buyerId" });
+    if (!buyerId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "buyerId is required", correlationId, field: "buyerId", retryable: false });
     const artistIds = await listFollowedArtistIds(buyerId);
     return writeServiceJson(response, 200, { artistIds, total: artistIds.length }, correlationId);
   },
   "POST /v1/recommendation/follows": async ({ request, response, correlationId }) => {
     const parsed = parseBody(ToggleFollowRequestSchema, await readJson(request));
-    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field });
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
     return writeServiceJson(response, 200, { following: await toggleFollow(parsed.data.buyerId, parsed.data.artistId) }, correlationId);
   },
 };

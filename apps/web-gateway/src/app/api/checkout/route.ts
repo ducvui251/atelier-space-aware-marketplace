@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { getAuthUser } from "@/lib/server/auth";
 import { json, errorResponse } from "@/lib/server/respond";
-import { CheckoutRequestSchema } from "@atelier/contracts";
+import { CheckoutClientRequestSchema } from "@atelier/contracts";
 import { checkout } from "@/lib/gateway/clients/commerce-checkout.client";
 
 export async function POST(request: NextRequest) {
@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
   if (!user) return errorResponse("Unauthorized", 401);
 
   const body = await request.json().catch(() => null);
-  const parsed = CheckoutRequestSchema.safeParse(body);
+  const parsed = CheckoutClientRequestSchema.safeParse(body);
   if (!parsed.success) return errorResponse("shippingAddress.{fullName,address,city,phone} are required", 400);
   const { shippingAddress, method, simulateFailure } = parsed.data;
 

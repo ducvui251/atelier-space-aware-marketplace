@@ -7,24 +7,24 @@ import { findByAuthUserId, syncAuthUser, updateProfile } from "./infrastructure/
 const routes: Record<string, ServiceRouteHandler> = {
   "GET /v1/account/me": async ({ url, response, correlationId }) => {
     const authUserId = url.searchParams.get("authUserId");
-    if (!authUserId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "authUserId is required", correlationId, field: "authUserId" });
+    if (!authUserId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "authUserId is required", correlationId, field: "authUserId", retryable: false });
     const user = await findByAuthUserId(authUserId, correlationId);
-    if (!user) return writeServiceError(response, 404, { code: "NOT_FOUND", message: "Account not found", correlationId });
+    if (!user) return writeServiceError(response, 404, { code: "NOT_FOUND", message: "Account not found", correlationId, retryable: false });
     return writeServiceJson(response, 200, { user }, correlationId);
   },
   "POST /v1/account/users/sync": async ({ request, response, correlationId }) => {
     const parsed = parseBody(AccountSyncRequestSchema, await readJson(request));
-    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field });
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
     const user = await syncAuthUser(parsed.data, correlationId);
     return writeServiceJson(response, 200, { user }, correlationId);
   },
   "PATCH /v1/account/me": async ({ request, url, response, correlationId }) => {
     const authUserId = url.searchParams.get("authUserId");
-    if (!authUserId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "authUserId is required", correlationId, field: "authUserId" });
+    if (!authUserId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "authUserId is required", correlationId, field: "authUserId", retryable: false });
     const parsed = parseBody(AccountUpdateRequestSchema, await readJson(request));
-    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field });
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
     const user = await updateProfile(authUserId, parsed.data, correlationId);
-    if (!user) return writeServiceError(response, 404, { code: "NOT_FOUND", message: "Account not found", correlationId });
+    if (!user) return writeServiceError(response, 404, { code: "NOT_FOUND", message: "Account not found", correlationId, retryable: false });
     return writeServiceJson(response, 200, { user }, correlationId);
   },
 };
