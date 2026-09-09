@@ -10,6 +10,7 @@ import {
   ArtworkUpdateRequestSchema,
   ArtworkVerificationReviewRequestSchema,
   CartAddRequestSchema,
+  CheckoutConfirmRequestSchema,
   CheckoutRequestSchema,
   ConfirmReceivedRequestSchema,
   CreateBuyerRoomRequestSchema,
@@ -114,6 +115,17 @@ describe("CheckoutRequestSchema", () => {
   it("rejects an unknown payment method", () => {
     const result = CheckoutRequestSchema.safeParse({ shippingAddress: validAddress, method: "crypto" });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("CheckoutConfirmRequestSchema", () => {
+  it("accepts a non-empty sessionId", () => {
+    expect(CheckoutConfirmRequestSchema.safeParse({ sessionId: "cs_test_abc123" }).success).toBe(true);
+  });
+
+  it("rejects an empty or missing sessionId", () => {
+    expect(CheckoutConfirmRequestSchema.safeParse({ sessionId: "" }).success).toBe(false);
+    expect(CheckoutConfirmRequestSchema.safeParse({}).success).toBe(false);
   });
 });
 
