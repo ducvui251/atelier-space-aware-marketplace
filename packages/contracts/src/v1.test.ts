@@ -20,6 +20,7 @@ import {
   CreateReservationRequestSchema,
   CollectionSchema,
   CollectionsListResponseSchema,
+  ImageUploadResponseSchema,
   OrderReviewRequestSchema,
   ResolveComplaintRequestSchema,
   ShipOrderRequestSchema,
@@ -75,6 +76,17 @@ describe("CollectionsListResponseSchema", () => {
 
   it("rejects a non-uuid id", () => {
     expect(CollectionSchema.safeParse({ ...validCollection, id: "warm-minimal" }).success).toBe(false);
+  });
+});
+
+describe("ImageUploadResponseSchema", () => {
+  it("accepts a well-formed public URL", () => {
+    expect(ImageUploadResponseSchema.safeParse({ url: "https://example.supabase.co/storage/v1/object/public/artwork-images/artist-1/abc.jpg" }).success).toBe(true);
+  });
+
+  it("rejects a missing or non-url value", () => {
+    expect(ImageUploadResponseSchema.safeParse({}).success).toBe(false);
+    expect(ImageUploadResponseSchema.safeParse({ url: "not-a-url" }).success).toBe(false);
   });
 });
 

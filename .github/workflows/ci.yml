@@ -82,6 +82,10 @@ jobs:
       # "Smoke-test" (sends it as x-service-token); a mismatch here is
       # exactly what caused the 401s that failed this job before.
       ATELIER_INTERNAL_SERVICE_TOKEN: ci-smoke-test-token
+      # Required by web-gateway/account-service (G-19 signed principal); the
+      # smoke test never calls /v1/account/me, so only `docker compose
+      # config`/`up` need it set to something non-empty.
+      ATELIER_PRINCIPAL_SIGNING_SECRET: ci-smoke-test-principal-secret
     steps:
       - uses: actions/checkout@v4
 

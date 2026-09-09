@@ -249,7 +249,23 @@ export const ResolveComplaintRequestSchema = z.object({
   note: z.string().trim().optional(),
 });
 
+// --- Gateway: image upload relay (G-05) --------------------------------
+// `POST /api/uploads/image` is a Gateway-only public route (not an internal
+// service route, so it isn't in routes.ts) that relays a browser-uploaded
+// file into Supabase Storage and returns its public URL. The allow-list and
+// size cap are shared constants so the Gateway route and any future client
+// pre-check use the exact same rule, and the response is validated against
+// this schema before being sent (same "executable response contract"
+// pattern as CollectionsListResponseSchema).
+export const IMAGE_UPLOAD_ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"] as const;
+export const IMAGE_UPLOAD_MAX_BYTES = 5_000_000; // 5MB — a single artwork photo; not a bulk-media endpoint.
+
+export const ImageUploadResponseSchema = z.object({
+  url: z.string().url(),
+});
+
 export type ArtworkSearchQuery = z.infer<typeof ArtworkSearchQuerySchema>;
+export type ImageUploadResponse = z.infer<typeof ImageUploadResponseSchema>;
 export type CheckoutClientRequest = z.infer<typeof CheckoutClientRequestSchema>;
 export type CheckoutRequest = z.infer<typeof CheckoutRequestSchema>;
 export type CheckoutConfirmRequest = z.infer<typeof CheckoutConfirmRequestSchema>;

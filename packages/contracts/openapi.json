@@ -81,7 +81,7 @@
   "paths": {
     "/v1/account/me": {
       "get": {
-        "summary": "Get the caller's account profile",
+        "summary": "Get the caller's account profile (identity from a signed x-principal header, G-19)",
         "tags": [
           "account"
         ],
@@ -93,16 +93,6 @@
         "responses": {
           "200": {
             "description": "Success"
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ServiceError"
-                }
-              }
-            }
           },
           "401": {
             "description": "Missing or invalid x-service-token",
@@ -127,7 +117,7 @@
         }
       },
       "patch": {
-        "summary": "Update the caller's own profile",
+        "summary": "Update the caller's own profile (identity from a signed x-principal header, G-19)",
         "tags": [
           "account"
         ],

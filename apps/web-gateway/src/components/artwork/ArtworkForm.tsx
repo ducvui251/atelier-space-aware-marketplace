@@ -4,6 +4,7 @@ import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { IMAGE_UPLOAD_ALLOWED_MIME_TYPES } from "@atelier/contracts";
 import type { Artwork } from "@/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -56,10 +57,14 @@ interface ArtworkFormProps {
 export function ArtworkForm({ initial, submitLabel, onSubmit, onSuccess }: ArtworkFormProps) {
   const [formError, setFormError] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
+  const [uploading, setUploading] = React.useState(false);
+  const [uploadError, setUploadError] = React.useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<ArtworkFormInputValues, unknown, ArtworkFormValues>({
     resolver: zodResolver(artworkSchema),
@@ -87,6 +92,29 @@ export function ArtworkForm({ initial, submitLabel, onSubmit, onSuccess }: Artwo
           year: new Date().getFullYear(),
         },
   });
+
+  async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setUploadError(null);
+    setUploading(true);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const response = await fetch("/api/uploads/image", { method: "POST", body });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        setUploadError(typeof data?.error === "string" ? data.error : "Tải ảnh lên thất bại");
+        return;
+      }
+      setValue("imageUrl", data.url, { shouldValidate: true });
+    } catch {
+      setUploadError("Tải ảnh lên thất bại");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function submit(values: ArtworkFormValues) {
     setFormError(null);
@@ -189,12 +217,26 @@ export function ArtworkForm({ initial, submitLabel, onSubmit, onSuccess }: Artwo
         />
       </Field>
 
-      <Field label="URL ảnh tác phẩm *" error={errors.imageUrl?.message}>
-        <Input
-          {...register("imageUrl")}
-          placeholder="https://…"
-          className={cn(errors.imageUrl && "border-destructive")}
-        />
+      <Field label="Ảnh tác phẩm *" error={errors.imageUrl?.message ?? uploadError ?? undefined}>
+        <div className="flex flex-col gap-2">
+          <input
+            type="file"
+            accept={IMAGE_UPLOAD_ALLOWED_MIME_TYPES.join(",")}
+            onChange={handleFileChange}
+            disabled={uploading}
+            className="text-body-sm text-foreground"
+          />
+          {uploading ? <p className="text-caption text-muted-foreground">Đang tải ảnh lên…</p> : null}
+          {watch("imageUrl") ? (
+            // eslint-disable-next-line @next/next/no-img-element -- arbitrary uploaded/pasted URL, not a local static asset
+            <img src={watch("imageUrl")} alt="Xem trước" className="h-32 w-32 rounded-md border border-border object-cover" />
+          ) : null}
+          <Input
+            {...register("imageUrl")}
+            placeholder="Hoặc dán URL ảnh: https://…"
+            className={cn(errors.imageUrl && "border-destructive")}
+          />
+        </div>
       </Field>
 
       <Field label="URL Certificate of Authenticity (tuỳ chọn)" error={errors.coaUrl?.message}>

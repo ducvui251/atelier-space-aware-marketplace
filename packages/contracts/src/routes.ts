@@ -46,9 +46,9 @@ export interface RouteDefinition {
 
 export const ROUTES: RouteDefinition[] = [
   // account
-  { method: "GET", path: "/v1/account/me", service: "account", summary: "Get the caller's account profile", auth: "internal", successStatus: 200, errorStatuses: [400, 401, 404] },
+  { method: "GET", path: "/v1/account/me", service: "account", summary: "Get the caller's account profile (identity from a signed x-principal header, G-19)", auth: "internal", successStatus: 200, errorStatuses: [401, 404] },
   { method: "POST", path: "/v1/account/users/sync", service: "account", summary: "Idempotently sync a Supabase identity to an account profile", auth: "internal", requestSchema: AccountSyncRequestSchema, requestLocation: "body", successStatus: 200, errorStatuses: [400, 401] },
-  { method: "PATCH", path: "/v1/account/me", service: "account", summary: "Update the caller's own profile", auth: "internal", requestSchema: AccountUpdateRequestSchema, requestLocation: "body", successStatus: 200, errorStatuses: [400, 401, 404] },
+  { method: "PATCH", path: "/v1/account/me", service: "account", summary: "Update the caller's own profile (identity from a signed x-principal header, G-19)", auth: "internal", requestSchema: AccountUpdateRequestSchema, requestLocation: "body", successStatus: 200, errorStatuses: [400, 401, 404] },
 
   // catalog-discovery
   { method: "GET", path: "/v1/catalog/artworks", service: "catalog-discovery", summary: "Search the catalog read model", auth: "internal", requestSchema: ArtworkSearchQuerySchema, requestLocation: "query", successStatus: 200, errorStatuses: [400, 401] },
