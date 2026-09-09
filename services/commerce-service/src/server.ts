@@ -61,26 +61,25 @@ const logger = createLogger("commerce");
 const routes: Record<string, ServiceRouteHandler> = {
   "GET /v1/commerce/cart": async ({ url, response, correlationId }) => {
     const buyerId = url.searchParams.get("buyerId");
-    if (!buyerId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "buyerId is required", correlationId, field: "buyerId" });
+    if (!buyerId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "buyerId is required", correlationId, field: "buyerId", retryable: false });
     const artworkIds = await listCart(buyerId);
     return writeServiceJson(response, 200, { artworkIds }, correlationId);
   },
   "POST /v1/commerce/cart": async ({ request, response, correlationId }) => {
     const parsed = parseBody(CartAddRequestSchema, await readJson(request));
-    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field });
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
     return writeServiceJson(response, 201, { artworkIds: await addCartItem(parsed.data.buyerId, parsed.data.artworkId) }, correlationId);
   },
   "DELETE /v1/commerce/cart/:artworkId": async ({ request, url, response, correlationId }) => {
     const buyerId = url.searchParams.get("buyerId");
     const artworkId = url.pathname.split("/").pop();
-    if (!buyerId || !artworkId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "buyerId and artworkId are required", correlationId });
+    if (!buyerId || !artworkId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "buyerId and artworkId are required", correlationId, retryable: false });
     return writeServiceJson(response, 200, { artworkIds: await removeCartItem(buyerId, artworkId) }, correlationId);
   },
   "POST /v1/commerce/checkout": async ({ request, response, correlationId }) => {
-    const body = await readJson<Record<string, unknown>>(request);
-    const parsed = CheckoutRequestSchema.safeParse(body);
-    const buyerId = typeof body?.buyerId === "string" ? body.buyerId : "";
-    if (!buyerId || !parsed.success) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "buyerId and a valid checkout request are required", correlationId });
+    const parsed = parseBody(CheckoutRequestSchema, await readJson(request));
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
+    const { buyerId } = parsed.data;
 
     const idempotencyKey = request.headers["idempotency-key"]?.toString() ?? correlationId;
     const requestHash = hashCheckoutRequest(buyerId, parsed.data.shippingAddress, parsed.data.method);
@@ -128,11 +127,11 @@ const routes: Record<string, ServiceRouteHandler> = {
   },
   "POST /v1/commerce/checkout/confirm": async ({ request, response, correlationId }) => {
     const parsed = parseBody(CheckoutConfirmRequestSchema, await readJson(request));
-    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field });
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
     const { sessionId } = parsed.data;
 
     const session = await getCheckoutSession(sessionId);
-    if (!session) return writeServiceError(response, 404, { code: "NOT_FOUND", message: "Unknown checkout session", correlationId });
+    if (!session) return writeServiceError(response, 404, { code: "NOT_FOUND", message: "Unknown checkout session", correlationId, retryable: false });
     if (session.status === "completed") return writeServiceJson(response, 200, { orders: await listOrdersByIds(session.orderIds) }, correlationId);
 
     const stripeSession = await retrieveCheckoutSession(sessionId);
@@ -156,31 +155,31 @@ const routes: Record<string, ServiceRouteHandler> = {
   "GET /v1/commerce/stats": async ({ response, correlationId }) => writeServiceJson(response, 200, await getCommerceStats(), correlationId),
   "GET /v1/commerce/orders": async ({ url, response, correlationId }) => {
     const buyerId = url.searchParams.get("buyerId");
-    if (!buyerId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "buyerId is required", correlationId, field: "buyerId" });
+    if (!buyerId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "buyerId is required", correlationId, field: "buyerId", retryable: false });
     const items = await listOrders(buyerId);
     return writeServiceJson(response, 200, { items, total: items.length }, correlationId);
   },
   "GET /v1/commerce/artist-orders": async ({ url, response, correlationId }) => {
     const artistId = url.searchParams.get("artistId");
-    if (!artistId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "artistId is required", correlationId, field: "artistId" });
+    if (!artistId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "artistId is required", correlationId, field: "artistId", retryable: false });
     const items = await listArtistOrders(artistId);
     return writeServiceJson(response, 200, { items, total: items.length }, correlationId);
   },
   "POST /v1/commerce/orders/:id/ship": async ({ request, url, response, correlationId }) => {
     const parsed = parseBody(ShipOrderRequestSchema, await readJson(request));
-    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field });
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
     const shipment = await shipOrder(url.pathname.split("/")[4] ?? "", parsed.data.artistId, { carrier: parsed.data.carrier, trackingNumber: parsed.data.trackingNumber });
     return shipment ? writeServiceJson(response, 200, shipment, correlationId) : writeServiceError(response, 403, { code: "FORBIDDEN", message: "This order does not belong to the artist", correlationId, retryable: false });
   },
   "POST /v1/commerce/orders/:id/confirm-received": async ({ request, url, response, correlationId }) => {
     const parsed = parseBody(ConfirmReceivedRequestSchema, await readJson(request));
-    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field });
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
     const order = await confirmReceived(url.pathname.split("/")[4] ?? "", parsed.data.buyerId);
     return order ? writeServiceJson(response, 200, order, correlationId) : writeServiceError(response, 409, { code: "CONFLICT", message: "Order must be shipped and belong to the buyer", correlationId, retryable: false });
   },
   "POST /v1/commerce/orders/:id/reviews": async ({ request, url, response, correlationId }) => {
     const parsed = parseBody(OrderReviewRequestSchema, await readJson(request));
-    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field });
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
     const review = await saveReview({ orderId: url.pathname.split("/")[4] ?? "", buyerId: parsed.data.buyerId, rating: parsed.data.rating, comment: parsed.data.comment });
     return review ? writeServiceJson(response, 200, review, correlationId) : writeServiceError(response, 409, { code: "CONFLICT", message: "Order cannot be reviewed", correlationId, retryable: false });
   },

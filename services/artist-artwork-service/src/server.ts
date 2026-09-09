@@ -6,24 +6,24 @@ import { health } from "./health.ts";
 import { commitReservation, createPersistedArtwork, ensureArtistProfile, findPersistedArtist, findPersistedArtistByUserId, findPersistedArtwork, listPersistedArtistArtworks, listPersistedArtists, listPersistedArtworks, releaseExpiredReservations, releaseReservation, reserveArtwork, updatePersistedArtistVerification, updatePersistedArtwork, updatePersistedArtworkVerification, updatePersistedAvailability } from "./infrastructure/catalog-repository.ts";
 
 function validationError(response: Parameters<ServiceRouteHandler>[0]["response"], correlationId: string, parsed: { code: "VALIDATION_ERROR"; message: string; field?: string }) {
-  return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field });
+  return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
 }
 
 const routes: Record<string, ServiceRouteHandler> = {
   "GET /v1/artist-artwork/artworks": async ({ response, correlationId }) => writeServiceJson(response, 200, { items: await listPersistedArtworks() }, correlationId),
   "GET /v1/artist-artwork/artist/artworks": async ({ url, response, correlationId }) => {
     const artistId = url.searchParams.get("artistId");
-    if (!artistId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "artistId is required", correlationId, field: "artistId" });
+    if (!artistId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "artistId is required", correlationId, field: "artistId", retryable: false });
     return writeServiceJson(response, 200, { items: await listPersistedArtistArtworks(artistId) }, correlationId);
   },
   "GET /v1/artist-artwork/artworks/:id": async ({ url, response, correlationId }) => {
     const artwork = await findPersistedArtwork(url.pathname.split("/").pop() ?? "");
-    return artwork ? writeServiceJson(response, 200, artwork, correlationId) : writeServiceError(response, 404, { code: "NOT_FOUND", message: "Artwork not found", correlationId });
+    return artwork ? writeServiceJson(response, 200, artwork, correlationId) : writeServiceError(response, 404, { code: "NOT_FOUND", message: "Artwork not found", correlationId, retryable: false });
   },
   "GET /v1/artist-artwork/artists": async ({ response, correlationId }) => writeServiceJson(response, 200, { items: await listPersistedArtists() }, correlationId),
   "GET /v1/artist-artwork/artists/by-user/:userId": async ({ url, response, correlationId }) => {
     const artist = await findPersistedArtistByUserId(url.pathname.split("/").pop() ?? "");
-    return artist ? writeServiceJson(response, 200, artist, correlationId) : writeServiceError(response, 404, { code: "NOT_FOUND", message: "No artist profile for this user", correlationId });
+    return artist ? writeServiceJson(response, 200, artist, correlationId) : writeServiceError(response, 404, { code: "NOT_FOUND", message: "No artist profile for this user", correlationId, retryable: false });
   },
   "POST /v1/artist-artwork/artists/by-user/:userId": async ({ request, url, response, correlationId }) => {
     const parsed = parseBody(EnsureArtistProfileRequestSchema, await readJson(request));
@@ -34,21 +34,21 @@ const routes: Record<string, ServiceRouteHandler> = {
   },
   "GET /v1/artist-artwork/artists/:id": async ({ url, response, correlationId }) => {
     const artist = await findPersistedArtist(url.pathname.split("/").pop() ?? "");
-    return artist ? writeServiceJson(response, 200, artist, correlationId) : writeServiceError(response, 404, { code: "NOT_FOUND", message: "Artist not found", correlationId });
+    return artist ? writeServiceJson(response, 200, artist, correlationId) : writeServiceError(response, 404, { code: "NOT_FOUND", message: "Artist not found", correlationId, retryable: false });
   },
   "PATCH /v1/artist-artwork/artworks/:id/verification": async ({ request, url, response, correlationId }) => {
     const parsed = parseBody(ArtworkArtistVerificationRequestSchema, await readJson(request));
     if (!parsed.success) return validationError(response, correlationId, parsed);
     const id = url.pathname.split("/")[4] ?? "";
     const artwork = await updatePersistedArtworkVerification(id, parsed.data, correlationId);
-    return artwork ? writeServiceJson(response, 200, artwork, correlationId) : writeServiceError(response, 404, { code: "NOT_FOUND", message: "Artwork not found", correlationId });
+    return artwork ? writeServiceJson(response, 200, artwork, correlationId) : writeServiceError(response, 404, { code: "NOT_FOUND", message: "Artwork not found", correlationId, retryable: false });
   },
   "PATCH /v1/artist-artwork/artists/:id/verification": async ({ request, url, response, correlationId }) => {
     const parsed = parseBody(ArtworkArtistVerificationRequestSchema, await readJson(request));
     if (!parsed.success) return validationError(response, correlationId, parsed);
     const id = url.pathname.split("/")[4] ?? "";
     const artist = await updatePersistedArtistVerification(id, parsed.data);
-    return artist ? writeServiceJson(response, 200, artist, correlationId) : writeServiceError(response, 404, { code: "NOT_FOUND", message: "Artist not found", correlationId });
+    return artist ? writeServiceJson(response, 200, artist, correlationId) : writeServiceError(response, 404, { code: "NOT_FOUND", message: "Artist not found", correlationId, retryable: false });
   },
   "PATCH /v1/artist-artwork/artworks/:id/availability": async ({ request, url, response, correlationId }) => {
     const parsed = parseBody(ArtworkAvailabilityRequestSchema, await readJson(request));
@@ -66,7 +66,7 @@ const routes: Record<string, ServiceRouteHandler> = {
     const parsed = parseBody(ArtworkUpdateRequestSchema, await readJson(request));
     if (!parsed.success) return validationError(response, correlationId, parsed);
     const artwork = await updatePersistedArtwork(url.pathname.split("/").pop() ?? "", parsed.data);
-    return artwork ? writeServiceJson(response, 200, artwork, correlationId) : writeServiceError(response, 404, { code: "NOT_FOUND", message: "Artwork not found", correlationId });
+    return artwork ? writeServiceJson(response, 200, artwork, correlationId) : writeServiceError(response, 404, { code: "NOT_FOUND", message: "Artwork not found", correlationId, retryable: false });
   },
   "POST /v1/artist-artwork/reservations": async ({ request, response, correlationId }) => {
     const parsed = parseBody(CreateReservationRequestSchema, await readJson(request));

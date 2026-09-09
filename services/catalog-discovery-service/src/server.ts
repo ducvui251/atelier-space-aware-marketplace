@@ -64,7 +64,7 @@ const logger = createLogger("catalog-discovery");
 const routes: Record<string, ServiceRouteHandler> = {
   "GET /v1/catalog/artworks": async ({ url, response, correlationId }) => {
     const parsed = parseBody(ArtworkSearchQuerySchema, Object.fromEntries(url.searchParams.entries()));
-    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field });
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
     const items = searchArtworks(await listReadModel(), parsed.data);
     return writeServiceJson(response, 200, { items, total: items.length }, correlationId);
   },
@@ -77,7 +77,7 @@ const routes: Record<string, ServiceRouteHandler> = {
       // is a bug in this service, not a client error — fail loudly instead
       // of shipping a response the Gateway's contract doesn't expect.
       logger.error("collections response failed its own contract", { correlationId, issues: validated.error.issues });
-      return writeServiceError(response, 500, { code: "CONTRACT_VIOLATION", message: "Collections response did not match its contract", correlationId });
+      return writeServiceError(response, 500, { code: "CONTRACT_VIOLATION", message: "Collections response did not match its contract", correlationId, retryable: false });
     }
     return writeServiceJson(response, 200, validated.data, correlationId);
   },

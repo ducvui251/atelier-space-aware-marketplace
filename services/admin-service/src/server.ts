@@ -20,14 +20,14 @@ const routes: Record<string, ServiceRouteHandler> = {
   "GET /v1/admin/complaints": async ({ response, correlationId }) => { const items = await listComplaints(); return writeServiceJson(response, 200, { items, total: items.length }, correlationId); },
   "POST /v1/admin/complaints": async ({ request, response, correlationId }) => {
     const parsed = parseBody(CreateComplaintRequestSchema, await readJson(request));
-    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field });
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
     return writeServiceJson(response, 201, await createComplaint({ authUserId: parsed.data.reporterId, orderId: parsed.data.orderId, reason: parsed.data.reason, evidenceUrl: parsed.data.evidenceUrl }), correlationId);
   },
   "POST /v1/admin/complaints/:id/resolve": async ({ request, url, response, correlationId }) => {
     const parsed = parseBody(ResolveComplaintRequestSchema, await readJson(request));
-    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field });
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
     const complaint = await resolveComplaint(url.pathname.split("/")[4] ?? "", parsed.data.status, parsed.data.note);
-    return complaint ? writeServiceJson(response, 200, complaint, correlationId) : writeServiceError(response, 404, { code: "NOT_FOUND", message: "Complaint not found", correlationId });
+    return complaint ? writeServiceJson(response, 200, complaint, correlationId) : writeServiceError(response, 404, { code: "NOT_FOUND", message: "Complaint not found", correlationId, retryable: false });
   },
 };
 

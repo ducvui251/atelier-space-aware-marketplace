@@ -42,6 +42,7 @@ PROJECT_PROMPT.md
 /docs/*
 !docs/adr/
 !docs/adr/*.md
+!docs/mutation-semantics.md
 !runbooks/
 !runbooks/*.md
 

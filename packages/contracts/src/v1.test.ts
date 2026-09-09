@@ -10,6 +10,7 @@ import {
   ArtworkUpdateRequestSchema,
   ArtworkVerificationReviewRequestSchema,
   CartAddRequestSchema,
+  CheckoutClientRequestSchema,
   CheckoutConfirmRequestSchema,
   CheckoutRequestSchema,
   ConfirmReceivedRequestSchema,
@@ -93,28 +94,42 @@ describe("ArtworkSearchQuerySchema", () => {
   });
 });
 
-describe("CheckoutRequestSchema", () => {
+describe("CheckoutClientRequestSchema", () => {
   const validAddress = { fullName: "A", address: "1 St", city: "Hanoi", phone: "090" };
 
-  it("accepts a full valid checkout request", () => {
-    const result = CheckoutRequestSchema.safeParse({ shippingAddress: validAddress, method: "card" });
+  it("accepts a full valid checkout request with no buyerId", () => {
+    const result = CheckoutClientRequestSchema.safeParse({ shippingAddress: validAddress, method: "card" });
     expect(result.success).toBe(true);
   });
 
   it("defaults method to card when omitted", () => {
-    const result = CheckoutRequestSchema.safeParse({ shippingAddress: validAddress });
+    const result = CheckoutClientRequestSchema.safeParse({ shippingAddress: validAddress });
     expect(result.success).toBe(true);
     if (result.success) expect(result.data.method).toBe("card");
   });
 
   it("rejects a shipping address missing required fields", () => {
-    const result = CheckoutRequestSchema.safeParse({ shippingAddress: { fullName: "A" } });
+    const result = CheckoutClientRequestSchema.safeParse({ shippingAddress: { fullName: "A" } });
     expect(result.success).toBe(false);
   });
 
   it("rejects an unknown payment method", () => {
-    const result = CheckoutRequestSchema.safeParse({ shippingAddress: validAddress, method: "crypto" });
+    const result = CheckoutClientRequestSchema.safeParse({ shippingAddress: validAddress, method: "crypto" });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("CheckoutRequestSchema", () => {
+  const validAddress = { fullName: "A", address: "1 St", city: "Hanoi", phone: "090" };
+
+  it("accepts a full valid internal checkout request with a buyerId", () => {
+    const result = CheckoutRequestSchema.safeParse({ buyerId: uuid1, shippingAddress: validAddress, method: "card" });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a missing or non-uuid buyerId", () => {
+    expect(CheckoutRequestSchema.safeParse({ shippingAddress: validAddress, method: "card" }).success).toBe(false);
+    expect(CheckoutRequestSchema.safeParse({ buyerId: "not-a-uuid", shippingAddress: validAddress, method: "card" }).success).toBe(false);
   });
 });
 

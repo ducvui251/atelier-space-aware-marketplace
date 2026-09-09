@@ -1,7 +1,7 @@
-import type { CheckoutRequest, Order } from "@atelier/contracts";
+import type { CheckoutClientRequest, Order } from "@atelier/contracts";
 import { requestService } from "../http-client";
 
-export async function checkout(authUserId: string, input: CheckoutRequest, idempotencyKey: string) {
+export async function checkout(authUserId: string, input: CheckoutClientRequest, idempotencyKey: string) {
   return requestService<{ orders: Order[]; checkoutUrl?: string }>("commerce", "/v1/commerce/checkout", {
     method: "POST",
     body: { buyerId: authUserId, ...input },
