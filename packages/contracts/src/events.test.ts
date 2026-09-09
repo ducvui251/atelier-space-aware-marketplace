@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ArtistVerifiedPayloadSchema, ArtworkVerifiedPayloadSchema, DomainEventTypeSchema } from "./events.ts";
+import { ArtistVerifiedPayloadSchema, ArtworkVerifiedPayloadSchema, DomainEventTypeSchema, OrderCreatedPayloadSchema, PaymentSucceededPayloadSchema } from "./events.ts";
 
 const uuid1 = "00000000-0000-4000-8000-000000000001";
 const uuid2 = "00000000-0000-4000-8000-000000000002";
@@ -37,5 +37,25 @@ describe("ArtistVerifiedPayloadSchema", () => {
   it("rejects a missing artistId or invalid status", () => {
     expect(ArtistVerifiedPayloadSchema.safeParse({ status: "verified" }).success).toBe(false);
     expect(ArtistVerifiedPayloadSchema.safeParse({ artistId: uuid1, status: "pending" }).success).toBe(false);
+  });
+});
+
+describe("OrderCreatedPayloadSchema", () => {
+  it("accepts a valid payload", () => {
+    expect(OrderCreatedPayloadSchema.safeParse({ orderId: uuid1, buyerId: uuid2, artworkId: uuid1, amount: 100, currency: "USD" }).success).toBe(true);
+  });
+
+  it("rejects a missing field", () => {
+    expect(OrderCreatedPayloadSchema.safeParse({ orderId: uuid1, buyerId: uuid2, amount: 100, currency: "USD" }).success).toBe(false);
+  });
+});
+
+describe("PaymentSucceededPayloadSchema", () => {
+  it("accepts a valid payload", () => {
+    expect(PaymentSucceededPayloadSchema.safeParse({ paymentId: uuid1, orderId: uuid2, buyerId: uuid1, artworkId: uuid2, amount: 100, currency: "USD" }).success).toBe(true);
+  });
+
+  it("rejects a missing field", () => {
+    expect(PaymentSucceededPayloadSchema.safeParse({ paymentId: uuid1, orderId: uuid2, amount: 100, currency: "USD" }).success).toBe(false);
   });
 });

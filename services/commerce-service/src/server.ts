@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { createServiceServer, getPort, readJson, writeServiceError, writeServiceJson, type ServiceRouteHandler } from "@atelier/config/http";
 import { createLogger } from "@atelier/config/logger";
 import { CartAddRequestSchema, CheckoutConfirmRequestSchema, CheckoutRequestSchema, ConfirmReceivedRequestSchema, OrderReviewRequestSchema, ShipOrderRequestSchema, parseBody, type Artwork } from "@atelier/contracts";
+import { runOutboxPublisher } from "@atelier/events";
 import { ping } from "@atelier/persistence";
 import { health } from "./health.ts";
 import { addCartItem, listCart, removeCartItem } from "./infrastructure/cart-repository.ts";
@@ -109,7 +110,7 @@ const routes: Record<string, ServiceRouteHandler> = {
     }
 
     try {
-      const orders = await persistPendingCheckout({ buyerId, items: items.map((item) => ({ artworkId: item.id, editionType: item.editionType, totalAmount: item.price, currency: item.currency, title: item.title })), shippingAddress: parsed.data.shippingAddress, method: parsed.data.method, idempotencyKey });
+      const orders = await persistPendingCheckout({ buyerId, items: items.map((item) => ({ artworkId: item.id, editionType: item.editionType, totalAmount: item.price, currency: item.currency, title: item.title })), shippingAddress: parsed.data.shippingAddress, method: parsed.data.method, idempotencyKey }, correlationId);
       const gatewayUrl = (process.env.WEB_GATEWAY_URL ?? "http://localhost:3000").replace(/\/$/, "");
       const session = await createCheckoutSession({
         buyerId,
@@ -139,7 +140,7 @@ const routes: Record<string, ServiceRouteHandler> = {
       return writeServiceError(response, 409, { code: "PAYMENT_NOT_COMPLETE", message: "Stripe has not confirmed payment for this session yet", correlationId, retryable: true });
     }
 
-    const confirmed = await confirmCheckoutSession(sessionId);
+    const confirmed = await confirmCheckoutSession(sessionId, correlationId);
     if (!confirmed) return writeServiceJson(response, 200, { orders: await listOrdersByIds(session.orderIds) }, correlationId);
 
     const commits = await Promise.all(confirmed.reservationIds.map((id) => commitReservationRemote(id)));
@@ -191,3 +192,12 @@ async function ready() {
 }
 
 createServiceServer({ name: "commerce", version: "v1", port: getPort("COMMERCE_PORT", 4104), health, ready, routes, internalToken: process.env.ATELIER_INTERNAL_SERVICE_TOKEN }).listen(getPort("COMMERCE_PORT", 4104));
+
+if (process.env.EVENT_BROKER_URL) {
+  runOutboxPublisher({
+    schema: "commerce",
+    brokerUrl: process.env.EVENT_BROKER_URL,
+    exchange: process.env.EVENT_EXCHANGE ?? "atelier.events.v1",
+    producer: "commerce",
+  });
+}

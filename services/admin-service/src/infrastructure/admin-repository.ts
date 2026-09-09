@@ -39,6 +39,32 @@ export async function resolveComplaint(id: string, status: "resolved" | "rejecte
   return rows[0] ? mapComplaint(rows[0]) : null;
 }
 
+/**
+ * Populated from Commerce's OrderCreated.v1/PaymentSucceeded.v1 events
+ * (Phase 5), not read here — this is the write side the event consumer
+ * calls. Each upsert only touches the fields its own event actually
+ * knows about; `status` is set unconditionally by whichever event this
+ * is, but never regressed by the *other* event arriving out of order
+ * (OrderCreated's upsert never overwrites an existing row's status).
+ */
+export async function upsertOrderFeedCreated(input: { orderId: string; buyerId: string; artworkId: string; amount: number; currency: string }): Promise<void> {
+  await query(
+    `insert into admin.order_feed (order_id, buyer_id, artwork_id, amount, currency, status)
+     values ($1::uuid, $2::uuid, $3::uuid, $4, $5, 'pending')
+     on conflict (order_id) do update set buyer_id = excluded.buyer_id, artwork_id = excluded.artwork_id, amount = excluded.amount, currency = excluded.currency, updated_at = now()`,
+    [input.orderId, input.buyerId, input.artworkId, input.amount, input.currency],
+  );
+}
+
+export async function markOrderFeedPaid(input: { orderId: string; buyerId: string; artworkId: string; amount: number; currency: string }): Promise<void> {
+  await query(
+    `insert into admin.order_feed (order_id, buyer_id, artwork_id, amount, currency, status)
+     values ($1::uuid, $2::uuid, $3::uuid, $4, $5, 'paid')
+     on conflict (order_id) do update set status = 'paid', amount = excluded.amount, currency = excluded.currency, updated_at = now()`,
+    [input.orderId, input.buyerId, input.artworkId, input.amount, input.currency],
+  );
+}
+
 export async function getStats() {
   const [artists, artworks, complaints, commerceStats] = await Promise.all([
     requestInternalService<{ items: Array<{ verificationStatus: string }> }>("artist-artwork", "/v1/artist-artwork/artists"),
