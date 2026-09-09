@@ -898,14 +898,14 @@ Exit gate: a repository scan shows no cross-service table writes and no producti
 
 ### Phase 4 — Make contracts complete and executable
 
-Status: **partial foundation; not accepted**. Zod schemas and one contract test file exist; route registry parity, complete response/error schemas and adapter coverage remain open.
+Status: **partial; route-registry parity closed, broader schema/adapter coverage still open**. Zod schemas and contract tests exist for the previously-missing routes; a durable, CI-enforced parity check now guards `routes.ts` against drift. Complete per-route response/error schemas, upload contract, and G-19 identity fix remain open.
 
 Tasks:
 
-- [ ] Define Zod request/response/error schemas for every route in §6.3, including the new `reservations`, `collections`, and `payments/webhook` contracts.
-- [ ] Replace `Record<string, unknown>` and ad hoc request checks with boundary schemas.
+- [ ] Define Zod request/response/error schemas for every route in §6.3, including the new `reservations`, `collections`, and `payments/webhook` contracts. *(2026-09-09: `checkout/confirm` now covered by `CheckoutConfirmRequestSchema`; the 3 reservation routes and most other routes still lack dedicated request/response schemas.)*
+- [ ] Replace `Record<string, unknown>` and ad hoc request checks with boundary schemas. *(2026-09-09: `commerce-service`'s `checkout/confirm` handler converted from manual field checks to `parseBody(CheckoutConfirmRequestSchema, ...)`; remaining ad hoc validation elsewhere untouched.)*
 - [ ] Standardize error codes and retryable flags.
-- [ ] Add a route-registry parity check so `packages/contracts/src/routes.ts`, OpenAPI and every implemented Gateway/service route cannot drift (currently collections, checkout confirmation and reservation routes are omitted).
+- [x] Add a route-registry parity check so `packages/contracts/src/routes.ts`, OpenAPI and every implemented Gateway/service route cannot drift (currently collections, checkout confirmation and reservation routes are omitted). *(2026-09-09: found and registered the 4 missing entries — `POST /v1/commerce/checkout/confirm` and the 3 `/v1/artist-artwork/reservations` routes (create/commit/release) — with `successStatus`/`errorStatuses` verified against actual handler behavior. Added `scripts/test-route-registry-parity.sh`, a new script that extracts every implemented route from all 8 services' `server.ts` and diffs it against `routes.ts` in both directions, failing on any drift. Verified live: `Route registry parity OK — 48 routes implemented, all registered.` Wired in as a new CI step "Route registry parity (Phase 4)" in `.github/workflows/ci.yml`, run right after "Contract tests" and before the boundary grep gates. Regenerated `packages/contracts/openapi.json` (44 → 48 routes). Added 2 new tests to `packages/contracts/src/v1.test.ts` for `CheckoutConfirmRequestSchema` (accepts non-empty `sessionId`, rejects empty/missing) — `pnpm --filter @atelier/contracts test` → 37/37 passing. Live-tested the rebuilt `commerce-service` against the running stack: `POST /v1/commerce/checkout/confirm` with `{}` → `400 VALIDATION_ERROR` on `sessionId` (new Zod boundary working); with a well-formed but nonexistent `sessionId` → `404 NOT_FOUND` (confirms the request passes validation and reaches the real Stripe-session lookup, not an artifact of the schema check). `pnpm type-check` clean across the workspace.)*
 - [ ] Add the upload contract: `POST /api/uploads/image` public spec + internal relay behavior, MIME/size rules, bucket name — register the bucket variable (G-05, §9.3).
 - [ ] Regenerate `packages/contracts/openapi.json` from schemas.
 - [ ] Add contract tests for every Gateway adapter and service route.

@@ -35,6 +35,9 @@ jobs:
       - name: Contract tests
         run: pnpm --filter @atelier/contracts test
 
+      - name: Route registry parity (Phase 4)
+        run: bash scripts/test-route-registry-parity.sh
+
       - name: Boundary grep gates
         # Anti-recurrence gates from MICROSERVICE_100_PLAN.md Phase 0:
         # 1. picsum placeholder imagery is banned from production source

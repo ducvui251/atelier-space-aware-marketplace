@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createServiceServer, getPort, readJson, writeServiceError, writeServiceJson, type ServiceRouteHandler } from "@atelier/config/http";
 import { createLogger } from "@atelier/config/logger";
-import { CartAddRequestSchema, CheckoutRequestSchema, ConfirmReceivedRequestSchema, OrderReviewRequestSchema, ShipOrderRequestSchema, parseBody, type Artwork } from "@atelier/contracts";
+import { CartAddRequestSchema, CheckoutConfirmRequestSchema, CheckoutRequestSchema, ConfirmReceivedRequestSchema, OrderReviewRequestSchema, ShipOrderRequestSchema, parseBody, type Artwork } from "@atelier/contracts";
 import { ping } from "@atelier/persistence";
 import { health } from "./health.ts";
 import { addCartItem, listCart, removeCartItem } from "./infrastructure/cart-repository.ts";
@@ -127,9 +127,9 @@ const routes: Record<string, ServiceRouteHandler> = {
     }
   },
   "POST /v1/commerce/checkout/confirm": async ({ request, response, correlationId }) => {
-    const body = await readJson<{ sessionId?: string }>(request);
-    const sessionId = typeof body?.sessionId === "string" ? body.sessionId : "";
-    if (!sessionId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "sessionId is required", correlationId, field: "sessionId" });
+    const parsed = parseBody(CheckoutConfirmRequestSchema, await readJson(request));
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field });
+    const { sessionId } = parsed.data;
 
     const session = await getCheckoutSession(sessionId);
     if (!session) return writeServiceError(response, 404, { code: "NOT_FOUND", message: "Unknown checkout session", correlationId });

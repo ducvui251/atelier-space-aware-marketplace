@@ -60,6 +60,10 @@ export const CheckoutRequestSchema = z.object({
   simulateFailure: z.boolean().optional(),
 });
 
+export const CheckoutConfirmRequestSchema = z.object({
+  sessionId: z.string().trim().min(1),
+});
+
 // --- Account ---------------------------------------------------------------
 
 export const SignupRequestSchema = z.object({
@@ -235,6 +239,7 @@ export const ResolveComplaintRequestSchema = z.object({
 
 export type ArtworkSearchQuery = z.infer<typeof ArtworkSearchQuerySchema>;
 export type CheckoutRequest = z.infer<typeof CheckoutRequestSchema>;
+export type CheckoutConfirmRequest = z.infer<typeof CheckoutConfirmRequestSchema>;
 export type AccountSyncRequest = z.infer<typeof AccountSyncRequestSchema>;
 export type AccountUpdateRequest = z.infer<typeof AccountUpdateRequestSchema>;
 export type SignupRequest = z.infer<typeof SignupRequestSchema>;
