@@ -10,6 +10,7 @@
   "dependencies": {
     "@atelier/config": "workspace:*",
     "@atelier/contracts": "workspace:*",
+    "@atelier/events": "workspace:*",
     "@atelier/persistence": "workspace:*"
   },
   "scripts": {

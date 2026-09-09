@@ -1,6 +1,7 @@
 import { createServiceServer, getPort, readJson, writeServiceError, writeServiceJson, type ServiceRouteHandler } from "@atelier/config/http";
 import { ArtworkArtistVerificationRequestSchema, ArtworkAvailabilityRequestSchema, ArtworkCreateRequestSchema, ArtworkUpdateRequestSchema, CreateReservationRequestSchema, EnsureArtistProfileRequestSchema, parseBody } from "@atelier/contracts";
-import { runOutboxPublisher } from "@atelier/events";
+import { ArtistVerifiedPayloadSchema, ArtworkVerifiedPayloadSchema } from "@atelier/contracts/events";
+import { consumeEvents, runOutboxPublisher, type ConsumedEvent } from "@atelier/events";
 import { ping } from "@atelier/persistence";
 import { health } from "./health.ts";
 import { commitReservation, createPersistedArtwork, ensureArtistProfile, findPersistedArtist, findPersistedArtistByUserId, findPersistedArtwork, listPersistedArtistArtworks, listPersistedArtists, listPersistedArtworks, releaseExpiredReservations, releaseReservation, reserveArtwork, updatePersistedArtistVerification, updatePersistedArtwork, updatePersistedArtworkVerification, updatePersistedAvailability } from "./infrastructure/catalog-repository.ts";
@@ -47,7 +48,7 @@ const routes: Record<string, ServiceRouteHandler> = {
     const parsed = parseBody(ArtworkArtistVerificationRequestSchema, await readJson(request));
     if (!parsed.success) return validationError(response, correlationId, parsed);
     const id = url.pathname.split("/")[4] ?? "";
-    const artist = await updatePersistedArtistVerification(id, parsed.data);
+    const artist = await updatePersistedArtistVerification(id, parsed.data, correlationId);
     return artist ? writeServiceJson(response, 200, artist, correlationId) : writeServiceError(response, 404, { code: "NOT_FOUND", message: "Artist not found", correlationId, retryable: false });
   },
   "PATCH /v1/artist-artwork/artworks/:id/availability": async ({ request, url, response, correlationId }) => {
@@ -100,6 +101,39 @@ if (process.env.EVENT_BROKER_URL) {
     exchange: process.env.EVENT_EXCHANGE ?? "atelier.events.v1",
     producer: "artist-artwork",
   });
+}
+
+/**
+ * Consumes Verification's own ArtworkVerified.v1/ArtistVerified.v1 events
+ * (Phase 5, G-22) instead of being PATCHed synchronously — this is what
+ * lets Verification persist its decision durably without waiting on this
+ * service, and lets a broker/consumer outage retry indefinitely rather
+ * than dropping the decision's projection update. Reuses the same
+ * correlationId as the triggering event for end-to-end traceability, and
+ * calls the same update functions the PATCH routes above still expose, so
+ * a re-delivered event is just a repeat of the same idempotent UPDATE.
+ */
+async function handleVerificationEvent(event: ConsumedEvent): Promise<void> {
+  const artwork = ArtworkVerifiedPayloadSchema.safeParse(event.payload);
+  if (artwork.success) {
+    await updatePersistedArtworkVerification(artwork.data.artworkId, artwork.data, event.correlationId, { emitEvent: false });
+    return;
+  }
+  const artist = ArtistVerifiedPayloadSchema.safeParse(event.payload);
+  if (artist.success) {
+    await updatePersistedArtistVerification(artist.data.artistId, artist.data, event.correlationId, { emitEvent: false });
+  }
+}
+
+if (process.env.EVENT_BROKER_URL) {
+  consumeEvents({
+    brokerUrl: process.env.EVENT_BROKER_URL,
+    exchange: process.env.EVENT_EXCHANGE ?? "atelier.events.v1",
+    queue: "atelier.artist-artwork.v1",
+    routingKeys: ["artwork.verified", "artist.verified"],
+    dedupSchema: "artist_artwork",
+    handler: handleVerificationEvent,
+  }).catch(() => undefined);
 }
 
 // Releases any reservation whose lease expired without a commit/release —

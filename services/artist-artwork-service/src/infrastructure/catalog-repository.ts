@@ -139,23 +139,41 @@ export async function findPersistedArtistByUserId(userId: string): Promise<Artis
   return rows[0] ? mapArtist(rows[0]) : null;
 }
 
+/**
+ * `emitEvent` defaults to true for the HTTP PATCH route (notifies Catalog
+ * as before). The event-driven consumer path (server.ts's
+ * handleVerificationEvent) passes `false`: Verification's own
+ * ArtworkVerified.v1/ArtistVerified.v1 is already published to the same
+ * "artwork.verified"/"artist.verified" routing keys Catalog listens on, so
+ * this service re-publishing under the identical type/routing key would
+ * be redelivered to its *own* consumer (same routing key, same exchange)
+ * and reprocessed forever — confirmed live: a single verification review
+ * produced 50+ self-triggered re-emissions in under a minute before this
+ * flag was added. Catalog's existing 60s poll (runSync) is the
+ * reconciliation fallback for the rare case where it processes this event
+ * before this service's own consumer has applied the update.
+ */
 export async function updatePersistedArtworkVerification(
   id: string,
   input: { status: Artwork["verificationStatus"]; note?: string; reviewerId?: string },
   correlationId: string,
+  options: { emitEvent?: boolean } = {},
 ): Promise<Artwork | null> {
+  const emitEvent = options.emitEvent ?? true;
   const updated = await transaction(async (client) => {
     const rows = await client.query<{ id: string }>(
       `update artist_artwork.artworks set verification_status = $2, updated_at = now() where id::text = $1 returning id::text`,
       [id, input.status],
     );
     if (!rows.rows[0]) return false;
-    await writeOutboxEvent(client, SCHEMA, {
-      type: "ArtworkVerified",
-      aggregateId: id,
-      correlationId,
-      payload: { artworkId: id, status: input.status },
-    });
+    if (emitEvent) {
+      await writeOutboxEvent(client, SCHEMA, {
+        type: "ArtworkVerified",
+        aggregateId: id,
+        correlationId,
+        payload: { artworkId: id, status: input.status, reviewerId: input.reviewerId },
+      });
+    }
     return true;
   });
   if (!updated) return null;
@@ -164,13 +182,28 @@ export async function updatePersistedArtworkVerification(
 
 export async function updatePersistedArtistVerification(
   id: string,
-  input: { status: Artist["verificationStatus"]; note?: string },
+  input: { status: Artist["verificationStatus"]; note?: string; reviewerId?: string },
+  correlationId: string,
+  options: { emitEvent?: boolean } = {},
 ): Promise<Artist | null> {
-  const rows = await query<{ id: string }>(
-    `update artist_artwork.artist_profiles set verification_status = $2, updated_at = now() where id::text = $1 returning id::text`,
-    [id, input.status],
-  );
-  if (!rows[0]) return null;
+  const emitEvent = options.emitEvent ?? true;
+  const updated = await transaction(async (client) => {
+    const rows = await client.query<{ id: string }>(
+      `update artist_artwork.artist_profiles set verification_status = $2, updated_at = now() where id::text = $1 returning id::text`,
+      [id, input.status],
+    );
+    if (!rows.rows[0]) return false;
+    if (emitEvent) {
+      await writeOutboxEvent(client, SCHEMA, {
+        type: "ArtistVerified",
+        aggregateId: id,
+        correlationId,
+        payload: { artistId: id, status: input.status, reviewerId: input.reviewerId },
+      });
+    }
+    return true;
+  });
+  if (!updated) return null;
   return findPersistedArtist(id);
 }
 
