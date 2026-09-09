@@ -46,6 +46,7 @@ services:
       DATABASE_URL: postgresql://account_service:account_service_dev_pw@postgres:5432/atelier
       ARTIST_ARTWORK_SERVICE_URL: http://artist-artwork-service:4103
       ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:?required}
+      ATELIER_PRINCIPAL_SIGNING_SECRET: ${ATELIER_PRINCIPAL_SIGNING_SECRET:?required}
     ports: ["4101:4101"]
     restart: unless-stopped
     deploy:
@@ -235,6 +236,12 @@ services:
       ROOM_PREVIEW_SERVICE_URL: http://room-preview-service:4107
       ADMIN_SERVICE_URL: http://admin-service:4108
       ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:?required}
+      ATELIER_PRINCIPAL_SIGNING_SECRET: ${ATELIER_PRINCIPAL_SIGNING_SECRET:?required}
+      # Optional (G-05): unset until the Supabase Storage bucket is
+      # provisioned (runbooks/image-upload-setup.md) — only POST
+      # /api/uploads/image needs it, so it doesn't fail the whole stack closed.
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      SUPABASE_STORAGE_BUCKET: ${SUPABASE_STORAGE_BUCKET:-artwork-images}
     ports: ["3000:3000"]
     restart: unless-stopped
     deploy:
