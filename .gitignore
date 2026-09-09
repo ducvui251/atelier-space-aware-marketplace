@@ -42,6 +42,8 @@ PROJECT_PROMPT.md
 /docs/*
 !docs/adr/
 !docs/adr/*.md
+!runbooks/
+!runbooks/*.md
 
 # local agent/tool artifacts
 /.token-optimizer/

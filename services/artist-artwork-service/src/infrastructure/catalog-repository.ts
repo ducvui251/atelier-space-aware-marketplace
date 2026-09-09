@@ -99,6 +99,22 @@ export async function findPersistedArtwork(id: string): Promise<Artwork | null> 
   return rows[0] ? mapArtwork(rows[0]) : null;
 }
 
+/**
+ * Idempotent: called every time an artist-role account syncs (signup and
+ * every subsequent login), so a repeat call for an already-provisioned
+ * account must be a safe no-op rather than erroring or duplicating a row.
+ */
+export async function ensureArtistProfile(userId: string, displayName: string): Promise<Artist> {
+  const rows = await query<ArtistRow>(
+    `insert into artist_artwork.artist_profiles (user_id, display_name)
+     values ($1::uuid, $2)
+     on conflict (user_id) where user_id is not null do update set updated_at = now()
+     returning id::text, user_id::text, display_name, location, nationality, bio, verification_status, image_url, portfolio_url`,
+    [userId, displayName],
+  );
+  return mapArtist(rows[0]);
+}
+
 export async function listPersistedArtists(): Promise<Artist[]> {
   return (await query<ArtistRow>(`select id::text, user_id::text, display_name, location, nationality, bio, verification_status, image_url, portfolio_url from artist_artwork.artist_profiles`)).map(mapArtist);
 }

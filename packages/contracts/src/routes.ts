@@ -15,6 +15,7 @@ import {
   CreateBuyerRoomRequestSchema,
   CreateComplaintRequestSchema,
   CreatePlacementRequestSchema,
+  EnsureArtistProfileRequestSchema,
   OrderReviewRequestSchema,
   ResolveComplaintRequestSchema,
   ShipOrderRequestSchema,
@@ -49,6 +50,7 @@ export const ROUTES: RouteDefinition[] = [
 
   // catalog-discovery
   { method: "GET", path: "/v1/catalog/artworks", service: "catalog-discovery", summary: "Search the catalog read model", auth: "internal", requestSchema: ArtworkSearchQuerySchema, requestLocation: "query", successStatus: 200, errorStatuses: [400, 401] },
+  { method: "GET", path: "/v1/catalog/collections", service: "catalog-discovery", summary: "List curated collections with live artwork counts", auth: "internal", successStatus: 200, errorStatuses: [401, 500] },
 
   // artist-artwork
   { method: "GET", path: "/v1/artist-artwork/artworks", service: "artist-artwork", summary: "List canonical artworks", auth: "internal", successStatus: 200, errorStatuses: [401] },
@@ -56,6 +58,7 @@ export const ROUTES: RouteDefinition[] = [
   { method: "GET", path: "/v1/artist-artwork/artworks/{id}", service: "artist-artwork", summary: "Get canonical artwork detail", auth: "internal", successStatus: 200, errorStatuses: [401, 404] },
   { method: "GET", path: "/v1/artist-artwork/artists", service: "artist-artwork", summary: "List artist profiles", auth: "internal", successStatus: 200, errorStatuses: [401] },
   { method: "GET", path: "/v1/artist-artwork/artists/by-user/{userId}", service: "artist-artwork", summary: "Look up the artist profile owned by an Account user", auth: "internal", successStatus: 200, errorStatuses: [401, 404] },
+  { method: "POST", path: "/v1/artist-artwork/artists/by-user/{userId}", service: "artist-artwork", summary: "Idempotently provision the artist profile for an Account user (G-06 signup)", auth: "internal", requestSchema: EnsureArtistProfileRequestSchema, requestLocation: "body", successStatus: 200, errorStatuses: [400, 401] },
   { method: "GET", path: "/v1/artist-artwork/artists/{id}", service: "artist-artwork", summary: "Get artist profile detail", auth: "internal", successStatus: 200, errorStatuses: [401, 404] },
   { method: "PATCH", path: "/v1/artist-artwork/artworks/{id}/verification", service: "artist-artwork", summary: "Apply a verification decision to an artwork's projection", auth: "internal", requestSchema: ArtworkArtistVerificationRequestSchema, requestLocation: "body", successStatus: 200, errorStatuses: [400, 401, 404] },
   { method: "PATCH", path: "/v1/artist-artwork/artists/{id}/verification", service: "artist-artwork", summary: "Apply a verification decision to an artist's projection", auth: "internal", requestSchema: ArtworkArtistVerificationRequestSchema, requestLocation: "body", successStatus: 200, errorStatuses: [400, 401, 404] },

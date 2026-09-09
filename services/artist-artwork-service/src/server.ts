@@ -1,9 +1,9 @@
 import { createServiceServer, getPort, readJson, writeServiceError, writeServiceJson, type ServiceRouteHandler } from "@atelier/config/http";
-import { ArtworkArtistVerificationRequestSchema, ArtworkAvailabilityRequestSchema, ArtworkCreateRequestSchema, ArtworkUpdateRequestSchema, CreateReservationRequestSchema, parseBody } from "@atelier/contracts";
+import { ArtworkArtistVerificationRequestSchema, ArtworkAvailabilityRequestSchema, ArtworkCreateRequestSchema, ArtworkUpdateRequestSchema, CreateReservationRequestSchema, EnsureArtistProfileRequestSchema, parseBody } from "@atelier/contracts";
 import { runOutboxPublisher } from "@atelier/events";
 import { ping } from "@atelier/persistence";
 import { health } from "./health.ts";
-import { commitReservation, createPersistedArtwork, findPersistedArtist, findPersistedArtistByUserId, findPersistedArtwork, listPersistedArtistArtworks, listPersistedArtists, listPersistedArtworks, releaseExpiredReservations, releaseReservation, reserveArtwork, updatePersistedArtistVerification, updatePersistedArtwork, updatePersistedArtworkVerification, updatePersistedAvailability } from "./infrastructure/catalog-repository.ts";
+import { commitReservation, createPersistedArtwork, ensureArtistProfile, findPersistedArtist, findPersistedArtistByUserId, findPersistedArtwork, listPersistedArtistArtworks, listPersistedArtists, listPersistedArtworks, releaseExpiredReservations, releaseReservation, reserveArtwork, updatePersistedArtistVerification, updatePersistedArtwork, updatePersistedArtworkVerification, updatePersistedAvailability } from "./infrastructure/catalog-repository.ts";
 
 function validationError(response: Parameters<ServiceRouteHandler>[0]["response"], correlationId: string, parsed: { code: "VALIDATION_ERROR"; message: string; field?: string }) {
   return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field });
@@ -24,6 +24,13 @@ const routes: Record<string, ServiceRouteHandler> = {
   "GET /v1/artist-artwork/artists/by-user/:userId": async ({ url, response, correlationId }) => {
     const artist = await findPersistedArtistByUserId(url.pathname.split("/").pop() ?? "");
     return artist ? writeServiceJson(response, 200, artist, correlationId) : writeServiceError(response, 404, { code: "NOT_FOUND", message: "No artist profile for this user", correlationId });
+  },
+  "POST /v1/artist-artwork/artists/by-user/:userId": async ({ request, url, response, correlationId }) => {
+    const parsed = parseBody(EnsureArtistProfileRequestSchema, await readJson(request));
+    if (!parsed.success) return validationError(response, correlationId, parsed);
+    const userId = url.pathname.split("/").pop() ?? "";
+    const artist = await ensureArtistProfile(userId, parsed.data.displayName);
+    return writeServiceJson(response, 200, artist, correlationId);
   },
   "GET /v1/artist-artwork/artists/:id": async ({ url, response, correlationId }) => {
     const artist = await findPersistedArtist(url.pathname.split("/").pop() ?? "");

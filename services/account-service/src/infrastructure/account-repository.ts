@@ -36,6 +36,14 @@ async function findArtistIdForUser(internalUserId: string): Promise<string | und
   }
 }
 
+/** Idempotent — safe to call on every sync of an artist-role account, not just the first. */
+async function ensureArtistProfileForUser(internalUserId: string, displayName: string): Promise<void> {
+  await requestInternalService("artist-artwork", `/v1/artist-artwork/artists/by-user/${encodeURIComponent(internalUserId)}`, {
+    method: "POST",
+    body: { displayName },
+  });
+}
+
 async function mapUser(row: AccountRow): Promise<AccountUser> {
   const artistId = await findArtistIdForUser(row.internal_id);
   return {
@@ -65,11 +73,12 @@ export async function syncAuthUser(input: {
   email: string;
   fullName?: string;
   phone?: string;
+  role?: "buyer" | "artist";
 }): Promise<AccountUser> {
   const upserted = await query<AccountRow>(
     `with upserted as (
       insert into account.users (auth_user_id, full_name, email, phone, role)
-      values ($1::uuid, $3, $2, $4, 'buyer')
+      values ($1::uuid, $3, $2, $4, coalesce($5, 'buyer'))
       on conflict (auth_user_id) do update set
         email = excluded.email,
         full_name = case when excluded.full_name <> '' then excluded.full_name else account.users.full_name end,
@@ -80,9 +89,16 @@ export async function syncAuthUser(input: {
     select u.id::text as internal_id, u.auth_user_id::text as id, u.full_name, u.email, u.phone, u.role,
            u.created_at::text as created_at
     from upserted u`,
-    [input.authUserId, input.email, input.fullName ?? "", input.phone ?? null],
+    [input.authUserId, input.email, input.fullName ?? "", input.phone ?? null, input.role ?? null],
   );
   if (!upserted[0]) throw new Error("Account profile was not persisted");
+  // Role only ever takes effect on first insert (see coalesce above), so a
+  // repeat sync can't be used to change an existing account's role. But a
+  // freshly-provisioned artist still needs their artist_profiles row, and a
+  // profile lost to a prior partial failure should self-heal on next login.
+  if (upserted[0].role === "artist") {
+    await ensureArtistProfileForUser(upserted[0].internal_id, upserted[0].full_name || input.email);
+  }
   return await mapUser(upserted[0]);
 }
 
