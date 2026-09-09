@@ -65,6 +65,16 @@ export async function markOrderFeedPaid(input: { orderId: string; buyerId: strin
   );
 }
 
+/**
+ * OrderShipped can only occur for an order that already exists (Commerce's
+ * shipOrder requires an existing order row), so unlike the two functions
+ * above this is a plain UPDATE, not a self-sufficient upsert — there's no
+ * real out-of-order-delivery case to defend against here.
+ */
+export async function markOrderFeedShipped(input: { orderId: string }): Promise<void> {
+  await query(`update admin.order_feed set status = 'shipped', updated_at = now() where order_id = $1::uuid`, [input.orderId]);
+}
+
 export async function getStats() {
   const [artists, artworks, complaints, commerceStats] = await Promise.all([
     requestInternalService<{ items: Array<{ verificationStatus: string }> }>("artist-artwork", "/v1/artist-artwork/artists"),

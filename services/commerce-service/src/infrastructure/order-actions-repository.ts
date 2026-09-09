@@ -1,6 +1,9 @@
 import type { Order, Review, Shipment } from "@atelier/contracts";
-import { query } from "@atelier/persistence";
+import { query, transaction } from "@atelier/persistence";
 import { requestInternalService } from "@atelier/config/service-client";
+import { writeOutboxEvent } from "@atelier/events";
+
+const SCHEMA = "commerce";
 
 type OrderRow = { id: string; buyer_id: string; artwork_id: string; edition_type: Order["editionType"]; total_amount: string; currency: string; status: Order["status"]; created_at: string; shipping_address: Order["shippingAddress"] };
 
@@ -39,7 +42,7 @@ export async function listArtistOrders(artistId: string) {
   }));
 }
 
-export async function shipOrder(orderId: string, artistId: string, input: { carrier: string; trackingNumber: string }): Promise<Shipment | null> {
+export async function shipOrder(orderId: string, artistId: string, input: { carrier: string; trackingNumber: string }, correlationId: string): Promise<Shipment | null> {
   const orders = await query<{ id: string; artwork_id: string }>(`select id::text, artwork_id::text from commerce.orders where id::text = $1`, [orderId]);
   if (!orders[0]) return null;
 
@@ -49,12 +52,23 @@ export async function shipOrder(orderId: string, artistId: string, input: { carr
   ).catch(() => null);
   if (!artwork || artwork.artistId !== artistId) return null;
 
-  const shipment = await query<{ id: string }>(
-    `insert into commerce.shipments (order_id, carrier, tracking_number, status) values ($1::uuid, $2, $3, 'in_transit')
-     on conflict (order_id) do update set carrier = excluded.carrier, tracking_number = excluded.tracking_number, status = 'in_transit', updated_at = now() returning id::text`, [orderId, input.carrier, input.trackingNumber],
-  );
-  await query(`update commerce.orders set status = 'shipped', updated_at = now() where id::text = $1`, [orderId]);
-  return shipment[0] ? { id: shipment[0].id, orderId, carrier: input.carrier, trackingNumber: input.trackingNumber, status: "in_transit" } : null;
+  return transaction(async (client) => {
+    const shipment = await client.query<{ id: string }>(
+      `insert into commerce.shipments (order_id, carrier, tracking_number, status) values ($1::uuid, $2, $3, 'in_transit')
+       on conflict (order_id) do update set carrier = excluded.carrier, tracking_number = excluded.tracking_number, status = 'in_transit', updated_at = now() returning id::text`, [orderId, input.carrier, input.trackingNumber],
+    );
+    if (!shipment.rows[0]) return null;
+    await client.query(`update commerce.orders set status = 'shipped', updated_at = now() where id::text = $1`, [orderId]);
+    // Re-shipping (updated tracking info) legitimately re-emits — Admin's
+    // update is a plain overwrite, so a repeat event is harmless.
+    await writeOutboxEvent(client, SCHEMA, {
+      type: "OrderShipped",
+      aggregateId: orderId,
+      correlationId,
+      payload: { orderId, shipmentId: shipment.rows[0].id, carrier: input.carrier, trackingNumber: input.trackingNumber },
+    });
+    return { id: shipment.rows[0].id, orderId, carrier: input.carrier, trackingNumber: input.trackingNumber, status: "in_transit" as const };
+  });
 }
 
 export async function confirmReceived(orderId: string, buyerId: string): Promise<Order | null> {
