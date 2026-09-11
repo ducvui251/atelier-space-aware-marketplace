@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   AccountSyncRequestSchema,
   AccountUpdateRequestSchema,
+  ArtistEarningsQuerySchema,
   ArtistVerificationReviewRequestSchema,
   ArtworkArtistVerificationRequestSchema,
   ArtworkAvailabilityRequestSchema,
@@ -117,6 +118,25 @@ describe("ArtworkSearchQuerySchema", () => {
 
   it("rejects a negative price", () => {
     expect(ArtworkSearchQuerySchema.safeParse({ minPrice: "-1" }).success).toBe(false);
+  });
+});
+
+describe("ArtistEarningsQuerySchema", () => {
+  it("defaults period to 'day' on an empty query", () => {
+    const result = ArtistEarningsQuerySchema.safeParse({});
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.period).toBe("day");
+  });
+
+  it("accepts week/month and a from/to date range", () => {
+    const result = ArtistEarningsQuerySchema.safeParse({ period: "month", from: "2026-01-01", to: "2026-03-01" });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data).toMatchObject({ period: "month", from: "2026-01-01", to: "2026-03-01" });
+  });
+
+  it("rejects an invalid period or a non-date from/to", () => {
+    expect(ArtistEarningsQuerySchema.safeParse({ period: "year" }).success).toBe(false);
+    expect(ArtistEarningsQuerySchema.safeParse({ from: "not-a-date" }).success).toBe(false);
   });
 });
 

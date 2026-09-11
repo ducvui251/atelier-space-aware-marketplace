@@ -2,6 +2,7 @@ import type { ZodType } from "zod";
 import {
   AccountSyncRequestSchema,
   AccountUpdateRequestSchema,
+  ArtistEarningsQuerySchema,
   ArtistVerificationReviewRequestSchema,
   ArtworkArtistVerificationRequestSchema,
   ArtworkAvailabilityRequestSchema,
@@ -82,6 +83,7 @@ export const ROUTES: RouteDefinition[] = [
   { method: "GET", path: "/v1/commerce/stats", service: "commerce", summary: "Aggregate order/revenue stats", auth: "internal", successStatus: 200, errorStatuses: [401] },
   { method: "GET", path: "/v1/commerce/orders", service: "commerce", summary: "List the buyer's own orders", auth: "internal", successStatus: 200, errorStatuses: [400, 401] },
   { method: "GET", path: "/v1/commerce/artist-orders", service: "commerce", summary: "List orders for an artist's artworks", auth: "internal", successStatus: 200, errorStatuses: [400, 401] },
+  { method: "GET", path: "/v1/commerce/artist-earnings", service: "commerce", summary: "Per-artist earnings aggregate: received/pending-payment/refunded totals, order status counts, revenue trend (§4.7)", auth: "internal", requestSchema: ArtistEarningsQuerySchema, requestLocation: "query", successStatus: 200, errorStatuses: [400, 401] },
   { method: "POST", path: "/v1/commerce/orders/{id}/ship", service: "commerce", summary: "Mark an order shipped (artist-owned)", auth: "internal", requestSchema: ShipOrderRequestSchema, requestLocation: "body", successStatus: 200, errorStatuses: [400, 401, 403] },
   { method: "POST", path: "/v1/commerce/orders/{id}/confirm-received", service: "commerce", summary: "Buyer confirms receipt of a shipped order", auth: "internal", requestSchema: ConfirmReceivedRequestSchema, requestLocation: "body", successStatus: 200, errorStatuses: [400, 401, 409] },
   { method: "POST", path: "/v1/commerce/orders/{id}/reviews", service: "commerce", summary: "Leave a review on a completed order", auth: "internal", requestSchema: OrderReviewRequestSchema, requestLocation: "body", successStatus: 200, errorStatuses: [400, 401, 409] },

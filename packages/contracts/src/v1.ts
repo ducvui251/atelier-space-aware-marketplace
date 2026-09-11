@@ -179,6 +179,15 @@ export const OrderReviewRequestSchema = z.object({
   comment: z.string().trim().optional(),
 });
 
+// Period bucketing for the artist earnings aggregate (§4.7 of the defect
+// audit). `from`/`to` default to a 90-day trailing window when omitted —
+// enforced service-side, not here, since the default depends on "now".
+export const ArtistEarningsQuerySchema = z.object({
+  period: z.enum(["day", "week", "month"]).default("day"),
+  from: z.string().date().optional(),
+  to: z.string().date().optional(),
+});
+
 // --- Recommendation ------------------------------------------------------------
 
 export const ToggleSavedRequestSchema = z.object({
@@ -297,6 +306,7 @@ export type CreateReservationRequest = z.infer<typeof CreateReservationRequestSc
 export type ArtworkArtistVerificationRequest = z.infer<typeof ArtworkArtistVerificationRequestSchema>;
 export type CartAddRequest = z.infer<typeof CartAddRequestSchema>;
 export type ShipOrderRequest = z.infer<typeof ShipOrderRequestSchema>;
+export type ArtistEarningsQuery = z.infer<typeof ArtistEarningsQuerySchema>;
 export type ConfirmReceivedRequest = z.infer<typeof ConfirmReceivedRequestSchema>;
 export type OrderReviewRequest = z.infer<typeof OrderReviewRequestSchema>;
 export type ToggleSavedRequest = z.infer<typeof ToggleSavedRequestSchema>;

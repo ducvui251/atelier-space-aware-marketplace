@@ -81,6 +81,29 @@ export interface SavedArtwork { id: string; buyerId: string; artworkId: string; 
 export type ComplaintStatus = "open" | "resolved" | "rejected";
 export interface Complaint { id: string; orderId: string; reporterId: string; reason: string; status: ComplaintStatus; resolutionNote?: string; }
 
+/**
+ * Commerce's per-artist earnings aggregate (§4.7 of the defect audit).
+ * No platform commission is modeled anywhere in this system yet, so
+ * `received`/`pendingPayment`/`refunded`/trend `net` are gross buyer-paid
+ * amounts, not a post-fee payout — there is also no real settlement/payout
+ * integration (e.g. Stripe Connect transfers) behind "received": it means
+ * "payment succeeded and not refunded," not "money has left Stripe's
+ * account." Both are honest read-outs of what this system can actually
+ * prove today, not a substitute for an actual payout ledger.
+ */
+export interface ArtistEarnings {
+  artistId: string;
+  currency: string;
+  period: "day" | "week" | "month";
+  from: string;
+  to: string;
+  received: number;
+  pendingPayment: number;
+  refunded: number;
+  orderCounts: { processing: number; shipped: number; completed: number; cancelled: number; refunded: number };
+  trend: { period: string; net: number }[];
+}
+
 export const SERVICE_NAMES = [
   "account", "catalog-discovery", "artist-artwork", "commerce",
   "recommendation", "verification", "room-preview", "admin",
