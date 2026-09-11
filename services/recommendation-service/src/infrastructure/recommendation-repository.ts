@@ -1,4 +1,4 @@
-import { query } from "@atelier/persistence";
+import { query, transaction } from "@atelier/persistence";
 
 /**
  * buyer_id stores the caller-supplied Supabase auth user id directly (same
@@ -44,17 +44,75 @@ export async function toggleSaved(buyerId: string, artworkId: string): Promise<b
   return true;
 }
 
+/**
+ * Writes a follow_events row alongside the follows toggle in the same
+ * transaction, so unfollow (a hard delete of the follows row) doesn't
+ * erase the ability to reconstruct historical follower counts — see
+ * getArtistAudience below.
+ */
 export async function toggleFollow(buyerId: string, artistId: string): Promise<boolean> {
-  const existing = await query<{ id: string }>(
-    `select id::text from recommendation.follows where buyer_id = $1::uuid and artist_id = $2::uuid`, [buyerId, artistId],
+  return transaction(async (client) => {
+    const existing = await client.query<{ id: string }>(
+      `select id::text from recommendation.follows where buyer_id = $1::uuid and artist_id = $2::uuid`, [buyerId, artistId],
+    );
+    if (existing.rows[0]) {
+      await client.query(`delete from recommendation.follows where id = $1::uuid`, [existing.rows[0].id]);
+      await client.query(
+        `insert into recommendation.follow_events (buyer_id, artist_id, event_type) values ($1::uuid, $2::uuid, 'unfollowed')`,
+        [buyerId, artistId],
+      );
+      return false;
+    }
+    await client.query(
+      `insert into recommendation.follows (buyer_id, artist_id) values ($1::uuid, $2::uuid)
+       on conflict (buyer_id, artist_id) do nothing`, [buyerId, artistId],
+    );
+    await client.query(
+      `insert into recommendation.follow_events (buyer_id, artist_id, event_type) values ($1::uuid, $2::uuid, 'followed')`,
+      [buyerId, artistId],
+    );
+    return true;
+  });
+}
+
+/**
+ * Audience metric (§4.7): total followers now, plus growth vs the same
+ * length period immediately before it. Reconstructs the historical count
+ * from follow_events (followed minus unfollowed events up to that point in
+ * time) rather than from recommendation.follows, since unfollow deletes
+ * that row — the current table can only ever answer "right now".
+ */
+export async function getArtistAudience(artistId: string, periodDays: number): Promise<{ totalFollowers: number; followersPreviousPeriod: number; growth: number }> {
+  const periodStart = new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000).toISOString();
+  const rows = await query<{ total_followers: string; followers_previous_period: string }>(
+    `select
+       (select count(*) from recommendation.follows where artist_id = $1::uuid)::text as total_followers,
+       (
+         (select count(*) from recommendation.follow_events where artist_id = $1::uuid and event_type = 'followed' and created_at <= $2::timestamptz)
+         -
+         (select count(*) from recommendation.follow_events where artist_id = $1::uuid and event_type = 'unfollowed' and created_at <= $2::timestamptz)
+       )::text as followers_previous_period`,
+    [artistId, periodStart],
   );
-  if (existing[0]) {
-    await query(`delete from recommendation.follows where id = $1::uuid`, [existing[0].id]);
-    return false;
-  }
-  await query(
-    `insert into recommendation.follows (buyer_id, artist_id) values ($1::uuid, $2::uuid)
-     on conflict (buyer_id, artist_id) do nothing`, [buyerId, artistId],
+  const totalFollowers = Number(rows[0]?.total_followers ?? 0);
+  const followersPreviousPeriod = Math.max(0, Number(rows[0]?.followers_previous_period ?? 0));
+  return { totalFollowers, followersPreviousPeriod, growth: totalFollowers - followersPreviousPeriod };
+}
+
+/**
+ * Per-artwork save counts for one artist's own artworks (§4.7's "Views và
+ * Saves theo artwork"). Artist ownership is resolved over HTTP from
+ * Artist & Artwork, same pattern as sourceArtworks() in server.ts —
+ * Recommendation never reads artist_artwork.* directly.
+ */
+export async function getArtistArtworkSaves(artworkIds: string[]): Promise<{ artworkId: string; saves: number }[]> {
+  if (artworkIds.length === 0) return [];
+  const rows = await query<{ artwork_id: string; saves: string }>(
+    `select artwork_id::text, count(*)::text as saves
+     from recommendation.saved_artworks
+     where artwork_id = any($1::uuid[])
+     group by artwork_id`,
+    [artworkIds],
   );
-  return true;
+  return rows.map((row) => ({ artworkId: row.artwork_id, saves: Number(row.saves) }));
 }

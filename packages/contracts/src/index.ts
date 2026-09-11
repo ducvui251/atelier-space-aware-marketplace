@@ -78,6 +78,21 @@ export interface Shipment { id: string; orderId: string; carrier?: string; track
 export interface Review { id: string; orderId: string; buyerId: string; rating: number; comment?: string; }
 export interface Follow { id: string; buyerId: string; artistId: string; }
 export interface SavedArtwork { id: string; buyerId: string; artworkId: string; }
+
+/**
+ * Audience metric (§4.7 of the defect audit): reconstructed from an
+ * append-only follow_events ledger, not the live recommendation.follows
+ * table (which loses history on unfollow — see follow_events for why).
+ */
+export interface ArtistAudience {
+  artistId: string;
+  periodDays: number;
+  totalFollowers: number;
+  followersPreviousPeriod: number;
+  growth: number;
+}
+
+export interface ArtworkSaveCount { artworkId: string; saves: number; }
 export type ComplaintStatus = "open" | "resolved" | "rejected";
 export interface Complaint { id: string; orderId: string; reporterId: string; reason: string; status: ComplaintStatus; resolutionNote?: string; }
 

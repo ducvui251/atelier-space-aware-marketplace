@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   AccountSyncRequestSchema,
   AccountUpdateRequestSchema,
+  ArtistAudienceQuerySchema,
   ArtistEarningsQuerySchema,
   ArtistVerificationReviewRequestSchema,
   ArtworkArtistVerificationRequestSchema,
@@ -137,6 +138,26 @@ describe("ArtistEarningsQuerySchema", () => {
   it("rejects an invalid period or a non-date from/to", () => {
     expect(ArtistEarningsQuerySchema.safeParse({ period: "year" }).success).toBe(false);
     expect(ArtistEarningsQuerySchema.safeParse({ from: "not-a-date" }).success).toBe(false);
+  });
+});
+
+describe("ArtistAudienceQuerySchema", () => {
+  it("defaults periodDays to 30 on an empty query", () => {
+    const result = ArtistAudienceQuerySchema.safeParse({});
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.periodDays).toBe(30);
+  });
+
+  it("coerces periodDays from a query-string value", () => {
+    const result = ArtistAudienceQuerySchema.safeParse({ periodDays: "7" });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.periodDays).toBe(7);
+  });
+
+  it("rejects a zero, negative, or excessive periodDays", () => {
+    expect(ArtistAudienceQuerySchema.safeParse({ periodDays: "0" }).success).toBe(false);
+    expect(ArtistAudienceQuerySchema.safeParse({ periodDays: "-5" }).success).toBe(false);
+    expect(ArtistAudienceQuerySchema.safeParse({ periodDays: "9999" }).success).toBe(false);
   });
 });
 

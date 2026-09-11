@@ -2,6 +2,7 @@ import type { ZodType } from "zod";
 import {
   AccountSyncRequestSchema,
   AccountUpdateRequestSchema,
+  ArtistAudienceQuerySchema,
   ArtistEarningsQuerySchema,
   ArtistVerificationReviewRequestSchema,
   ArtworkArtistVerificationRequestSchema,
@@ -94,6 +95,8 @@ export const ROUTES: RouteDefinition[] = [
   { method: "POST", path: "/v1/recommendation/saved", service: "recommendation", summary: "Toggle save/unsave for an artwork", auth: "internal", requestSchema: ToggleSavedRequestSchema, requestLocation: "body", successStatus: 200, errorStatuses: [400, 401] },
   { method: "GET", path: "/v1/recommendation/follows", service: "recommendation", summary: "List the artists the buyer follows", auth: "internal", successStatus: 200, errorStatuses: [400, 401] },
   { method: "POST", path: "/v1/recommendation/follows", service: "recommendation", summary: "Toggle follow/unfollow for an artist", auth: "internal", requestSchema: ToggleFollowRequestSchema, requestLocation: "body", successStatus: 200, errorStatuses: [400, 401] },
+  { method: "GET", path: "/v1/recommendation/artist-audience", service: "recommendation", summary: "Follower count and growth vs a previous period (§4.7)", auth: "internal", requestSchema: ArtistAudienceQuerySchema, requestLocation: "query", successStatus: 200, errorStatuses: [400, 401] },
+  { method: "GET", path: "/v1/recommendation/artist-saves", service: "recommendation", summary: "Per-artwork save counts for an artist's own artworks (§4.7)", auth: "internal", successStatus: 200, errorStatuses: [400, 401] },
 
   // verification
   { method: "POST", path: "/v1/verification/artworks/{id}/review", service: "verification", summary: "Record a verification decision for an artwork", auth: "internal", requestSchema: ArtworkVerificationReviewRequestSchema, requestLocation: "body", successStatus: 200, errorStatuses: [400, 401, 404] },
