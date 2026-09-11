@@ -7,9 +7,12 @@ const nextConfig: NextConfig = {
   ],
   images: {
     remotePatterns: [
-      // Added per-deployment when artwork imagery moves to Supabase Storage
-      // or a CDN; local demo assets live in public/img (ADR 0001 D7).
       { protocol: "https", hostname: "images.unsplash.com" },
+      // Artwork images uploaded via POST /api/uploads/image (G-05) are
+      // served from the project's Supabase Storage public URL, which is
+      // always <project-ref>.supabase.co — wildcard the subdomain instead
+      // of hardcoding one project ref so this works across environments.
+      { protocol: "https", hostname: "*.supabase.co", pathname: "/storage/v1/object/public/**" },
     ],
   },
 };

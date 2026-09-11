@@ -1,9 +1,9 @@
 import Link from "next/link";
-import Image from "next/image";
 import { BadgeCheck } from "lucide-react";
 import type { Artist } from "@/types";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { ArtworkImage } from "@/components/artwork/ArtworkImage";
 
 interface ArtistCardProps {
   artist: Artist;
@@ -19,7 +19,7 @@ export function ArtistCard({ artist, className }: ArtistCardProps) {
       className={cn("group focus-ring flex flex-col gap-3", className)}
     >
       <div className="relative aspect-[4/5] w-full overflow-hidden rounded-lg bg-muted">
-        <Image
+        <ArtworkImage
           src={artist.imageUrl}
           alt={`Portrait of ${artist.displayName}`}
           fill

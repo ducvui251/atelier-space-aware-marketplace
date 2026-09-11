@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { RequireRole } from "@/components/auth/RequireRole";
 import { Button } from "@/components/ui/button";
+import { ArtworkImage } from "@/components/artwork/ArtworkImage";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useApiResource } from "@/lib/client/hooks";
@@ -30,7 +30,7 @@ function ReviewRow({
   return (
     <div className="flex flex-wrap items-center gap-4 rounded-lg border border-border bg-surface p-4">
       <div className="relative size-16 shrink-0 overflow-hidden rounded-md bg-muted">
-        <Image src={imageUrl} alt={title} fill sizes="64px" className="object-cover" />
+        <ArtworkImage src={imageUrl} alt={title} fill sizes="64px" className="object-cover" />
       </div>
       <div className="min-w-[180px] flex-1">
         <p className="text-body font-medium text-foreground">{title}</p>

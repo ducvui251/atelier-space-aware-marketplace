@@ -3,6 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { ArtworkImage } from "@/components/artwork/ArtworkImage";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { FilterChip } from "@/components/discovery/FilterChip";
@@ -100,7 +101,7 @@ export function RoomPlaceholder({ artworks, rooms }: { artworks: Artwork[]; room
                 artworkAspect(artwork.orientation),
               )}
             >
-              <Image src={artwork.imageUrl} alt={artwork.title} fill sizes="30vw" className="object-cover" />
+              <ArtworkImage src={artwork.imageUrl} alt={artwork.title} fill sizes="30vw" className="object-cover" />
             </div>
             <p className="mt-2 truncate text-center text-caption text-surface/90">{artwork.title}</p>
           </div>
@@ -122,7 +123,7 @@ export function RoomPlaceholder({ artworks, rooms }: { artworks: Artwork[]; room
                     a.id === artwork.id && "ring-2 ring-foreground ring-offset-1",
                   )}
                 >
-                  <Image src={a.imageUrl} alt={a.title} fill sizes="56px" className="object-cover" />
+                  <ArtworkImage src={a.imageUrl} alt={a.title} fill sizes="56px" className="object-cover" />
                 </button>
               ))}
             </div>
@@ -178,7 +179,7 @@ export function RoomPlaceholder({ artworks, rooms }: { artworks: Artwork[]; room
                 {entry.artwork ? (
                   <Link href={`/artworks/${entry.artwork.id}`} className="block">
                     <div className="relative aspect-square bg-muted">
-                      <Image src={entry.artwork.imageUrl} alt={entry.artwork.title} fill sizes="200px" className="object-cover" />
+                      <ArtworkImage src={entry.artwork.imageUrl} alt={entry.artwork.title} fill sizes="200px" className="object-cover" />
                     </div>
                     <div className="p-2">
                       <p className="truncate text-caption font-medium text-foreground">{entry.artwork.title}</p>

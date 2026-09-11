@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { ShoppingBag, X } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { RequireRole } from "@/components/auth/RequireRole";
+import { ArtworkImage } from "@/components/artwork/ArtworkImage";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -48,7 +48,7 @@ function CartView() {
         {items.map((artwork) => (
           <div key={artwork.id} className="flex gap-4 rounded-lg border border-border bg-surface p-4">
             <div className="relative size-24 shrink-0 overflow-hidden rounded-md bg-muted">
-              <Image src={artwork.imageUrl} alt={artwork.title} fill sizes="96px" className="object-cover" />
+              <ArtworkImage src={artwork.imageUrl} alt={artwork.title} fill sizes="96px" className="object-cover" />
             </div>
             <div className="flex flex-1 flex-col justify-between">
               <div>
