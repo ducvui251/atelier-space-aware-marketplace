@@ -1003,6 +1003,90 @@ Tasks:
 
 Exit gate: two concurrent buyers cannot purchase the same one-of-one artwork, retries and webhook replays do not duplicate orders/payments, and payment/shipping state changes are explicit and auditable.
 
+### Defect-audit fixes (2026-09-11), from `ATELIER_FIX_AND_FEATURE_PLAN.md`
+
+Not a numbered phase in this plan's own scheme — this is a separate
+defect-analysis pass (`ATELIER_FIX_AND_FEATURE_PLAN.md`, kept outside the
+repo) whose Phase 1 ("trust, image, public visibility") work landed here.
+Recorded per this doc's own evidence discipline since it touches services
+this plan already tracks.
+
+**Artwork image rendering + file-only upload:** `next.config.ts` was
+missing a remotePattern for Supabase Storage (`*.supabase.co/storage/v1/
+object/public/**`) — uploaded images never actually rendered anywhere,
+only the `images.unsplash.com` demo assets did. Fixed, plus a new
+`ArtworkImage` component so a missing image renders an explicit
+placeholder instead of crashing `next/image` on `src=""`. Applied
+everywhere an artwork/artist image renders (catalog, detail, cart,
+checkout, rooms, admin queue, artist/artist-profile pages). `ArtworkForm`'s
+"paste an image URL" text input is removed entirely — file upload via
+`POST /api/uploads/image` is now the only path. Live-verified via a real
+Chrome session: uploaded a real file as `demo.artist@atelier.test`,
+confirmed the persisted `imageUrl` is a real Supabase Storage URL, and
+confirmed it renders full-size on the detail page.
+
+**Public visibility (pending/rejected hidden) + decision note/reviewer
+propagation:** previously `listPersistedArtworks()` (the public listing
+backing both the Gateway's direct catalog pages and Catalog & Discovery's
+read-model source) returned every status with no filter — a brand-new
+pending artwork was publicly browsable and viewable at its own detail URL.
+Also, Verification's decision `note` was captured in
+`verification.artwork_verifications`/`artist_verifications` (the audit
+source, unaffected) but never reached the `ArtworkVerified.v1`/
+`ArtistVerified.v1` event payload, so Artist & Artwork's projection —
+what the artist dashboard actually reads — never had a rejection reason to
+show despite the UI already having a `verificationNote` field wired up
+for it.
+
+Fixed:
+- Migration `0016_verification_decision_projection.sql` adds
+  `verification_note`/`reviewed_by`/`reviewed_at` to `artist_artwork.artworks`
+  and `.artist_profiles`.
+- `ArtworkVerifiedPayloadSchema`/`ArtistVerifiedPayloadSchema` gained an
+  optional `note` field; Verification's outbox event now carries it.
+- `listPersistedArtworks()` defaults to `verification_status = 'verified'`
+  only; the one legitimate exception (Admin's verification-queue/stats,
+  which must see pending items) opts in via `?status=all` on
+  `GET /v1/artist-artwork/artworks` — Commerce's checkout availability
+  check and Recommendation's suggestions get the safe verified-only
+  default for free, which is also strictly more correct for them.
+- Catalog & Discovery's event-driven fast path (`handleArtworkEvent`) now
+  removes a read-model row instead of upserting it when the fetched
+  artwork isn't `verified` (new `removeReadModelArtwork`) — previously an
+  `artwork.published` event (fired at creation, status `pending`) would
+  have upserted a pending artwork straight into the "public" read model.
+- Public detail (`/artworks/[id]` page and its `/api/artworks/[id]`
+  route) now 404s a non-verified artwork the same as a nonexistent one,
+  not just omits it from the listing — verified byte-for-byte identical
+  to a genuinely nonexistent id's response.
+- Re-submitting an edited artwork clears the prior
+  note/reviewer/timestamp from the projection along with the status reset
+  to `pending` (the audit row in `verification.artwork_verifications`
+  is untouched) — a fresh pending row must not display a stale rejection
+  reason as if it belonged to the new submission.
+- Found and fixed a real regression from the visibility filter itself
+  during this same pass: the artist's own edit page
+  (`/artist/artworks/[id]/edit`) was fetching through
+  `/api/artworks/[id]` (the now verified-only public route), so an
+  artist could no longer open their own pending/rejected artwork to
+  edit it. Added `GET /api/artist/artworks/[id]` (ownership-checked, all
+  statuses) and pointed the edit page at it instead.
+
+Live-verified end-to-end via a mix of the real Postgres volume and
+internal-network `curl` calls (per this session's account-switching-scope
+constraint, not repeated browser logins): created a real pending artwork
+→ confirmed absent from the public list and its own detail page →
+confirmed present in Admin's queue → rejected with a real reason through
+the admin UI → confirmed the reason renders on the artist dashboard →
+resubmitted (simulated via the internal PATCH route) → confirmed status
+back to `pending` with the note cleared and the audit row intact →
+approved (simulated via the internal verification-service route) →
+confirmed Catalog & Discovery's read model picked it up via the event
+fast path (no poll wait) and it now renders publicly. All test data
+deleted afterward. Full regression (type-check across all 13
+packages/services, lint, contracts test 58/58, route-registry-parity,
+build) re-run clean after every code change in this pass.
+
 ### Phase 7 — Finish Gateway and MVP UI integration
 
 Status: **partial foundation; not accepted**. Gateway pages and room mutations exist; upload, signup correctness, dependency/error states, rejected labels and browser E2E remain open.
@@ -1010,10 +1094,10 @@ Status: **partial foundation; not accepted**. Gateway pages and room mutations e
 Tasks:
 
 - [ ] Verify every row of the §11 table against live services: discovery, detail, artist, collections, save/follow, cart, checkout, order, ship, admin, rooms, placements.
-- [x] Wire the upload UI: `ArtworkForm` multipart → `POST /api/uploads/image` → returned URL into create/update (G-05). *(Done ahead of schedule in Phase 4, 2026-09-09 — see that phase's evidence note. Fully verified end-to-end against the real Supabase Storage bucket the same day; the URL-paste fallback still works alongside it.)*
+- [x] Wire the upload UI: `ArtworkForm` multipart → `POST /api/uploads/image` → returned URL into create/update (G-05). *(Done ahead of schedule in Phase 4, 2026-09-09 — see that phase's evidence note. Fully verified end-to-end against the real Supabase Storage bucket the same day. Update 2026-09-11: the URL-paste fallback mentioned here has since been removed — see the defect-audit note below — file upload is now the only path.)*
 - [ ] Add signup UI polish + auth-state handling across the shell (G-06).
 - [ ] Implement loading, empty, unavailable, unauthorized, forbidden, conflict, and dependency-failure states for every rewired page.
-- [ ] Fix rejected verification displayed as pending in `components/artwork/VerificationBadge.tsx`, `components/artist/ArtistCard.tsx` and `app/artists/[id]/page.tsx`; add explicit persisted pending/verified/rejected rendering tests (T-013).
+- [ ] Fix rejected verification displayed as pending in `components/artwork/VerificationBadge.tsx`, `components/artist/ArtistCard.tsx` and `app/artists/[id]/page.tsx`; add explicit persisted pending/verified/rejected rendering tests (T-013). *(Still open as stated — those three display components themselves are untouched. But the data foundation this depends on is now fixed, see the defect-audit note below: verification decisions carry a real note/reviewer/timestamp into the projection, so a future pass on these components has real data to render instead of a bare status enum.)*
 - [ ] Run accessibility checks for keyboard interaction, alt text, labels, focus, contrast, and reduced motion.
 
 Exit gate: a fresh user can sign up, complete the MVP journey through the browser with no internal network calls, and state survives service restart (T-021, T-024).

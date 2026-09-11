@@ -36,7 +36,7 @@ export async function reviewArtwork(input: { artworkId: string; reviewerAuthUser
       type: "ArtworkVerified",
       aggregateId: input.artworkId,
       correlationId,
-      payload: { artworkId: input.artworkId, status: input.status, reviewerId: input.reviewerAuthUserId },
+      payload: { artworkId: input.artworkId, status: input.status, reviewerId: input.reviewerAuthUserId, note: input.note },
     });
   });
 
@@ -56,7 +56,7 @@ export async function reviewArtist(input: { artistId: string; status: "verified"
       type: "ArtistVerified",
       aggregateId: input.artistId,
       correlationId,
-      payload: { artistId: input.artistId, status: input.status },
+      payload: { artistId: input.artistId, status: input.status, note: input.note },
     });
   });
 

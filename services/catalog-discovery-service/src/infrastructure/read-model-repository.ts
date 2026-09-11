@@ -35,7 +35,8 @@ export async function syncReadModel(artworks: Artwork[]): Promise<void> {
 /**
  * Single-row upsert used by the event consumer — the fast path that keeps
  * the read model fresh within one publish/consume round trip instead of
- * waiting for the next poll tick.
+ * waiting for the next poll tick. Callers must only pass artworks that
+ * belong in the public read model (see removeReadModelArtwork otherwise).
  */
 export async function upsertReadModelArtwork(artwork: Artwork): Promise<void> {
   await query(
@@ -44,4 +45,15 @@ export async function upsertReadModelArtwork(artwork: Artwork): Promise<void> {
      on conflict (id) do update set payload = excluded.payload, synced_at = now()`,
     [artwork.id, JSON.stringify(artwork)],
   );
+}
+
+/**
+ * The event fast path's counterpart to an upsert: an artwork.verified event
+ * with status "rejected", or any event fetch that now shows a non-verified
+ * artwork (e.g. an artist edit reset it back to pending), means the read
+ * model must drop the row rather than upsert a pending/rejected snapshot
+ * into what is supposed to be a verified-only public projection.
+ */
+export async function removeReadModelArtwork(artworkId: string): Promise<void> {
+  await query(`delete from catalog_discovery.artwork_read_models where id::text = $1`, [artworkId]);
 }

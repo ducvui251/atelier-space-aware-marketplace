@@ -94,7 +94,7 @@ export async function markOrderFeedFailed(input: { orderId: string; buyerId: str
 export async function getStats() {
   const [artists, artworks, complaints, commerceStats] = await Promise.all([
     requestInternalService<{ items: Array<{ verificationStatus: string }> }>("artist-artwork", "/v1/artist-artwork/artists"),
-    requestInternalService<{ items: Array<{ verificationStatus: string }> }>("artist-artwork", "/v1/artist-artwork/artworks"),
+    requestInternalService<{ items: Array<{ verificationStatus: string }> }>("artist-artwork", "/v1/artist-artwork/artworks?status=all"),
     query<{ count: string }>(`select count(*)::text as count from admin.complaints where status = 'open'`),
     requestInternalService<{ totalOrders: number; revenue: number }>("commerce", "/v1/commerce/stats"),
   ]);
