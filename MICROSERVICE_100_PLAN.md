@@ -918,7 +918,16 @@ Exit gate: every internal route has executable schemas and contract tests; no pu
 
 ### Phase 5 — Implement events and outbox delivery
 
-Status: **partial; G-22 closed with live durability/recovery proof. Commerce and Admin now also have real broker connectivity, an outbox, and three live producer→consumer events (`OrderCreated.v1`/`PaymentSucceeded.v1`/`OrderShipped.v1` → `admin.order_feed`), covering the full pending→paid→shipped order lifecycle and proved through a real Stripe test-mode checkout plus a real ship call. Recommendation/Room Preview broker connectivity, the remaining §7.3 events (`PaymentFailed.v1`, `ShipmentUpdated.v1`, `ComplaintOpened.v1`), and pending-outbox metrics remain open** for a future pass.
+Status: **closed for this pass at the point of diminishing returns, not at 100%.** G-22 is closed with live durability/recovery proof. Commerce and Admin have real broker connectivity, an outbox, and three live producer→consumer events (`OrderCreated.v1`/`PaymentSucceeded.v1`/`OrderShipped.v1` → `admin.order_feed`), covering the full pending→paid→shipped order lifecycle, proved through a real Stripe test-mode checkout plus a real ship call.
+
+**The remaining items were deliberately not forced, and the reasoning is recorded here rather than left as a silent gap:**
+- Recommendation/Room Preview broker connectivity: checked `recommendation-service/src/server.ts` — it re-fetches artwork data live over HTTP on *every* request with no cache or local read model at all, so "consume `ArtworkSold.v1` to invalidate a cache" (§7.3's stated rule for that consumer) has nothing to invalidate; wiring the broker in for it would be connectivity with no function behind it. Room Preview appears in no row of the §7.3 event catalog at all — it has no defined event role to implement.
+- `PaymentFailed.v1`: needs a real Stripe webhook to have a genuine trigger (the current `checkout/confirm` flow only distinguishes "not yet paid" from "paid," not a definitive failure) — that's explicitly Phase 6's G-04, not yet built. Implementing this now would mean fabricating a trigger ahead of its actual infrastructure.
+- `ShipmentUpdated.v1`: needs a real carrier webhook; shipping today is a free-text carrier/tracking field the artist types in, with no carrier API to integrate — same "no real trigger yet" issue.
+- `ComplaintOpened.v1`: could be emitted, but Commerce (its only named consumer) has no defined action to take on it — the complaint is already durably recorded in `admin.complaints` itself, so publishing an event nothing acts on would be plumbing for its own sake.
+- Pending-outbox metrics: this is a slice of the full `/metrics` (G-07) work explicitly planned for **Phase 8** with its own §12.1 metric set; implementing a partial version here risked duplicating or conflicting with that later, more complete pass.
+
+Moving to Phase 6 next, where `PaymentFailed.v1`'s real trigger (the Stripe webhook, G-04) actually belongs.
 
 Tasks:
 
@@ -942,17 +951,50 @@ Exit gate: every required MVP event producer/consumer has delivery, deduplicatio
 
 ### Phase 6 — Correct inventory, checkout, payments, shipping
 
-Status: **partial foundation; not accepted**. Reservation/checkout migrations and a Stripe session adapter exist; webhook authority, atomic recovery and shipping integration remain open.
+Status: **G-04 (Stripe webhook) closed and live-verified; the rest of the phase (atomic reservation/idempotency proof, shipping adapter, order state guards, concurrent checkout tests) remains open — not accepted as a whole.**
+
+**G-04 evidence (2026-09-11):** implemented and live-tested end-to-end via
+`stripe listen --forward-to http://localhost:3000/api/webhooks/stripe`
+(Stripe CLI, project's real test key):
+- `commerce.payment_events` table (migration `0015_commerce_payment_events.sql`,
+  RLS-enabled), idempotency gate on `provider_event_id`.
+- Gateway `POST /api/webhooks/stripe` verifies `stripe-signature` against the
+  raw body via `Stripe.webhooks.constructEvent`, relays the verified event
+  as-is to Commerce.
+- Commerce `POST /v1/commerce/payments/webhook` handles
+  `checkout.session.completed` (converges with the existing poll-confirm
+  path through the same `confirmCheckoutSession`), `payment_intent.payment_failed`
+  (cancels order, releases the Artist & Artwork reservation, emits
+  `PaymentFailed.v1`), `charge.refunded` (marks payment `refunded`).
+- `orderIds` threaded through `payment_intent_data.metadata` at Checkout
+  Session creation, confirmed live that `session.payment_intent` is `null`
+  immediately after creation (no other way to recover it later).
+- Admin now also consumes `PaymentFailed.v1` into `admin.order_feed` (status
+  `failed`).
+- Real test-mode events verified live: successful payment (`4242...`),
+  declined payment (`4000000000000002`), a real refund via Stripe's REST
+  API, and a real duplicate delivery via `stripe events resend` — all
+  idempotent, no double-processing, reservation correctly released on
+  failure.
+- Dead code removed as part of this: `services/commerce-service/src/application/checkout.ts`
+  (already flagged stale below) and the `simulateFailure` field from
+  `CheckoutRequestSchema`/`CheckoutClientRequestSchema` + the Gateway checkout
+  route.
+- Full regression re-run after rebase onto latest `main`: `pnpm type-check`
+  (pass, all 13 packages/services including admin-service), `pnpm lint`
+  (pass, 0 warnings), `pnpm --filter @atelier/contracts test` (58/58 pass),
+  `bash scripts/test-route-registry-parity.sh` (49 routes, all registered),
+  `pnpm build` (pass).
 
 Tasks:
 
 - [ ] Implement/confirm atomic reservation, commit, release, and expiry in Artist & Artwork (migration 0008 exists; close the G-22 lease gap if confirmed).
 - [ ] Reuse persisted Commerce reservation IDs and Artist & Artwork leases (migrations 0008/0010); prove expiry alignment, restart recovery, partial multi-item compensation and repeated confirm safety.
 - [ ] Add idempotency key persistence and request-body mismatch detection (migration 0009 exists; verify usage).
-- [ ] Claim concurrent idempotency keys before Stripe session creation; make reservation commit/expiry all-or-nothing and prevent direct availability writes from bypassing leases. Treat `services/commerce-service/src/application/checkout.ts` as stale/dead code until removed or covered.
-- [ ] **Stripe webhook (G-04):** Gateway `POST /api/webhooks/stripe` (raw-body signature verify) → Commerce `POST /v1/commerce/payments/webhook`; `payment_events` table with unique `provider_event_id`; handle `checkout.session.completed`, `payment_intent.payment_failed`, `charge.refunded`; webhook authoritative, poll-confirm degraded fallback (§10.2).
-- [ ] Add `STRIPE_WEBHOOK_SECRET` to `.env.example`/compose/registry in the same change.
-- [ ] Keep existing `stripe` payment persistence; test provider state mapping and audit any legacy rows before proposing a migration. Remove production `simulateFailure` handling in favor of a test adapter with an explicit contract migration.
+- [ ] Claim concurrent idempotency keys before Stripe session creation; make reservation commit/expiry all-or-nothing and prevent direct availability writes from bypassing leases. *(still open — only the dead-code half of this task is done: `services/commerce-service/src/application/checkout.ts` was deleted 2026-09-11 as part of G-04, see evidence above; the concurrent-claim/all-or-nothing proof itself has not been attempted)*
+- [x] **Stripe webhook (G-04):** Gateway `POST /api/webhooks/stripe` (raw-body signature verify) → Commerce `POST /v1/commerce/payments/webhook`; `payment_events` table with unique `provider_event_id`; handle `checkout.session.completed`, `payment_intent.payment_failed`, `charge.refunded`; webhook authoritative, poll-confirm degraded fallback (§10.2). *(done and live-verified 2026-09-11, see evidence above)*
+- [x] Add `STRIPE_WEBHOOK_SECRET` to `.env.example`/compose/registry in the same change. *(done 2026-09-11)*
+- [x] Keep existing `stripe` payment persistence; test provider state mapping and audit any legacy rows before proposing a migration. Remove production `simulateFailure` handling in favor of a test adapter with an explicit contract migration. *(simulateFailure removed 2026-09-11; real Stripe test-mode cards now do this job — see G-04 evidence above)*
 - [ ] Add payment failure, timeout, and webhook retry compensation; reservation expiry sweeper.
 - [ ] Ensure paid/order-completed state follows successful inventory commit, with compensation/reconciliation when commit fails; add payment failure, timeout, and webhook retry compensation plus reservation expiry sweeper.
 - [ ] Add shipping adapter boundary, carrier webhook processing, durable shipment events, and transition guards including delivery state on buyer receipt confirmation.

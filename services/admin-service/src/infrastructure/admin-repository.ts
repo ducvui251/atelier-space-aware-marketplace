@@ -75,6 +75,22 @@ export async function markOrderFeedShipped(input: { orderId: string }): Promise<
   await query(`update admin.order_feed set status = 'shipped', updated_at = now() where order_id = $1::uuid`, [input.orderId]);
 }
 
+/**
+ * Phase 6, G-04 — driven by Commerce's PaymentFailed.v1 (itself only
+ * emitted from a real Stripe `payment_intent.payment_failed` webhook). Same
+ * self-sufficient-upsert shape as `upsertOrderFeedCreated`/`markOrderFeedPaid`:
+ * a failure can arrive before this service has ever seen the corresponding
+ * OrderCreated event, so this must be able to create the row on its own.
+ */
+export async function markOrderFeedFailed(input: { orderId: string; buyerId: string; artworkId: string; amount: number; currency: string }): Promise<void> {
+  await query(
+    `insert into admin.order_feed (order_id, buyer_id, artwork_id, amount, currency, status)
+     values ($1::uuid, $2::uuid, $3::uuid, $4, $5, 'failed')
+     on conflict (order_id) do update set status = 'failed', amount = excluded.amount, currency = excluded.currency, updated_at = now()`,
+    [input.orderId, input.buyerId, input.artworkId, input.amount, input.currency],
+  );
+}
+
 export async function getStats() {
   const [artists, artworks, complaints, commerceStats] = await Promise.all([
     requestInternalService<{ items: Array<{ verificationStatus: string }> }>("artist-artwork", "/v1/artist-artwork/artists"),

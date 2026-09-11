@@ -2,7 +2,6 @@ import type { ServiceDefinition } from "@atelier/contracts";
 export { orders, payments, shipments } from "./infrastructure/orders.ts";
 export { reviews } from "./infrastructure/reviews.ts";
 export { addToCart, getCart, removeFromCart } from "./application/cart.ts";
-export { createCheckout, type CheckoutResult } from "./application/checkout.ts";
 export { health } from "./health.ts";
 
 export const COMMERCE_SERVICE: ServiceDefinition = {

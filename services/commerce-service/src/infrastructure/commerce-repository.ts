@@ -133,3 +133,72 @@ export async function confirmCheckoutSession(stripeSessionId: string, correlatio
     return { orderIds, reservationIds };
   });
 }
+
+/**
+ * Idempotency gate for the Stripe webhook (Phase 6, G-04): the caller must
+ * check this returns `true` (a genuinely new event) before acting on it.
+ * `on conflict (provider_event_id) do nothing` means a duplicate delivery —
+ * Stripe retries on any non-2xx response, and can also just double-send —
+ * returns `false` without a second row, so the caller's side effects never
+ * run twice for the same event id.
+ */
+export async function recordPaymentEvent(providerEventId: string, eventType: string, payload: unknown): Promise<boolean> {
+  const rows = await query<{ id: string }>(
+    `insert into commerce.payment_events (provider_event_id, event_type, payload) values ($1, $2, $3::jsonb)
+     on conflict (provider_event_id) do nothing returning id`,
+    [providerEventId, eventType, JSON.stringify(payload)],
+  );
+  return rows.length > 0;
+}
+
+/**
+ * Driven by Stripe's `payment_intent.payment_failed` webhook. Only acts on
+ * a still-`open` checkout session — if the session is already `completed`
+ * (e.g. a retried payment on the same PaymentIntent eventually succeeded)
+ * or already `expired` (a previous failure event already handled it), this
+ * is a safe no-op. Returns the reservation ids the caller must release
+ * remotely (Artist & Artwork's reservation API is out-of-schema for
+ * Commerce, so that HTTP call happens at the call site, same pattern as
+ * the checkout handler's own reservation calls).
+ */
+export async function handlePaymentFailed(orderIds: string[], correlationId: string): Promise<{ reservationIds: string[] } | null> {
+  if (orderIds.length === 0) return null;
+  return transaction(async (client) => {
+    const session = await client.query<{ stripe_session_id: string; reservation_ids: string[]; order_ids: string[] }>(
+      `select stripe_session_id, reservation_ids, order_ids from commerce.checkout_sessions where order_ids ?| $1::text[] and status = 'open'`,
+      [orderIds],
+    );
+    if (!session.rows[0]) return null;
+    const { stripe_session_id: stripeSessionId, reservation_ids: reservationIds, order_ids: sessionOrderIds } = session.rows[0];
+    await client.query(`update commerce.checkout_sessions set status = 'expired' where stripe_session_id = $1`, [stripeSessionId]);
+    await client.query(`update commerce.orders set status = 'cancelled', updated_at = now() where id = any($1::uuid[])`, [sessionOrderIds]);
+    const failed = await client.query<{ payment_id: string; order_id: string; amount: string; currency: string; buyer_id: string; artwork_id: string }>(
+      `update commerce.payments p set status = 'failed', updated_at = now()
+       from commerce.orders o
+       where p.order_id = any($1::uuid[]) and o.id = p.order_id
+       returning p.id as payment_id, p.order_id, p.amount::text, o.currency, o.buyer_id::text, o.artwork_id::text`,
+      [sessionOrderIds],
+    );
+    for (const row of failed.rows) {
+      await writeOutboxEvent(client, SCHEMA, {
+        type: "PaymentFailed",
+        aggregateId: row.order_id,
+        correlationId,
+        payload: { paymentId: row.payment_id, orderId: row.order_id, buyerId: row.buyer_id, artworkId: row.artwork_id, amount: Number(row.amount), currency: row.currency },
+      });
+    }
+    return { reservationIds };
+  });
+}
+
+/**
+ * Driven by Stripe's `charge.refunded` webhook. Only records the refund on
+ * the payment row — the plan's event catalog (§7.3) doesn't list a refund
+ * event type, so this deliberately doesn't invent one; "handle" here means
+ * durably recording the state transition, not publishing something nothing
+ * consumes yet.
+ */
+export async function handleChargeRefunded(orderIds: string[]): Promise<void> {
+  if (orderIds.length === 0) return;
+  await query(`update commerce.payments set status = 'refunded', updated_at = now() where order_id = any($1::uuid[])`, [orderIds]);
+}
