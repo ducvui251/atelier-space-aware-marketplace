@@ -1,4 +1,4 @@
-import type { Artist, Artwork } from "@atelier/contracts";
+import type { Artist, ArtworkSearchQuery, Artwork } from "@atelier/contracts";
 import { requestService, ServiceClientError } from "../http-client";
 
 interface ListResponse<T> { items: T[]; total: number; }
@@ -6,6 +6,23 @@ interface ListResponse<T> { items: T[]; total: number; }
 export async function listArtworks(): Promise<Artwork[]> {
   const result = await requestService<ListResponse<Artwork>>("artist-artwork", "/v1/artist-artwork/artworks");
   return result.items;
+}
+
+/**
+ * The public catalog's actual read path (§3.2/§4.1 of the defect audit):
+ * Catalog & Discovery's read model, which is verified-only and kept fresh
+ * by events (see catalog-discovery-service). listArtworks() above talks to
+ * Artist & Artwork directly and stays in use elsewhere (related-artwork
+ * rails, room preview, artist profile) — narrowing every one of those
+ * call sites onto Catalog & Discovery is a separate pass, not this one.
+ */
+export async function searchCatalogArtworks(query: Partial<ArtworkSearchQuery> = {}): Promise<ListResponse<Artwork>> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== "") params.set(key, String(value));
+  }
+  const qs = params.toString();
+  return requestService<ListResponse<Artwork>>("catalog-discovery", `/v1/catalog/artworks${qs ? `?${qs}` : ""}`);
 }
 
 export async function listFeaturedArtworks(): Promise<Artwork[]> { return (await listArtworks()).slice(0, 6); }

@@ -1087,6 +1087,53 @@ deleted afterward. Full regression (type-check across all 13
 packages/services, lint, contracts test 58/58, route-registry-parity,
 build) re-run clean after every code change in this pass.
 
+**Phase 2 (catalog-backed dropdown filters, §3.2/§4.1), 2026-09-11:**
+`/artworks` previously fetched from Artist & Artwork directly and filtered
+client-side with toggleable chips — the actual defect (§3.2): no dropdown
+menu, and the page bypassed Catalog & Discovery's read model entirely.
+
+Fixed:
+- `/artworks/page.tsx` now calls `searchCatalogArtworks()` (new function
+  in `artwork.client.ts`) against Catalog & Discovery's
+  `GET /v1/catalog/artworks`, using exactly the fields
+  `ArtworkSearchQuerySchema` already defines (`style`, `color`,
+  `orientation`, `edition`, `availability`, `minPrice`/`maxPrice`) — no new
+  fields invented, per the audit's own instruction. `listArtworks()`
+  (direct Artist & Artwork) stays in use for the other call sites (related
+  work, room preview, artist profile) — narrowing those onto Catalog &
+  Discovery too is a separate pass.
+- `FilterableArtworks` rewritten from a client-side chip-toggle list into
+  real `<select>` dropdowns (one per facet, native — full keyboard support
+  and screen-reader semantics for free, no new UI dependency), single-value
+  per facet to match the schema exactly. Choosing a value pushes it onto
+  the URL query string and the Server Component re-fetches from Catalog &
+  Discovery — the URL is the actual source of truth now, not client state.
+- `priceBucketToRange`/`PRICE_BUCKETS` moved to a plain shared module
+  (`lib/artwork-filters.ts`, no `"use client"`) so both the Server
+  Component (building the query) and the client dropdown UI (rendering the
+  bucket options) can use the same mapping — a Server Component cannot call
+  a function exported from a `"use client"` file, which was a real bug
+  caught during this pass's own build+live-test cycle (500 error on every
+  request to `/artworks` until fixed).
+- `DualViewToggle` (Catalog ⇄ Room) now carries the current query string
+  across the switch, per §4.1's explicit requirement.
+- Distinct loading (skeleton via `useTransition`), empty (0 results — with
+  a "Clear filters" action), and unavailable (Catalog & Discovery
+  unreachable — distinct copy + retry, via `Promise.allSettled` rather
+  than swallowing the error into an empty array) states.
+
+Live-verified in a real browser (public page, no login needed): selected
+Orientation → Portrait, confirmed the URL became `?orientation=portrait`
+and the count matched a direct `curl` against
+`catalog-discovery-service:4102/v1/catalog/artworks?orientation=portrait`
+exactly (10 of 13). Switched to Room view and back, confirmed the query
+string survived both ways. Confirmed `Clear all` resets the URL to
+`/artworks`. Confirmed an availability+orientation combination with zero
+matches renders the empty state, not a crash or a stale list. Full
+regression (type-check, lint, contracts test 58/58, route-registry-parity,
+build) clean; web-gateway rebuilt and redeployed healthy before every live
+check.
+
 ### Phase 7 — Finish Gateway and MVP UI integration
 
 Status: **partial foundation; not accepted**. Gateway pages and room mutations exist; upload, signup correctness, dependency/error states, rejected labels and browser E2E remain open.
