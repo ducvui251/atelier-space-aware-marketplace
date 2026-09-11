@@ -115,3 +115,33 @@ export async function getArtistEarnings(
     trend: trendRows.map((t) => ({ period: t.bucket, net: Number(t.net ?? 0) })),
   };
 }
+
+/**
+ * Top-selling artwork for one artist (§4.7's Artwork performance metric).
+ * "Sold" is gated on order.status = 'completed' — the buyer actually
+ * confirmed receipt, the strongest signal this system has of a genuine
+ * sale (paid/shipped orders can still fail delivery or get refunded).
+ */
+export async function getArtistTopSellingArtworks(
+  artistId: string,
+  options: { from: string; to: string; limit: number },
+): Promise<{ artworkId: string; salesCount: number; revenue: number }[]> {
+  const { items: artworks } = await requestInternalService<{ items: { id: string }[] }>(
+    "artist-artwork",
+    `/v1/artist-artwork/artist/artworks?artistId=${encodeURIComponent(artistId)}`,
+  );
+  const artworkIds = artworks.map((a) => a.id);
+  if (artworkIds.length === 0) return [];
+
+  const rows = await query<{ artwork_id: string; sales_count: string; revenue: string }>(
+    `select artwork_id::text, count(*)::text as sales_count, sum(total_amount)::text as revenue
+     from commerce.orders
+     where artwork_id = any($1::uuid[]) and status = 'completed'
+       and created_at >= $2::timestamptz and created_at < $3::timestamptz
+     group by artwork_id
+     order by count(*) desc, sum(total_amount) desc
+     limit $4`,
+    [artworkIds, options.from, options.to, options.limit],
+  );
+  return rows.map((row) => ({ artworkId: row.artwork_id, salesCount: Number(row.sales_count), revenue: Number(row.revenue) }));
+}

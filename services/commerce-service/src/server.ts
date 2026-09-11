@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
 import { createServiceServer, getPort, readJson, writeServiceError, writeServiceJson, type ServiceRouteHandler } from "@atelier/config/http";
 import { createLogger } from "@atelier/config/logger";
-import { ArtistEarningsQuerySchema, CartAddRequestSchema, CheckoutConfirmRequestSchema, CheckoutRequestSchema, ConfirmReceivedRequestSchema, OrderReviewRequestSchema, ShipOrderRequestSchema, StripeWebhookRelaySchema, parseBody, type Artwork } from "@atelier/contracts";
+import { ArtistEarningsQuerySchema, ArtistTopArtworksQuerySchema, CartAddRequestSchema, CheckoutConfirmRequestSchema, CheckoutRequestSchema, ConfirmReceivedRequestSchema, OrderReviewRequestSchema, ShipOrderRequestSchema, StripeWebhookRelaySchema, parseBody, type Artwork } from "@atelier/contracts";
 import { runOutboxPublisher } from "@atelier/events";
 import { ping } from "@atelier/persistence";
 import { health } from "./health.ts";
 import { addCartItem, listCart, removeCartItem } from "./infrastructure/cart-repository.ts";
 import { confirmCheckoutSession, getCheckoutSession, getIdempotencyRecord, handleChargeRefunded, handlePaymentFailed, persistPendingCheckout, recordPaymentEvent, saveCheckoutSession, saveIdempotencyRecord } from "./infrastructure/commerce-repository.ts";
-import { getArtistEarnings, getCommerceStats, listOrders, listOrdersByIds } from "./infrastructure/order-repository.ts";
+import { getArtistEarnings, getArtistTopSellingArtworks, getCommerceStats, listOrders, listOrdersByIds } from "./infrastructure/order-repository.ts";
 import { confirmReceived, listArtistOrders, saveReview, shipOrder } from "./infrastructure/order-actions-repository.ts";
 import { createCheckoutSession, retrieveCheckoutSession, retrievePaymentIntent } from "./infrastructure/stripe-client.ts";
 
@@ -232,6 +232,18 @@ const routes: Record<string, ServiceRouteHandler> = {
       : new Date(to.getTime() - 90 * 24 * 60 * 60 * 1000);
     const earnings = await getArtistEarnings(artistId, { period: parsed.data.period, from: from.toISOString(), to: to.toISOString() });
     return writeServiceJson(response, 200, earnings, correlationId);
+  },
+  "GET /v1/commerce/artist-top-artworks": async ({ url, response, correlationId }) => {
+    const artistId = url.searchParams.get("artistId");
+    if (!artistId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "artistId is required", correlationId, field: "artistId", retryable: false });
+    const parsed = parseBody(ArtistTopArtworksQuerySchema, Object.fromEntries(url.searchParams.entries()));
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
+    const to = parsed.data.to ? new Date(`${parsed.data.to}T00:00:00.000Z`) : new Date();
+    const from = parsed.data.from
+      ? new Date(`${parsed.data.from}T00:00:00.000Z`)
+      : new Date(to.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const items = await getArtistTopSellingArtworks(artistId, { from: from.toISOString(), to: to.toISOString(), limit: parsed.data.limit });
+    return writeServiceJson(response, 200, { items, total: items.length }, correlationId);
   },
   "POST /v1/commerce/orders/:id/ship": async ({ request, url, response, correlationId }) => {
     const parsed = parseBody(ShipOrderRequestSchema, await readJson(request));

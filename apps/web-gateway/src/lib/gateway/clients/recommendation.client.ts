@@ -1,4 +1,13 @@
+import type { ArtistAudience, ArtworkSaveCount } from "@atelier/contracts";
 import { requestService } from "../http-client";
+
+export function getArtistAudience(artistId: string, periodDays: number, timeoutMs: number) {
+  return requestService<ArtistAudience>("recommendation", `/v1/recommendation/artist-audience?artistId=${encodeURIComponent(artistId)}&periodDays=${periodDays}`, { timeoutMs });
+}
+
+export function getArtistSaves(artistId: string, timeoutMs: number) {
+  return requestService<{ items: ArtworkSaveCount[]; total: number }>("recommendation", `/v1/recommendation/artist-saves?artistId=${encodeURIComponent(artistId)}`, { timeoutMs });
+}
 
 export async function getNetworkRecommendations(buyerId: string | null) {
   const query = buyerId ? `?buyerId=${encodeURIComponent(buyerId)}` : "";

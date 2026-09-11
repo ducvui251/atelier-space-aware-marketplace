@@ -4,6 +4,7 @@ import {
   AccountUpdateRequestSchema,
   ArtistAudienceQuerySchema,
   ArtistEarningsQuerySchema,
+  ArtistTopArtworksQuerySchema,
   ArtistVerificationReviewRequestSchema,
   ArtworkArtistVerificationRequestSchema,
   ArtworkAvailabilityRequestSchema,
@@ -138,6 +139,18 @@ describe("ArtistEarningsQuerySchema", () => {
   it("rejects an invalid period or a non-date from/to", () => {
     expect(ArtistEarningsQuerySchema.safeParse({ period: "year" }).success).toBe(false);
     expect(ArtistEarningsQuerySchema.safeParse({ from: "not-a-date" }).success).toBe(false);
+  });
+});
+
+describe("ArtistTopArtworksQuerySchema", () => {
+  it("defaults limit to 5 on an empty query", () => {
+    const result = ArtistTopArtworksQuerySchema.safeParse({});
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.limit).toBe(5);
+  });
+
+  it("rejects a limit above 20", () => {
+    expect(ArtistTopArtworksQuerySchema.safeParse({ limit: "21" }).success).toBe(false);
   });
 });
 
