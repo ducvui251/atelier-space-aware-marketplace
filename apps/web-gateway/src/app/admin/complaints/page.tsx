@@ -34,7 +34,7 @@ function ComplaintRow({ complaint, onChanged }: { complaint: Complaint; onChange
     <div className="rounded-lg border border-border bg-surface p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-body font-medium text-foreground">Đơn {complaint.orderId}</p>
+          <p className="text-body font-medium text-foreground">Order {complaint.orderId}</p>
         </div>
         <Badge variant={complaint.status === "open" ? "warning" : complaint.status === "resolved" ? "success" : "destructive"} className="capitalize">
           {complaint.status}
@@ -42,7 +42,7 @@ function ComplaintRow({ complaint, onChanged }: { complaint: Complaint; onChange
       </div>
       <p className="mt-3 text-body-sm text-foreground">{complaint.reason}</p>
       {complaint.resolutionNote ? (
-        <p className="mt-2 text-caption text-muted-foreground">Ghi chú xử lý: {complaint.resolutionNote}</p>
+        <p className="mt-2 text-caption text-muted-foreground">Resolution note: {complaint.resolutionNote}</p>
       ) : null}
 
       {complaint.status === "open" ? (
@@ -50,14 +50,14 @@ function ComplaintRow({ complaint, onChanged }: { complaint: Complaint; onChange
           <Input
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Ghi chú xử lý"
+            placeholder="Resolution note"
             className="h-9 max-w-xs flex-1"
           />
           <Button size="sm" disabled={submitting} onClick={() => resolve("resolved")}>
-            Đánh dấu đã xử lý
+            Mark resolved
           </Button>
           <Button size="sm" variant="outline" disabled={submitting} onClick={() => resolve("rejected")}>
-            Từ chối
+            Reject
           </Button>
         </div>
       ) : null}
@@ -72,7 +72,7 @@ function ComplaintsQueue() {
   return (
     <>
       <p className="eyebrow">Admin</p>
-      <h1 className="mt-2 font-display text-h2 text-foreground">Khiếu nại</h1>
+      <h1 className="mt-2 font-display text-h2 text-foreground">Complaints</h1>
 
       <div className="mt-8">
         {loading ? (
@@ -84,16 +84,16 @@ function ComplaintsQueue() {
         ) : error ? (
           <EmptyState
             icon={AlertTriangle}
-            title="Không thể tải khiếu nại"
+            title="Couldn't load complaints"
             description={error}
             action={
               <Button variant="outline" onClick={refresh}>
-                Thử lại
+                Retry
               </Button>
             }
           />
         ) : complaints.length === 0 ? (
-          <EmptyState icon={AlertTriangle} title="Không có khiếu nại" description="Khiếu nại từ người mua sẽ hiện ở đây." />
+          <EmptyState icon={AlertTriangle} title="No complaints" description="Complaints from buyers will show up here." />
         ) : (
           <div className="flex flex-col gap-4">
             {complaints.map((complaint) => (

@@ -27,7 +27,7 @@ function CheckoutSuccessView() {
   React.useEffect(() => {
     if (!sessionId) {
       setState("error");
-      setErrorMessage("Thiếu session_id trong URL.");
+      setErrorMessage("Missing session_id in the URL.");
       return;
     }
 
@@ -48,7 +48,7 @@ function CheckoutSuccessView() {
           }
           if (!cancelled) {
             setState("error");
-            setErrorMessage(error instanceof ApiError ? error.message : "Không thể xác nhận thanh toán.");
+            setErrorMessage(error instanceof ApiError ? error.message : "Couldn't confirm the payment.");
           }
           return;
         }
@@ -71,8 +71,8 @@ function CheckoutSuccessView() {
     return (
       <div className="flex flex-col items-center gap-3 py-16 text-center">
         <CheckCircle2 className="size-12 text-success-foreground" />
-        <p className="text-h3 text-foreground">Thanh toán thành công!</p>
-        <p className="text-body-sm text-muted-foreground">Đang chuyển tới trang đơn hàng…</p>
+        <p className="text-h3 text-foreground">Payment successful!</p>
+        <p className="text-body-sm text-muted-foreground">Redirecting to your orders…</p>
       </div>
     );
   }
@@ -81,10 +81,10 @@ function CheckoutSuccessView() {
     return (
       <div className="flex flex-col items-center gap-3 py-16 text-center">
         <XCircle className="size-12 text-destructive" />
-        <p className="text-h3 text-foreground">Không thể xác nhận thanh toán</p>
+        <p className="text-h3 text-foreground">Couldn&apos;t confirm the payment</p>
         <p className="text-body-sm text-muted-foreground">{errorMessage}</p>
         <Button asChild variant="outline" className="mt-2">
-          <Link href="/orders">Xem đơn hàng của tôi</Link>
+          <Link href="/orders">View my orders</Link>
         </Button>
       </div>
     );
@@ -93,9 +93,9 @@ function CheckoutSuccessView() {
   return (
     <div className="flex flex-col items-center gap-3 py-16 text-center">
       <Loader2 className="size-12 animate-spin text-muted-foreground" />
-      <p className="text-h3 text-foreground">Đang xác nhận thanh toán với Stripe…</p>
+      <p className="text-h3 text-foreground">Confirming your payment with Stripe…</p>
       {state === "not-paid-yet" ? (
-        <p className="text-body-sm text-muted-foreground">Vui lòng chờ trong giây lát.</p>
+        <p className="text-body-sm text-muted-foreground">Please wait a moment.</p>
       ) : null}
     </div>
   );

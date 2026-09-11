@@ -24,11 +24,11 @@ export function RequireRole({ role, children }: RequireRoleProps) {
       <PageContainer className="py-16">
         <EmptyState
           icon={Lock}
-          title="Bạn cần đăng nhập"
-          description="Đăng nhập để tiếp tục với khu vực này."
+          title="Sign in required"
+          description="Sign in to continue to this area."
           action={
             <Button asChild>
-              <Link href="/login">Đăng nhập</Link>
+              <Link href="/login">Sign in</Link>
             </Button>
           }
         />
@@ -41,11 +41,11 @@ export function RequireRole({ role, children }: RequireRoleProps) {
       <PageContainer className="py-16">
         <EmptyState
           icon={Lock}
-          title="Không có quyền truy cập"
-          description={`Khu vực này dành cho tài khoản ${roles.join(" hoặc ")}.`}
+          title="Access denied"
+          description={`This area is for ${roles.join(" or ")} accounts only.`}
           action={
             <Button asChild variant="outline">
-              <Link href="/">Về trang chủ</Link>
+              <Link href="/">Back to home</Link>
             </Button>
           }
         />

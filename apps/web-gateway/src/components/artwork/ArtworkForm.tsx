@@ -29,19 +29,19 @@ export interface ArtworkFormInput {
 }
 
 const artworkSchema = z.object({
-  title: z.string().trim().min(1, "Bắt buộc"),
-  medium: z.string().trim().min(1, "Bắt buộc"),
-  widthCm: z.coerce.number().positive("Phải lớn hơn 0"),
-  heightCm: z.coerce.number().positive("Phải lớn hơn 0"),
-  price: z.coerce.number().positive("Phải lớn hơn 0"),
-  currency: z.string().trim().min(1, "Bắt buộc"),
-  dominantColors: z.string().trim().min(1, "Nhập ít nhất một màu, cách nhau bởi dấu phẩy"),
-  style: z.string().trim().min(1, "Nhập ít nhất một phong cách, cách nhau bởi dấu phẩy"),
+  title: z.string().trim().min(1, "Required"),
+  medium: z.string().trim().min(1, "Required"),
+  widthCm: z.coerce.number().positive("Must be greater than 0"),
+  heightCm: z.coerce.number().positive("Must be greater than 0"),
+  price: z.coerce.number().positive("Must be greater than 0"),
+  currency: z.string().trim().min(1, "Required"),
+  dominantColors: z.string().trim().min(1, "Enter at least one color, separated by commas"),
+  style: z.string().trim().min(1, "Enter at least one style, separated by commas"),
   orientation: z.enum(["portrait", "landscape", "square"]),
   editionType: z.enum(["original", "limited-edition"]),
   year: z.coerce.number().int().min(1900).max(new Date().getFullYear() + 1),
   imageUrl: z.string().trim().url("Upload an image before saving"),
-  coaUrl: z.string().trim().url("URL không hợp lệ").optional().or(z.literal("")),
+  coaUrl: z.string().trim().url("Invalid URL").optional().or(z.literal("")),
   description: z.string().trim().optional(),
 });
 
@@ -160,28 +160,28 @@ export function ArtworkForm({ initial, submitLabel, onSubmit, onSuccess }: Artwo
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Tên tác phẩm *" error={errors.title?.message}>
+        <Field label="Title *" error={errors.title?.message}>
           <Input {...register("title")} className={cn(errors.title && "border-destructive")} />
         </Field>
-        <Field label="Chất liệu *" error={errors.medium?.message}>
+        <Field label="Medium *" error={errors.medium?.message}>
           <Input {...register("medium")} className={cn(errors.medium && "border-destructive")} />
         </Field>
-        <Field label="Chiều rộng (cm) *" error={errors.widthCm?.message}>
+        <Field label="Width (cm) *" error={errors.widthCm?.message}>
           <Input type="number" step="1" {...register("widthCm")} className={cn(errors.widthCm && "border-destructive")} />
         </Field>
-        <Field label="Chiều cao (cm) *" error={errors.heightCm?.message}>
+        <Field label="Height (cm) *" error={errors.heightCm?.message}>
           <Input type="number" step="1" {...register("heightCm")} className={cn(errors.heightCm && "border-destructive")} />
         </Field>
-        <Field label="Giá *" error={errors.price?.message}>
+        <Field label="Price *" error={errors.price?.message}>
           <Input type="number" step="1" {...register("price")} className={cn(errors.price && "border-destructive")} />
         </Field>
-        <Field label="Tiền tệ *" error={errors.currency?.message}>
+        <Field label="Currency *" error={errors.currency?.message}>
           <Input {...register("currency")} className={cn(errors.currency && "border-destructive")} />
         </Field>
-        <Field label="Năm sáng tác *" error={errors.year?.message}>
+        <Field label="Year *" error={errors.year?.message}>
           <Input type="number" step="1" {...register("year")} className={cn(errors.year && "border-destructive")} />
         </Field>
-        <Field label="Hướng tranh *" error={errors.orientation?.message}>
+        <Field label="Orientation *" error={errors.orientation?.message}>
           <select
             {...register("orientation")}
             className="focus-ring h-11 w-full rounded-md border border-border bg-surface px-4 text-body text-foreground"
@@ -191,7 +191,7 @@ export function ArtworkForm({ initial, submitLabel, onSubmit, onSuccess }: Artwo
             <option value="square">Square</option>
           </select>
         </Field>
-        <Field label="Loại bản *" error={errors.editionType?.message}>
+        <Field label="Edition *" error={errors.editionType?.message}>
           <select
             {...register("editionType")}
             className="focus-ring h-11 w-full rounded-md border border-border bg-surface px-4 text-body text-foreground"
@@ -202,7 +202,7 @@ export function ArtworkForm({ initial, submitLabel, onSubmit, onSuccess }: Artwo
         </Field>
       </div>
 
-      <Field label="Màu chủ đạo * (cách nhau bởi dấu phẩy)" error={errors.dominantColors?.message}>
+      <Field label="Dominant colors * (comma-separated)" error={errors.dominantColors?.message}>
         <Input
           {...register("dominantColors")}
           placeholder="Ivory, Warm Grey, Sand"
@@ -210,7 +210,7 @@ export function ArtworkForm({ initial, submitLabel, onSubmit, onSuccess }: Artwo
         />
       </Field>
 
-      <Field label="Phong cách * (cách nhau bởi dấu phẩy)" error={errors.style?.message}>
+      <Field label="Style * (comma-separated)" error={errors.style?.message}>
         <Input
           {...register("style")}
           placeholder="Abstract, Organic"
@@ -218,7 +218,7 @@ export function ArtworkForm({ initial, submitLabel, onSubmit, onSuccess }: Artwo
         />
       </Field>
 
-      <Field label="Ảnh tác phẩm *" error={errors.imageUrl?.message ?? uploadError ?? undefined}>
+      <Field label="Artwork image *" error={errors.imageUrl?.message ?? uploadError ?? undefined}>
         <div className="flex flex-col gap-2">
           <input
             type="file"
@@ -237,11 +237,11 @@ export function ArtworkForm({ initial, submitLabel, onSubmit, onSuccess }: Artwo
         </div>
       </Field>
 
-      <Field label="URL Certificate of Authenticity (tuỳ chọn)" error={errors.coaUrl?.message}>
+      <Field label="Certificate of Authenticity URL (optional)" error={errors.coaUrl?.message}>
         <Input {...register("coaUrl")} placeholder="https://…" />
       </Field>
 
-      <Field label="Mô tả (tuỳ chọn)" error={errors.description?.message}>
+      <Field label="Description (optional)" error={errors.description?.message}>
         <textarea
           {...register("description")}
           rows={4}
@@ -250,7 +250,7 @@ export function ArtworkForm({ initial, submitLabel, onSubmit, onSuccess }: Artwo
       </Field>
 
       <Button type="submit" className="mt-2 w-fit" disabled={submitting}>
-        {submitting ? "Đang lưu…" : submitLabel}
+        {submitting ? "Saving…" : submitLabel}
       </Button>
     </form>
   );

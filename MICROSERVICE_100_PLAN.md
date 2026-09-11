@@ -1482,6 +1482,57 @@ separate pass, by the user's own request.
   into a validation pass — flagged here rather than either quietly
   skipped or quietly added.
 
+**Phase 2's remaining item — English copy migration (§5 of the defect
+audit), 2026-09-11.** The one item deliberately left open when Phase 2
+otherwise closed, done last by the user's own request.
+
+Inventory: `rg "[À-ỹ]" apps/web-gateway/src --include='*.tsx' --include='*.ts'`
+found 145 occurrences across 22 files (this matched, almost exactly, what
+§3.9's spot-check had already flagged — the two files it named as
+unchecked, `artist/orders` and `AccountMenu`, were in fact both in scope
+and are now fixed). All 22 translated to English: form labels and zod
+validation messages, button/link text, empty/loading/error state copy,
+toast/status messages, and the two remaining `toLocaleDateString("vi-VN")`
+call sites (orders and artist-orders pages) switched to `"en-US"`. No
+enum or database value was touched — only display strings. Spot-checked
+`apps/web-gateway/src/app/api/**` separately: already all-English, no
+changes needed there.
+
+**Scope decision on architecture, not just translation:** did not
+introduce a copy-constants/i18n-dictionary layer. §5.4 raises this as an
+option for future locale support, but no other part of this codebase
+uses one — every other already-English string is written inline in its
+component, and adding a dictionary architecture for only the strings this
+pass touched would be inconsistent with the rest of the file and pure
+speculation for a locale requirement nobody has asked for yet. Translated
+in place, matching the codebase's existing convention.
+
+**A real false-positive the Vietnamese-diacritic regex itself produced,
+worth recording:** `[À-ỹ]` also matches `×` (U+00D7, the multiplication
+sign in "40 × 50 cm" dimension displays) because that code point falls
+inside the Latin-1 Supplement range the pattern spans. Four files
+(`ArtworkCard`, `ArtworkDetailClient`, `ArtworkMetadata`, `artist/page.tsx`)
+flagged on this alone — confirmed by reading each match in context, not
+translated, since it was never Vietnamese. §5.5's proposed CI check
+would need to exclude this code point specifically, or scope to a
+tighter Vietnamese-only diacritic set, to avoid failing on legitimate
+math on every subsequent commit — not implemented in this pass since
+building that CI check wasn't asked for, but the false-positive is
+recorded here so it isn't rediscovered as a surprise later. No
+CI check was added.
+
+Live-verified: full regression (type-check, lint — including a real
+`react/no-unescaped-entities` catch this pass's own lint run found and
+fixed, a raw apostrophe in JSX text on `checkout/success/page.tsx` rather
+than inside a string literal — contracts test 66/66, route-registry-parity
+53 routes, build) clean. Rebuilt and redeployed web-gateway; curled all
+14 touched routes (`/`, `/artworks`, `/cart`, `/checkout`,
+`/checkout/success`, `/orders`, `/rooms`, `/artist`, `/artist/orders`,
+`/artist/artworks/new`, `/admin`, `/admin/complaints`, `/account`,
+`/login`) — all 200, none crashed from the string changes. Re-confirmed
+the full-codebase grep (corrected for the `×` false positive) finds zero
+remaining Vietnamese UI copy.
+
 ### Phase 7 — Finish Gateway and MVP UI integration
 
 Status: **partial foundation; not accepted**. Gateway pages and room mutations exist; upload, signup correctness, dependency/error states, rejected labels and browser E2E remain open.

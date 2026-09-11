@@ -62,13 +62,13 @@ function AdminOverview() {
   return (
     <>
       <p className="eyebrow">Admin</p>
-      <h1 className="mt-2 font-display text-h2 text-foreground">Quản trị hệ thống</h1>
+      <h1 className="mt-2 font-display text-h2 text-foreground">Admin overview</h1>
 
       {error ? (
         <div className="mt-6 flex items-center justify-between gap-3 rounded-md border border-destructive bg-destructive-soft px-4 py-3 text-body-sm text-destructive-foreground">
-          <span>Không thể tải số liệu: {error}</span>
+          <span>Couldn&apos;t load stats: {error}</span>
           <Button size="sm" variant="outline" onClick={refresh}>
-            Thử lại
+            Retry
           </Button>
         </div>
       ) : null}
@@ -78,10 +78,10 @@ function AdminOverview() {
           [0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[104px] w-full rounded-lg" />)
         ) : (
           <>
-            <StatCard icon={ShieldQuestion} label="Nghệ sĩ chờ duyệt" value={String(data?.pendingArtists ?? 0)} href="/admin/artists/pending" />
-            <StatCard icon={Package} label="Tác phẩm chờ duyệt" value={String(data?.pendingArtworks ?? 0)} href="/admin/artworks/pending" />
-            <StatCard icon={AlertTriangle} label="Khiếu nại đang mở" value={String(data?.openComplaints ?? 0)} href="/admin/complaints" />
-            <StatCard icon={DollarSign} label="Tổng doanh thu (đơn đã tạo)" value={formatPrice(data?.revenue ?? 0, "USD")} />
+            <StatCard icon={ShieldQuestion} label="Artists pending review" value={String(data?.pendingArtists ?? 0)} href="/admin/artists/pending" />
+            <StatCard icon={Package} label="Artworks pending review" value={String(data?.pendingArtworks ?? 0)} href="/admin/artworks/pending" />
+            <StatCard icon={AlertTriangle} label="Open complaints" value={String(data?.openComplaints ?? 0)} href="/admin/complaints" />
+            <StatCard icon={DollarSign} label="Total revenue (orders placed)" value={formatPrice(data?.revenue ?? 0, "USD")} />
           </>
         )}
       </div>

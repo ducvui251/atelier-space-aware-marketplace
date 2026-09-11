@@ -64,10 +64,10 @@ export function RoomPlaceholder({ artworks, rooms }: { artworks: Artwork[]; room
         method: "POST",
         body: JSON.stringify({ artworkId: artwork.id, scale, positionX: 50, positionY: 14, rotation: 0 }),
       });
-      setSavedMessage("Đã lưu cách bố trí này.");
+      setSavedMessage("This layout has been saved.");
       refreshSaved();
     } catch (error) {
-      setSavedMessage(error instanceof ApiError ? error.message : "Không thể lưu. Vui lòng thử lại.");
+      setSavedMessage(error instanceof ApiError ? error.message : "Couldn't save. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -159,7 +159,7 @@ export function RoomPlaceholder({ artworks, rooms }: { artworks: Artwork[]; room
 
           <div className="flex flex-col gap-2">
             <Button onClick={saveRoom} disabled={saving}>
-              {saving ? "Đang lưu…" : "Lưu cách bố trí này"}
+              {saving ? "Saving…" : "Save this layout"}
             </Button>
             {savedMessage ? (
               <p role="status" className="text-caption text-muted-foreground">
@@ -172,7 +172,7 @@ export function RoomPlaceholder({ artworks, rooms }: { artworks: Artwork[]; room
 
       {currentUser && saved && saved.items.length > 0 ? (
         <div>
-          <p className="eyebrow mb-3">Đã lưu ({saved.items.length})</p>
+          <p className="eyebrow mb-3">Saved ({saved.items.length})</p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {saved.items.map((entry) => (
               <div key={entry.placement.id} className="group relative overflow-hidden rounded-lg border border-border bg-surface">
@@ -187,11 +187,11 @@ export function RoomPlaceholder({ artworks, rooms }: { artworks: Artwork[]; room
                     </div>
                   </Link>
                 ) : (
-                  <div className="p-2 text-caption text-muted-foreground">Tác phẩm không còn tồn tại</div>
+                  <div className="p-2 text-caption text-muted-foreground">This artwork no longer exists</div>
                 )}
                 <button
                   type="button"
-                  aria-label="Xoá cách bố trí đã lưu"
+                  aria-label="Remove saved layout"
                   onClick={() => removeSaved(entry)}
                   className="focus-ring absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-background/90 text-foreground opacity-0 transition-opacity hover:bg-destructive-soft hover:text-destructive group-hover:opacity-100"
                 >

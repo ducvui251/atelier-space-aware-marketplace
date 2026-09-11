@@ -37,19 +37,19 @@ function ShipForm({ orderId, onShipped }: { orderId: string; onShipped: () => vo
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Input
-        placeholder="Đơn vị vận chuyển"
+        placeholder="Carrier"
         value={carrier}
         onChange={(e) => setCarrier(e.target.value)}
         className="h-9 w-40"
       />
       <Input
-        placeholder="Mã tracking"
+        placeholder="Tracking number"
         value={tracking}
         onChange={(e) => setTracking(e.target.value)}
         className="h-9 w-40"
       />
       <Button size="sm" disabled={!carrier.trim() || !tracking.trim() || submitting} onClick={submit}>
-        Đánh dấu đã gửi
+        Mark as shipped
       </Button>
     </div>
   );
@@ -65,7 +65,7 @@ function ArtistOrderRow({ order, onChanged }: { order: ArtistOrder; onChanged: (
           <p className="text-body font-medium text-foreground">{artwork?.title ?? order.artworkId}</p>
           <p className="text-caption text-muted-foreground">
             {formatPrice(order.totalAmount, order.currency)} ·{" "}
-            {new Date(order.createdAt).toLocaleDateString("vi-VN")}
+            {new Date(order.createdAt).toLocaleDateString("en-US")}
           </p>
         </div>
         <Badge variant="outline" className="capitalize">
@@ -73,11 +73,11 @@ function ArtistOrderRow({ order, onChanged }: { order: ArtistOrder; onChanged: (
         </Badge>
       </div>
       <p className="mt-3 text-body-sm text-muted-foreground">
-        Giao tới: {order.shippingAddress.fullName}, {order.shippingAddress.address}, {order.shippingAddress.city}
+        Ship to: {order.shippingAddress.fullName}, {order.shippingAddress.address}, {order.shippingAddress.city}
       </p>
       {order.shipment ? (
         <p className="mt-2 text-caption text-muted-foreground">
-          Vận chuyển: {order.shipment.carrier} · {order.shipment.trackingNumber} · {order.shipment.status}
+          Shipment: {order.shipment.carrier} · {order.shipment.trackingNumber} · {order.shipment.status}
         </p>
       ) : null}
       {order.status === "paid" ? (
@@ -96,7 +96,7 @@ function ArtistOrdersView() {
   return (
     <>
       <p className="eyebrow">Artist dashboard</p>
-      <h1 className="mt-2 font-display text-h2 text-foreground">Đơn hàng của bạn</h1>
+      <h1 className="mt-2 font-display text-h2 text-foreground">Your orders</h1>
 
       {loading ? (
         <div className="mt-10 flex flex-col gap-4">
@@ -108,11 +108,11 @@ function ArtistOrdersView() {
         <div className="mt-10">
           <EmptyState
             icon={AlertTriangle}
-            title="Không thể tải đơn hàng"
+            title="Couldn't load your orders"
             description={error}
             action={
               <Button variant="outline" onClick={refresh}>
-                Thử lại
+                Retry
               </Button>
             }
           />
@@ -121,8 +121,8 @@ function ArtistOrdersView() {
         <div className="mt-10">
           <EmptyState
             icon={PackageOpen}
-            title="Chưa có đơn hàng"
-            description="Đơn hàng cho tác phẩm của bạn sẽ hiện ở đây."
+            title="No orders yet"
+            description="Orders for your artwork will show up here."
           />
         </div>
       ) : (

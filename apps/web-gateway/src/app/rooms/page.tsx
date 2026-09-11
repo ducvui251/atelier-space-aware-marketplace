@@ -30,7 +30,7 @@ export default async function RoomsPage() {
             See it against your walls.
           </h1>
           <p className="mt-3 max-w-2xl text-body text-muted-foreground">
-            Chọn phòng, chọn tác phẩm và chỉnh tỉ lệ để hình dung trước khi mua.
+            Choose a room, pick an artwork, and adjust the scale to visualize it before you buy.
           </p>
         </div>
         <DualViewToggle className="shrink-0" />
