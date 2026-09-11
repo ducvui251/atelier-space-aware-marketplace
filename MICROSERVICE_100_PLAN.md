@@ -1187,6 +1187,64 @@ now 404s. Full regression (type-check, lint, contracts test 58/58,
 route-registry-parity, build) clean; web-gateway rebuilt and redeployed
 healthy before the live check.
 
+**Phase 3 (Commerce earnings/order aggregates, §4.7), 2026-09-11:** first
+slice of the reporting/analytics phase — the Commerce-side data foundation
+only; no Gateway UI yet (that's a later item in this same phase).
+
+**Metric semantics locked before coding, per this doc's own Phase 0
+guidance** — grounded in what `commerce.orders`/`commerce.payments`
+actually track today, not the aspirational settlement/payout model 4.7
+describes:
+- No platform commission is modeled anywhere in this system. "Gross" and
+  "net" are the same number (the buyer-paid `total_amount`) until a real
+  fee model exists — `ArtistEarnings` documents this explicitly rather
+  than fabricating a fee percentage nobody asked for.
+- `received` = sum of orders whose payment `status = 'success'`.
+  `pendingPayment` = payment `status` is `null`/`pending`. `refunded` =
+  payment `status = 'refunded'`. None of this means money has actually
+  settled to the artist — there is no Stripe Connect payout (or any
+  payout) integration in this system. "Received" honestly means "payment
+  succeeded and not refunded," and the contract type says so.
+- `commerce.orders.status` has no `returned` value and never changes on a
+  refund — `charge.refunded` (G-04) only touches `commerce.payments.status`.
+  A refunded order would otherwise double-count into whatever order-status
+  bucket it was already in. Order buckets (`processing`/`shipped`/
+  `completed`/`cancelled`/`refunded`) are made mutually exclusive by
+  giving `refunded` precedence over the order-status classification — this
+  was caught and fixed via this pass's own live-test (a real refunded test
+  order counted in two buckets at once before the fix), not assumed correct
+  from reading the code.
+
+Implemented: `GET /v1/commerce/artist-earnings?artistId=&period=day|week|month&from=&to=`
+(internal, artist ownership resolved over HTTP from Artist & Artwork —
+same pattern as the existing `listArtistOrders`, Commerce still never
+reads `artist_artwork.*` directly), defaulting to a trailing 90-day window.
+Returns `received`/`pendingPayment`/`refunded` totals, the five mutually
+exclusive order-count buckets, and a revenue trend series bucketed by the
+requested period. New `ArtistEarningsQuerySchema`/`ArtistEarnings`
+contract types, registered in `routes.ts` (route-registry-parity: 50
+routes now), with dedicated schema tests (61/61 contract tests passing,
+up from 58).
+
+Live-verified against real order/payment data from earlier live-tested
+Stripe sessions (not fixtures): queried a real artist with 7 real orders
+(4 paid-processing, 2 completed, 1 refunded worth $50) — confirmed the
+bucket counts sum to exactly 7, confirmed `received`/`refunded` totals
+match a direct read of `commerce.payments`, confirmed `period=month`
+collapses the trend into one bucket correctly, confirmed an artist with
+zero orders returns a clean zeroed response (no crash), confirmed a
+missing `artistId` returns 400. Full regression (type-check, lint,
+contracts test 61/61, route-registry-parity 50 routes, build) clean;
+commerce-service rebuilt and redeployed healthy before every live check.
+
+**Deferred, not done:** `packages/contracts/openapi.json` was not
+regenerated (the Node-24-container workaround noted elsewhere in this
+plan as fragile — a prior interrupted run once leaked `node_modules` and
+broke the next `docker build`) — the generator itself is unaffected by
+this change's correctness, so this is a documentation-sync gap, not a
+functional one. No Gateway page consumes this endpoint yet — that's a
+separate item later in this phase (artist analytics dashboard composition).
+
 ### Phase 7 — Finish Gateway and MVP UI integration
 
 Status: **partial foundation; not accepted**. Gateway pages and room mutations exist; upload, signup correctness, dependency/error states, rejected labels and browser E2E remain open.
