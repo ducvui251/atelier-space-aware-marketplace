@@ -16,7 +16,7 @@ function EditArtworkView() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const { currentArtist } = useAuth();
-  const { data: artwork, loading } = useApiResource<Artwork>(`/api/artworks/${encodeURIComponent(params.id)}`);
+  const { data: artwork, loading } = useApiResource<Artwork>(`/api/artist/artworks/${encodeURIComponent(params.id)}`);
 
   if (loading) return null;
 

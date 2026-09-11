@@ -42,6 +42,7 @@ export const ArtworkVerifiedPayloadSchema = z.object({
   artworkId: z.string().uuid(),
   status: z.enum(["verified", "rejected"]),
   reviewerId: z.string().uuid().optional(),
+  note: z.string().trim().optional(),
 });
 
 // Verification's own outbox event (Phase 5, G-22) — Artist & Artwork
@@ -54,6 +55,7 @@ export const ArtistVerifiedPayloadSchema = z.object({
   artistId: z.string().uuid(),
   status: z.enum(["verified", "rejected"]),
   reviewerId: z.string().uuid().optional(),
+  note: z.string().trim().optional(),
 });
 
 export const ArtworkSoldPayloadSchema = z.object({

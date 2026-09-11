@@ -10,18 +10,21 @@ type ArtworkRow = {
   edition_type: Artwork["editionType"]; availability: Artwork["availability"];
   verification_status: Artwork["verificationStatus"]; image_url: string | null; orientation: Artwork["orientation"];
   creation_year: number | null; description: string | null;
+  verification_note: string | null; reviewed_by: string | null; reviewed_at: string | null;
 };
 
 type ArtistRow = {
   id: string; user_id: string | null; display_name: string; location: string | null; nationality: string | null;
   bio: string | null; verification_status: Artist["verificationStatus"]; image_url: string | null; portfolio_url: string | null;
+  verification_note: string | null; reviewed_by: string | null; reviewed_at: string | null;
 };
 
 const artworkSql = `
   select a.id::text, a.title, a.artist_id::text, ap.display_name as artist,
          a.price::text, a.currency, a.width_cm::text, a.height_cm::text, a.medium,
          a.styles, a.dominant_colors, a.edition_type, a.availability, a.verification_status,
-         ai.image_url, a.orientation, a.creation_year, a.description
+         ai.image_url, a.orientation, a.creation_year, a.description,
+         a.verification_note, a.reviewed_by::text, a.reviewed_at::text
   from artist_artwork.artworks a
   join artist_artwork.artist_profiles ap on ap.id = a.artist_id
   left join lateral (
@@ -39,6 +42,9 @@ function mapArtwork(row: ArtworkRow): Artwork {
     editionType: row.edition_type, availability: row.availability, verificationStatus: row.verification_status,
     imageUrl: row.image_url ?? "", orientation: row.orientation, year: row.creation_year ?? 0,
     ...(row.description ? { description: row.description } : {}),
+    ...(row.verification_note ? { verificationNote: row.verification_note } : {}),
+    ...(row.reviewed_by ? { reviewedBy: row.reviewed_by } : {}),
+    ...(row.reviewed_at ? { reviewedAt: row.reviewed_at } : {}),
   };
 }
 
@@ -47,11 +53,24 @@ function mapArtist(row: ArtistRow): Artist {
     id: row.id, ...(row.user_id ? { userId: row.user_id } : {}), displayName: row.display_name,
     location: row.location ?? "", nationality: row.nationality ?? "", bio: row.bio ?? "",
     verificationStatus: row.verification_status, imageUrl: row.image_url ?? "", ...(row.portfolio_url ? { portfolioUrl: row.portfolio_url } : {}),
+    ...(row.verification_note ? { verificationNote: row.verification_note } : {}),
+    ...(row.reviewed_by ? { reviewedBy: row.reviewed_by } : {}),
+    ...(row.reviewed_at ? { reviewedAt: row.reviewed_at } : {}),
   };
 }
 
-export async function listPersistedArtworks(): Promise<Artwork[]> {
-  return (await query<ArtworkRow>(artworkSql)).map(mapArtwork);
+/**
+ * Defaults to the public listing (Gateway's direct catalog pages, Catalog &
+ * Discovery's read-model source, Commerce's checkout availability check,
+ * Recommendation's suggestions) — only artist-approved work belongs there.
+ * Pass includeAllStatuses for the one legitimate internal exception: Admin's
+ * verification queue and pending counts, which must see pending artworks to
+ * do their job. Callers that need an artist's own full listing use
+ * listPersistedArtistArtworks below instead.
+ */
+export async function listPersistedArtworks(options: { includeAllStatuses?: boolean } = {}): Promise<Artwork[]> {
+  const where = options.includeAllStatuses ? "" : "where a.verification_status = 'verified'";
+  return (await query<ArtworkRow>(`${artworkSql} ${where}`)).map(mapArtwork);
 }
 
 export async function listPersistedArtistArtworks(artistId: string): Promise<Artwork[]> {
@@ -87,8 +106,14 @@ export async function createPersistedArtwork(input: {
 export async function updatePersistedArtwork(id: string, input: Partial<Pick<Artwork, "title" | "description" | "medium" | "price" | "widthCm" | "heightCm" | "year" | "currency" | "orientation" | "dominantColors" | "style">>): Promise<Artwork | null> {
   const current = await findPersistedArtwork(id);
   if (!current) return null;
+  // Re-submitting for review clears the prior decision (note/reviewer/
+  // timestamp) from the projection — a fresh pending row must not display a
+  // rejection reason left over from before this edit as if it belonged to
+  // the new submission. The decision itself stays intact in Verification's
+  // own audit trail (verification.artwork_verifications), this only clears
+  // the projection's copy.
   await query(
-    `update artist_artwork.artworks set title = $2, description = $3, medium = $4, price = $5, width_cm = $6, height_cm = $7, creation_year = $8, currency = $9, orientation = $10, dominant_colors = $11::jsonb, styles = $12::jsonb, verification_status = 'pending', updated_at = now() where id::text = $1`,
+    `update artist_artwork.artworks set title = $2, description = $3, medium = $4, price = $5, width_cm = $6, height_cm = $7, creation_year = $8, currency = $9, orientation = $10, dominant_colors = $11::jsonb, styles = $12::jsonb, verification_status = 'pending', verification_note = null, reviewed_by = null, reviewed_at = null, updated_at = now() where id::text = $1`,
     [id, input.title ?? current.title, input.description ?? current.description ?? null, input.medium ?? current.medium, input.price ?? current.price, input.widthCm ?? current.widthCm, input.heightCm ?? current.heightCm, input.year ?? current.year, input.currency ?? current.currency, input.orientation ?? current.orientation, JSON.stringify(input.dominantColors ?? current.dominantColors), JSON.stringify(input.style ?? current.style)],
   );
   return findPersistedArtwork(id);
@@ -104,23 +129,25 @@ export async function findPersistedArtwork(id: string): Promise<Artwork | null> 
  * every subsequent login), so a repeat call for an already-provisioned
  * account must be a safe no-op rather than erroring or duplicating a row.
  */
+const artistColumns = `id::text, user_id::text, display_name, location, nationality, bio, verification_status, image_url, portfolio_url, verification_note, reviewed_by::text, reviewed_at::text`;
+
 export async function ensureArtistProfile(userId: string, displayName: string): Promise<Artist> {
   const rows = await query<ArtistRow>(
     `insert into artist_artwork.artist_profiles (user_id, display_name)
      values ($1::uuid, $2)
      on conflict (user_id) where user_id is not null do update set updated_at = now()
-     returning id::text, user_id::text, display_name, location, nationality, bio, verification_status, image_url, portfolio_url`,
+     returning ${artistColumns}`,
     [userId, displayName],
   );
   return mapArtist(rows[0]);
 }
 
 export async function listPersistedArtists(): Promise<Artist[]> {
-  return (await query<ArtistRow>(`select id::text, user_id::text, display_name, location, nationality, bio, verification_status, image_url, portfolio_url from artist_artwork.artist_profiles`)).map(mapArtist);
+  return (await query<ArtistRow>(`select ${artistColumns} from artist_artwork.artist_profiles`)).map(mapArtist);
 }
 
 export async function findPersistedArtist(id: string): Promise<Artist | null> {
-  const rows = await query<ArtistRow>(`select id::text, user_id::text, display_name, location, nationality, bio, verification_status, image_url, portfolio_url from artist_artwork.artist_profiles where id::text = $1`, [id]);
+  const rows = await query<ArtistRow>(`select ${artistColumns} from artist_artwork.artist_profiles where id::text = $1`, [id]);
   return rows[0] ? mapArtist(rows[0]) : null;
 }
 
@@ -132,8 +159,7 @@ export async function findPersistedArtist(id: string): Promise<Artist | null> {
  */
 export async function findPersistedArtistByUserId(userId: string): Promise<Artist | null> {
   const rows = await query<ArtistRow>(
-    `select id::text, user_id::text, display_name, location, nationality, bio, verification_status, image_url, portfolio_url
-     from artist_artwork.artist_profiles where user_id::text = $1`,
+    `select ${artistColumns} from artist_artwork.artist_profiles where user_id::text = $1`,
     [userId],
   );
   return rows[0] ? mapArtist(rows[0]) : null;
@@ -162,8 +188,10 @@ export async function updatePersistedArtworkVerification(
   const emitEvent = options.emitEvent ?? true;
   const updated = await transaction(async (client) => {
     const rows = await client.query<{ id: string }>(
-      `update artist_artwork.artworks set verification_status = $2, updated_at = now() where id::text = $1 returning id::text`,
-      [id, input.status],
+      `update artist_artwork.artworks
+       set verification_status = $2, verification_note = $3, reviewed_by = $4::uuid, reviewed_at = now(), updated_at = now()
+       where id::text = $1 returning id::text`,
+      [id, input.status, input.note ?? null, input.reviewerId ?? null],
     );
     if (!rows.rows[0]) return false;
     if (emitEvent) {
@@ -171,7 +199,7 @@ export async function updatePersistedArtworkVerification(
         type: "ArtworkVerified",
         aggregateId: id,
         correlationId,
-        payload: { artworkId: id, status: input.status, reviewerId: input.reviewerId },
+        payload: { artworkId: id, status: input.status, reviewerId: input.reviewerId, note: input.note },
       });
     }
     return true;
@@ -189,8 +217,10 @@ export async function updatePersistedArtistVerification(
   const emitEvent = options.emitEvent ?? true;
   const updated = await transaction(async (client) => {
     const rows = await client.query<{ id: string }>(
-      `update artist_artwork.artist_profiles set verification_status = $2, updated_at = now() where id::text = $1 returning id::text`,
-      [id, input.status],
+      `update artist_artwork.artist_profiles
+       set verification_status = $2, verification_note = $3, reviewed_by = $4::uuid, reviewed_at = now(), updated_at = now()
+       where id::text = $1 returning id::text`,
+      [id, input.status, input.note ?? null, input.reviewerId ?? null],
     );
     if (!rows.rows[0]) return false;
     if (emitEvent) {
@@ -198,7 +228,7 @@ export async function updatePersistedArtistVerification(
         type: "ArtistVerified",
         aggregateId: id,
         correlationId,
-        payload: { artistId: id, status: input.status, reviewerId: input.reviewerId },
+        payload: { artistId: id, status: input.status, reviewerId: input.reviewerId, note: input.note },
       });
     }
     return true;

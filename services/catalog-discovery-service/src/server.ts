@@ -7,7 +7,7 @@ import { ping } from "@atelier/persistence";
 import { health } from "./health.ts";
 import { searchArtworks } from "./domain/search-rules.ts";
 import { listCollections } from "./infrastructure/collections-repository.ts";
-import { listReadModel, syncReadModel, upsertReadModelArtwork } from "./infrastructure/read-model-repository.ts";
+import { listReadModel, removeReadModelArtwork, syncReadModel, upsertReadModelArtwork } from "./infrastructure/read-model-repository.ts";
 
 async function sourceArtworks(): Promise<Artwork[]> {
   const baseUrl = process.env.ARTIST_ARTWORK_SERVICE_URL ?? "http://localhost:4103";
@@ -56,7 +56,11 @@ async function handleArtworkEvent(event: { type: string; payload: unknown }): Pr
   }
   if (!artworkId) return;
   const artwork = await sourceArtwork(artworkId);
-  if (artwork) await upsertReadModelArtwork(artwork);
+  // The read model is verified-only: an artwork that no longer exists, or
+  // whose current status isn't "verified" (rejected, or reset to pending by
+  // an artist edit), must be removed rather than upserted.
+  if (artwork && artwork.verificationStatus === "verified") await upsertReadModelArtwork(artwork);
+  else await removeReadModelArtwork(artworkId);
 }
 
 const logger = createLogger("catalog-discovery");

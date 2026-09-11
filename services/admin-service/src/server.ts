@@ -15,7 +15,7 @@ async function source<T>(path: string): Promise<T> {
 
 const routes: Record<string, ServiceRouteHandler> = {
   "GET /v1/admin/verification-queue": async ({ response, correlationId }) => {
-    const [artists, artworks] = await Promise.all([source<{ items: Array<{ verificationStatus: string }> }>("/v1/artist-artwork/artists"), source<{ items: Array<{ verificationStatus: string }> }>("/v1/artist-artwork/artworks")]);
+    const [artists, artworks] = await Promise.all([source<{ items: Array<{ verificationStatus: string }> }>("/v1/artist-artwork/artists"), source<{ items: Array<{ verificationStatus: string }> }>("/v1/artist-artwork/artworks?status=all")]);
     return writeServiceJson(response, 200, { artists: artists.items.filter((item) => item.verificationStatus === "pending"), artworks: artworks.items.filter((item) => item.verificationStatus === "pending") }, correlationId);
   },
   "GET /v1/admin/stats": async ({ response, correlationId }) => writeServiceJson(response, 200, await getStats(), correlationId),

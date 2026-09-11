@@ -21,10 +21,11 @@ export async function generateMetadata({
 }: ArtworkDetailPageProps): Promise<Metadata> {
   const { id } = await params;
   const artwork = await findArtwork(id);
+  const visible = artwork && artwork.verificationStatus === "verified" ? artwork : null;
   return {
-    title: artwork ? artwork.title : "Artwork",
-    description: artwork
-      ? `${artwork.title} by ${artwork.artist}. ${artwork.medium}.`
+    title: visible ? visible.title : "Artwork",
+    description: visible
+      ? `${visible.title} by ${visible.artist}. ${visible.medium}.`
       : undefined,
   };
 }
@@ -34,7 +35,10 @@ export default async function ArtworkDetailPage({
 }: ArtworkDetailPageProps) {
   const { id } = await params;
   const artwork = await findArtwork(id);
-  if (!artwork) notFound();
+  // Public detail is verified-only — a pending/rejected artwork's direct
+  // URL must 404 the same as a nonexistent one, not just be missing from
+  // the listing (the artist's own view goes through /artist/artworks/[id]/edit).
+  if (!artwork || artwork.verificationStatus !== "verified") notFound();
 
   const artist = await findArtist(artwork.artistId);
   const related = (await listArtworks()).filter(

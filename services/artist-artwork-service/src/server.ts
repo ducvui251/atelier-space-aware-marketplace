@@ -11,7 +11,10 @@ function validationError(response: Parameters<ServiceRouteHandler>[0]["response"
 }
 
 const routes: Record<string, ServiceRouteHandler> = {
-  "GET /v1/artist-artwork/artworks": async ({ response, correlationId }) => writeServiceJson(response, 200, { items: await listPersistedArtworks() }, correlationId),
+  "GET /v1/artist-artwork/artworks": async ({ url, response, correlationId }) => {
+    const includeAllStatuses = url.searchParams.get("status") === "all";
+    return writeServiceJson(response, 200, { items: await listPersistedArtworks({ includeAllStatuses }) }, correlationId);
+  },
   "GET /v1/artist-artwork/artist/artworks": async ({ url, response, correlationId }) => {
     const artistId = url.searchParams.get("artistId");
     if (!artistId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "artistId is required", correlationId, field: "artistId", retryable: false });
