@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ArtistVerifiedPayloadSchema, ArtworkVerifiedPayloadSchema, DomainEventTypeSchema, OrderCreatedPayloadSchema, OrderShippedPayloadSchema, PaymentSucceededPayloadSchema } from "./events.ts";
+import { ArtistVerifiedPayloadSchema, ArtworkVerifiedPayloadSchema, DomainEventTypeSchema, OrderCreatedPayloadSchema, OrderShippedPayloadSchema, PaymentFailedPayloadSchema, PaymentSucceededPayloadSchema } from "./events.ts";
 
 const uuid1 = "00000000-0000-4000-8000-000000000001";
 const uuid2 = "00000000-0000-4000-8000-000000000002";
@@ -57,6 +57,16 @@ describe("PaymentSucceededPayloadSchema", () => {
 
   it("rejects a missing field", () => {
     expect(PaymentSucceededPayloadSchema.safeParse({ paymentId: uuid1, orderId: uuid2, amount: 100, currency: "USD" }).success).toBe(false);
+  });
+});
+
+describe("PaymentFailedPayloadSchema", () => {
+  it("accepts a valid payload", () => {
+    expect(PaymentFailedPayloadSchema.safeParse({ paymentId: uuid1, orderId: uuid2, buyerId: uuid1, artworkId: uuid2, amount: 100, currency: "USD" }).success).toBe(true);
+  });
+
+  it("rejects a missing field", () => {
+    expect(PaymentFailedPayloadSchema.safeParse({ paymentId: uuid1, orderId: uuid2, amount: 100, currency: "USD" }).success).toBe(false);
   });
 });
 

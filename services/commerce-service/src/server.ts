@@ -1,15 +1,15 @@
 import { createHash } from "node:crypto";
 import { createServiceServer, getPort, readJson, writeServiceError, writeServiceJson, type ServiceRouteHandler } from "@atelier/config/http";
 import { createLogger } from "@atelier/config/logger";
-import { CartAddRequestSchema, CheckoutConfirmRequestSchema, CheckoutRequestSchema, ConfirmReceivedRequestSchema, OrderReviewRequestSchema, ShipOrderRequestSchema, parseBody, type Artwork } from "@atelier/contracts";
+import { CartAddRequestSchema, CheckoutConfirmRequestSchema, CheckoutRequestSchema, ConfirmReceivedRequestSchema, OrderReviewRequestSchema, ShipOrderRequestSchema, StripeWebhookRelaySchema, parseBody, type Artwork } from "@atelier/contracts";
 import { runOutboxPublisher } from "@atelier/events";
 import { ping } from "@atelier/persistence";
 import { health } from "./health.ts";
 import { addCartItem, listCart, removeCartItem } from "./infrastructure/cart-repository.ts";
-import { confirmCheckoutSession, getCheckoutSession, getIdempotencyRecord, persistPendingCheckout, saveCheckoutSession, saveIdempotencyRecord } from "./infrastructure/commerce-repository.ts";
+import { confirmCheckoutSession, getCheckoutSession, getIdempotencyRecord, handleChargeRefunded, handlePaymentFailed, persistPendingCheckout, recordPaymentEvent, saveCheckoutSession, saveIdempotencyRecord } from "./infrastructure/commerce-repository.ts";
 import { getCommerceStats, listOrders, listOrdersByIds } from "./infrastructure/order-repository.ts";
 import { confirmReceived, listArtistOrders, saveReview, shipOrder } from "./infrastructure/order-actions-repository.ts";
-import { createCheckoutSession, retrieveCheckoutSession } from "./infrastructure/stripe-client.ts";
+import { createCheckoutSession, retrieveCheckoutSession, retrievePaymentIntent } from "./infrastructure/stripe-client.ts";
 
 function artistArtworkHeaders(): Record<string, string> {
   return process.env.ATELIER_INTERNAL_SERVICE_TOKEN ? { "x-service-token": process.env.ATELIER_INTERNAL_SERVICE_TOKEN } : {};
@@ -114,6 +114,7 @@ const routes: Record<string, ServiceRouteHandler> = {
       const gatewayUrl = (process.env.WEB_GATEWAY_URL ?? "http://localhost:3000").replace(/\/$/, "");
       const session = await createCheckoutSession({
         buyerId,
+        orderIds: orders.map((order) => order.id),
         items: items.map((item) => ({ artworkId: item.id, title: item.title, amount: item.price, currency: item.currency })),
         successUrl: `${gatewayUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
         cancelUrl: `${gatewayUrl}/checkout?cancelled=1`,
@@ -152,6 +153,59 @@ const routes: Record<string, ServiceRouteHandler> = {
       logger.error("one or more reservation commits failed after payment", { correlationId, sessionId, orderIds: confirmed.orderIds });
     }
     return writeServiceJson(response, 200, { orders: await listOrdersByIds(confirmed.orderIds) }, correlationId);
+  },
+  /**
+   * Phase 6, G-04. The Gateway has already verified the Stripe signature
+   * against the raw request body before relaying here — this route trusts
+   * the internal token, not a second signature check. `recordPaymentEvent`
+   * is the idempotency gate: a duplicate delivery (Stripe retries on any
+   * non-2xx, and can also just double-send) returns 200 immediately without
+   * re-running any side effect. Converges with the poll-confirm path
+   * (`checkout/confirm` above) through the same `confirmCheckoutSession`
+   * function and the same `status = 'open'` guard, so whichever path wins
+   * the race, the other is a safe no-op.
+   */
+  "POST /v1/commerce/payments/webhook": async ({ request, response, correlationId }) => {
+    const parsed = parseBody(StripeWebhookRelaySchema, await readJson(request));
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
+    const { id: eventId, type: eventType, data } = parsed.data;
+
+    const isNew = await recordPaymentEvent(eventId, eventType, parsed.data);
+    if (!isNew) return writeServiceJson(response, 200, { received: true, duplicate: true }, correlationId);
+
+    switch (eventType) {
+      case "checkout.session.completed": {
+        const sessionId = typeof data.object.id === "string" ? data.object.id : "";
+        if (sessionId) {
+          const confirmed = await confirmCheckoutSession(sessionId, correlationId);
+          if (confirmed) {
+            const commits = await Promise.all(confirmed.reservationIds.map((id) => commitReservationRemote(id)));
+            if (commits.some((ok) => !ok)) logger.error("one or more reservation commits failed after webhook payment", { correlationId, sessionId });
+          }
+        }
+        break;
+      }
+      case "payment_intent.payment_failed": {
+        const metadata = data.object.metadata as { orderIds?: string } | undefined;
+        const orderIds: string[] = metadata?.orderIds ? JSON.parse(metadata.orderIds) : [];
+        const result = await handlePaymentFailed(orderIds, correlationId);
+        if (result) await Promise.all(result.reservationIds.map((id) => releaseReservationRemote(id)));
+        break;
+      }
+      case "charge.refunded": {
+        const paymentIntentId = typeof data.object.payment_intent === "string" ? data.object.payment_intent : "";
+        if (paymentIntentId) {
+          const paymentIntent = await retrievePaymentIntent(paymentIntentId).catch(() => null);
+          const orderIds: string[] = paymentIntent?.metadata?.orderIds ? JSON.parse(paymentIntent.metadata.orderIds) : [];
+          await handleChargeRefunded(orderIds);
+        }
+        break;
+      }
+      default:
+        // Recorded in payment_events above; no state transition defined for this type.
+        break;
+    }
+    return writeServiceJson(response, 200, { received: true }, correlationId);
   },
   "GET /v1/commerce/stats": async ({ response, correlationId }) => writeServiceJson(response, 200, await getCommerceStats(), correlationId),
   "GET /v1/commerce/orders": async ({ url, response, correlationId }) => {

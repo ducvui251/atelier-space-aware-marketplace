@@ -24,6 +24,7 @@ import {
   OrderReviewRequestSchema,
   ResolveComplaintRequestSchema,
   ShipOrderRequestSchema,
+  StripeWebhookRelaySchema,
   ToggleFollowRequestSchema,
   ToggleSavedRequestSchema,
   parseBody,
@@ -87,6 +88,19 @@ describe("ImageUploadResponseSchema", () => {
   it("rejects a missing or non-url value", () => {
     expect(ImageUploadResponseSchema.safeParse({}).success).toBe(false);
     expect(ImageUploadResponseSchema.safeParse({ url: "not-a-url" }).success).toBe(false);
+  });
+});
+
+describe("StripeWebhookRelaySchema", () => {
+  it("accepts a well-formed relayed event regardless of the object's exact shape", () => {
+    expect(StripeWebhookRelaySchema.safeParse({ id: "evt_123", type: "checkout.session.completed", data: { object: { id: "cs_123", payment_status: "paid" } } }).success).toBe(true);
+    expect(StripeWebhookRelaySchema.safeParse({ id: "evt_124", type: "payment_intent.payment_failed", data: { object: { id: "pi_123", metadata: { orderIds: "[]" } } } }).success).toBe(true);
+  });
+
+  it("rejects a missing id/type or malformed data", () => {
+    expect(StripeWebhookRelaySchema.safeParse({ type: "checkout.session.completed", data: { object: {} } }).success).toBe(false);
+    expect(StripeWebhookRelaySchema.safeParse({ id: "evt_123", data: { object: {} } }).success).toBe(false);
+    expect(StripeWebhookRelaySchema.safeParse({ id: "evt_123", type: "x", data: {} }).success).toBe(false);
   });
 });
 

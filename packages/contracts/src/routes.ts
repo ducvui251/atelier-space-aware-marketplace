@@ -21,6 +21,7 @@ import {
   OrderReviewRequestSchema,
   ResolveComplaintRequestSchema,
   ShipOrderRequestSchema,
+  StripeWebhookRelaySchema,
   ToggleFollowRequestSchema,
   ToggleSavedRequestSchema,
 } from "./v1.ts";
@@ -77,6 +78,7 @@ export const ROUTES: RouteDefinition[] = [
   { method: "DELETE", path: "/v1/commerce/cart/{artworkId}", service: "commerce", summary: "Remove an artwork from the buyer's cart", auth: "internal", successStatus: 200, errorStatuses: [400, 401] },
   { method: "POST", path: "/v1/commerce/checkout", service: "commerce", summary: "Checkout the buyer's cart (fixed-price, idempotent)", auth: "internal", requestSchema: CheckoutRequestSchema, requestLocation: "body", successStatus: 201, errorStatuses: [400, 401, 409] },
   { method: "POST", path: "/v1/commerce/checkout/confirm", service: "commerce", summary: "Confirm a Stripe Checkout Session and finalize the order (idempotent)", auth: "internal", requestSchema: CheckoutConfirmRequestSchema, requestLocation: "body", successStatus: 200, errorStatuses: [400, 401, 404, 409] },
+  { method: "POST", path: "/v1/commerce/payments/webhook", service: "commerce", summary: "Receive a Gateway-relayed, already signature-verified Stripe webhook event (idempotent by provider event ID, G-04)", auth: "internal", requestSchema: StripeWebhookRelaySchema, requestLocation: "body", successStatus: 200, errorStatuses: [400, 401] },
   { method: "GET", path: "/v1/commerce/stats", service: "commerce", summary: "Aggregate order/revenue stats", auth: "internal", successStatus: 200, errorStatuses: [401] },
   { method: "GET", path: "/v1/commerce/orders", service: "commerce", summary: "List the buyer's own orders", auth: "internal", successStatus: 200, errorStatuses: [400, 401] },
   { method: "GET", path: "/v1/commerce/artist-orders", service: "commerce", summary: "List orders for an artist's artworks", auth: "internal", successStatus: 200, errorStatuses: [400, 401] },

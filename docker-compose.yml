@@ -251,6 +251,12 @@ services:
       # /api/uploads/image needs it, so it doesn't fail the whole stack closed.
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
       SUPABASE_STORAGE_BUCKET: ${SUPABASE_STORAGE_BUCKET:-artwork-images}
+      # G-04: webhook signature verification only needs the API key locally
+      # (no network call), not a real one — but both are optional (`:-`) so
+      # an unconfigured webhook doesn't fail the whole stack closed; the
+      # route itself returns a clear 500 instead of accepting unverified events.
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
     ports: ["3000:3000"]
     restart: unless-stopped
     deploy:

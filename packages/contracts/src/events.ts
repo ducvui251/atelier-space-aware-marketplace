@@ -11,6 +11,7 @@ export const DomainEventTypeSchema = z.enum([
   "ArtistFollowed",
   "OrderCreated",
   "PaymentSucceeded",
+  "PaymentFailed",
   "OrderShipped",
   "ComplaintOpened",
 ]);
@@ -95,6 +96,19 @@ export const OrderShippedPayloadSchema = z.object({
   trackingNumber: z.string(),
 });
 
+// Phase 6 (G-04) — driven by Stripe's payment_intent.payment_failed webhook,
+// the only genuine trigger for this event (there is no "payment failed"
+// signal in the poll-confirm path, which only distinguishes not-yet-paid
+// from paid).
+export const PaymentFailedPayloadSchema = z.object({
+  paymentId: z.string().uuid(),
+  orderId: z.string().uuid(),
+  buyerId: z.string().uuid(),
+  artworkId: z.string().uuid(),
+  amount: z.number(),
+  currency: z.string(),
+});
+
 export type ArtworkPublishedPayload = z.infer<typeof ArtworkPublishedPayloadSchema>;
 export type ArtworkVerifiedPayload = z.infer<typeof ArtworkVerifiedPayloadSchema>;
 export type ArtistVerifiedPayload = z.infer<typeof ArtistVerifiedPayloadSchema>;
@@ -103,3 +117,4 @@ export type ArtworkReservedPayload = z.infer<typeof ArtworkReservedPayloadSchema
 export type OrderCreatedPayload = z.infer<typeof OrderCreatedPayloadSchema>;
 export type PaymentSucceededPayload = z.infer<typeof PaymentSucceededPayloadSchema>;
 export type OrderShippedPayload = z.infer<typeof OrderShippedPayloadSchema>;
+export type PaymentFailedPayload = z.infer<typeof PaymentFailedPayloadSchema>;

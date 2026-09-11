@@ -65,7 +65,6 @@ export const CheckoutClientRequestSchema = z.object({
     phone: z.string().trim().min(1),
   }),
   method: z.enum(["card", "wallet"]).default("card"),
-  simulateFailure: z.boolean().optional(),
 });
 
 export const CheckoutRequestSchema = CheckoutClientRequestSchema.extend({
@@ -264,7 +263,24 @@ export const ImageUploadResponseSchema = z.object({
   url: z.string().url(),
 });
 
+// --- Gateway -> Commerce: Stripe webhook relay (Phase 6, G-04) --------------
+// The Gateway's `POST /api/webhooks/stripe` verifies the raw-body HMAC
+// signature (a step this schema deliberately does not — signature
+// verification needs the exact raw bytes, not this already-parsed JSON)
+// and relays the verified event to Commerce's `POST
+// /v1/commerce/payments/webhook`. `data.object`'s shape varies by Stripe
+// event type (Checkout Session, PaymentIntent, Charge, ...), so it's
+// validated loosely here; the handler narrows it per `type`.
+export const StripeWebhookRelaySchema = z.object({
+  id: z.string().trim().min(1),
+  type: z.string().trim().min(1),
+  data: z.object({
+    object: z.record(z.string(), z.unknown()),
+  }),
+});
+
 export type ArtworkSearchQuery = z.infer<typeof ArtworkSearchQuerySchema>;
+export type StripeWebhookRelay = z.infer<typeof StripeWebhookRelaySchema>;
 export type ImageUploadResponse = z.infer<typeof ImageUploadResponseSchema>;
 export type CheckoutClientRequest = z.infer<typeof CheckoutClientRequestSchema>;
 export type CheckoutRequest = z.infer<typeof CheckoutRequestSchema>;

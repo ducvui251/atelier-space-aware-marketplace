@@ -11,9 +11,8 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const parsed = CheckoutClientRequestSchema.safeParse(body);
   if (!parsed.success) return errorResponse("shippingAddress.{fullName,address,city,phone} are required", 400);
-  const { shippingAddress, method, simulateFailure } = parsed.data;
+  const { shippingAddress, method } = parsed.data;
 
-  if (simulateFailure) return errorResponse("Payment simulation is no longer supported", 400);
   try {
     const result = await checkout(user.id, { shippingAddress, method }, request.headers.get("idempotency-key") ?? crypto.randomUUID());
     return json(result, 201);
