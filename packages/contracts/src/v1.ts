@@ -200,6 +200,11 @@ export const ToggleFollowRequestSchema = z.object({
   artistId: z.string().uuid(),
 });
 
+// Audience metric (§4.7): how many days back "the previous period" means.
+export const ArtistAudienceQuerySchema = z.object({
+  periodDays: z.coerce.number().int().positive().max(365).default(30),
+});
+
 // --- Verification --------------------------------------------------------------
 
 export const ArtworkVerificationReviewRequestSchema = z
@@ -307,6 +312,7 @@ export type ArtworkArtistVerificationRequest = z.infer<typeof ArtworkArtistVerif
 export type CartAddRequest = z.infer<typeof CartAddRequestSchema>;
 export type ShipOrderRequest = z.infer<typeof ShipOrderRequestSchema>;
 export type ArtistEarningsQuery = z.infer<typeof ArtistEarningsQuerySchema>;
+export type ArtistAudienceQuery = z.infer<typeof ArtistAudienceQuerySchema>;
 export type ConfirmReceivedRequest = z.infer<typeof ConfirmReceivedRequestSchema>;
 export type OrderReviewRequest = z.infer<typeof OrderReviewRequestSchema>;
 export type ToggleSavedRequest = z.infer<typeof ToggleSavedRequestSchema>;

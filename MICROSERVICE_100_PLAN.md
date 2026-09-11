@@ -1245,6 +1245,61 @@ this change's correctness, so this is a documentation-sync gap, not a
 functional one. No Gateway page consumes this endpoint yet — that's a
 separate item later in this phase (artist analytics dashboard composition).
 
+**Phase 3 (Recommendation view/save/follow aggregates, §4.7), 2026-09-11:**
+second slice — Recommendation-side data foundation, again no Gateway UI
+yet.
+
+**Scope decision, recorded rather than silently done partially:** the
+audit names three things — views, saves, followers. Saves and followers
+are built here; **views are deliberately deferred**, matching this doc's
+own Phase 5 precedent of recording *why* rather than forcing something
+half-real. There is no view-tracking instrumentation anywhere in this
+system today — no event, no route, nothing calls anything when a buyer
+opens an artwork's detail page. Building it means adding a genuinely new
+feature (wire the artwork detail page to record a view, plus a dedup/
+session-classified event store), not writing an aggregate query over data
+that already exists — §4.7 itself hedges this ("có thể dùng
+Recommendation-owned aggregate hoặc analytics provider theo quyết định
+runtime"), i.e. it's an open call, not a mandate to build now.
+
+**Saves:** `recommendation.saved_artworks` already holds exactly what's
+needed (no growth-over-time requirement for this metric in §4.7's table,
+only current counts) — added `getArtistArtworkSaves`, grouping by artwork
+for an artist's own artwork ids (resolved over HTTP from Artist & Artwork,
+same pattern used throughout — Recommendation never reads
+`artist_artwork.*` directly). New `GET /v1/recommendation/artist-saves?artistId=`.
+
+**Followers, with real growth history:** `recommendation.follows` is a
+plain toggle — unfollow hard-deletes the row, so "followers now" was
+answerable but "followers 30 days ago" was not, and §4.7 explicitly
+requires "growth so với period trước" without losing history on unfollow.
+Migration `0017_recommendation_follow_events.sql` adds an append-only
+`follow_events` ledger (`followed`/`unfollowed`, timestamped), written
+alongside every `follows` toggle in the same transaction, plus a backfill
+of every currently-active follow as a synthetic `followed` event so
+historical reconstruction works immediately rather than only for actions
+from now on. `getArtistAudience` reconstructs the follower count as of any
+past timestamp as `count(followed ≤ t) − count(unfollowed ≤ t)`. New
+`GET /v1/recommendation/artist-audience?artistId=&periodDays=` (default
+30), new `ArtistAudienceQuerySchema`/`ArtistAudience`/`ArtworkSaveCount`
+contract types, registered in `routes.ts` (route-registry-parity: 52
+routes now), with dedicated schema tests (64/64 contract tests, up from
+61).
+
+Live-verified against a real toggle, not fixtures: followed a real
+artist from a real existing buyer account via the internal endpoint,
+confirmed `totalFollowers` went 0→1 and `growth` reflected it; unfollowed
+the same pair, confirmed `totalFollowers` went back to 0 **and** the
+`follow_events` table still holds both the `followed` and `unfollowed`
+rows (the exact case this whole feature exists to handle — history
+surviving a hard delete). Confirmed `artist-saves` against the two real
+saved-artwork rows already in the dev database (correct artist, correct
+count), confirmed an artist with no artworks returns an empty list, and
+confirmed a missing `artistId` 400s on both new endpoints. Full
+regression (type-check, lint, contracts test 64/64, route-registry-parity
+52 routes, build) clean; recommendation-service rebuilt and redeployed
+healthy before every live check.
+
 ### Phase 7 — Finish Gateway and MVP UI integration
 
 Status: **partial foundation; not accepted**. Gateway pages and room mutations exist; upload, signup correctness, dependency/error states, rejected labels and browser E2E remain open.
