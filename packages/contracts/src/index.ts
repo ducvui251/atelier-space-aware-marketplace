@@ -95,6 +95,14 @@ export interface ArtistAudience {
 export interface ArtworkSaveCount { artworkId: string; saves: number; }
 
 /**
+ * Top-selling artwork (§4.7's Artwork performance metric). "Sold" is
+ * gated on order status = completed — see getArtistTopSellingArtworks
+ * in commerce-service for why (the strongest signal this system has of
+ * a genuine, not-refunded-or-failed sale).
+ */
+export interface ArtworkSaleCount { artworkId: string; salesCount: number; revenue: number; }
+
+/**
  * Admin overview chart data (§4.6 of the defect audit). `revenueTrend` is
  * "amount collected" (order_feed status paid/shipped) — there is no
  * completed/refunded status in admin.order_feed today (see

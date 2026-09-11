@@ -1348,6 +1348,80 @@ checked). Full regression (type-check, lint, contracts test 64/64,
 route-registry-parity 52 routes, build) clean; admin-service and
 web-gateway rebuilt and redeployed healthy before the live check.
 
+**Phase 3 (Artist analytics dashboard, §4.7), 2026-09-11 — closes this
+phase's 4-item list.** Composes the three prior slices (Commerce
+earnings, Recommendation audience/saves, plus one new Commerce query)
+into one artist-facing page. This is the first genuinely
+multi-dependency Gateway composition in the app, so it's also the first
+to implement §4.7's own explicit requirements: per-dependency timeout
+and partial-failure isolation, not a single all-or-nothing fetch.
+
+**New:** `getArtistTopSellingArtworks` (commerce-service) — "sold" is
+gated on `order.status = 'completed'` (buyer confirmed receipt), the
+strongest signal this system has of a genuine, not-refunded-or-failed
+sale, exposed as `GET /v1/commerce/artist-top-artworks`. New
+`ArtistTopArtworksQuerySchema`/`ArtworkSaleCount` contract types.
+
+**New Gateway composition:** `GET /api/artist/analytics?period=`,
+artist-derived from the session (never a query param — an artist can
+only ever see their own data). Calls Commerce earnings, Commerce
+top-artworks, Recommendation audience, Recommendation saves, and Artist
+& Artwork's own artwork list via `Promise.allSettled`, each with its own
+3-second timeout; a failed dependency degrades to an explicit
+`unavailable` flag on just its own section instead of failing the whole
+response — matching §4.7's "timeout 3 giây, partial dependency failure"
+requirement precisely, not approximately. Artwork performance is
+composed client-side in the route by joining the artist's own artwork
+list (title/image/status) with the saves and top-artworks maps by
+artwork id.
+
+**Conversion is explicitly not computed** (eligible orders / unique
+artwork detail views): there is no view-tracking data source anywhere in
+this system (recorded as a deliberate scope decision in the
+Recommendation aggregates slice above). Rather than divide by an
+undefined denominator and risk 0 or NaN, this section reports
+`unavailable: false` with a `reason` string the UI renders as "No data —
+…", matching §4.7's explicit "chia cho zero trả 0/'No data', không trả
+NaN" requirement in spirit even where the underlying data doesn't exist
+yet.
+
+New `/artist/analytics` page: KPI cards (Received/Pending payment/
+Refunded/Followers+growth), the same `RevenueTrendChart` component from
+the Admin overview reused here (mapping `{period, net}` to
+`{period, amount}`), an explicit Conversion "no data" card, and an
+artwork performance table (image, status, saves, sales, revenue) using
+the same `ArtworkImage` fallback as everywhere else. Linked from
+`/artist`'s header.
+
+**A real bug this pass's own live-test caught, not just claimed
+fixed:** the route's period→periodDays mapping was applied twice
+(`periodDays * 30` on a value that was already `30` for `period=month`,
+producing `900` — past `ArtistAudienceQuerySchema`'s 365-day cap). This
+made the Audience section fail on every real request with
+`period=month` (the page's actual default), degrading correctly to
+"Audience is unavailable right now" rather than crashing — the partial-
+failure design worked exactly as intended, but the failure itself was a
+real bug, caught by loading the live page in Chrome and noticing the
+unavailable card where real data was expected, not by reading the code.
+Fixed by removing the duplicate multiplication; re-verified live that
+Followers renders real data (0, +0 vs 30 days ago — accurate for this
+account, not an error).
+
+Live-verified in a real Chrome session
+(`demo.artist@atelier.test`): loaded `/artist/analytics`, confirmed all
+four KPI cards render real values, confirmed the revenue chart and its
+text summary, confirmed the Conversion "no data" card renders instead of
+crashing or showing a fake number, confirmed all 8 of this account's own
+artworks list in the performance table with correct status labels and
+(accurately zero, since this artist has no completed sales) saves/sales/
+revenue — cross-checked those endpoints separately for an artist who
+does have completed sales (Lena Moreau, via internal-network `curl`,
+consistent with this pass's account-usage-limiting constraint) and
+confirmed non-zero, correct figures there. Full regression (type-check,
+lint, contracts test 66/66, route-registry-parity 53 routes, build)
+clean; commerce-service and web-gateway rebuilt and redeployed healthy
+before every live check.
+
 ### Phase 7 — Finish Gateway and MVP UI integration
 
 Status: **partial foundation; not accepted**. Gateway pages and room mutations exist; upload, signup correctness, dependency/error states, rejected labels and browser E2E remain open.
