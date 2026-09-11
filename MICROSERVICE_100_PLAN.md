@@ -1134,6 +1134,34 @@ regression (type-check, lint, contracts test 58/58, route-registry-parity,
 build) clean; web-gateway rebuilt and redeployed healthy before every live
 check.
 
+**Phase 2 (artist dashboard as an image grid, §3.3/§4.2), 2026-09-11:**
+`/artist` was a bare `<table>` (Title/Price/Availability/Verification
+columns, no image at all) — the direct cause of §3.3's defect. Rewritten
+as a responsive card grid (reusing the `Grid`/`ArtworkImage` components
+from the earlier image-rendering fix): each card shows the artwork image
+(with the same "No image" fallback), title, price, dimensions when
+present, availability, and a verification badge with a real English label
+(`Pending review`/`Verified`/`Rejected` — never `verified` for a
+non-verified row). A rejected card gets a distinct, labeled "Rejection
+reason" block once it has a note (the projection fix from the item
+above is what makes this possible — previously there was nothing to
+show). Artists still see every status of their own work (pending/
+rejected included); this is the artist-scoped listing, unaffected by the
+public-catalog visibility filter. Added distinct loading (skeleton grid),
+empty ("No listings yet" + a create-listing action), and error (retry)
+states — the table version had loading/error handling but no distinct
+empty state.
+
+Live-verified in a real Chrome session (existing `demo.artist@atelier.test`
+session, no new account): attached a real rejection note to an existing
+rejected test listing via the internal verification-service route, then
+read the live `/artist` page's accessibility tree — confirmed the
+"Rejected" card renders the image, title, price, dimensions, availability,
+and a "Rejection reason" block containing that exact note text; confirmed
+sibling cards render correctly for `Verified` and `Pending review` rows
+too. Full regression (type-check, lint, build) clean; web-gateway rebuilt
+and redeployed healthy before the live check.
+
 ### Phase 7 — Finish Gateway and MVP UI integration
 
 Status: **partial foundation; not accepted**. Gateway pages and room mutations exist; upload, signup correctness, dependency/error states, rejected labels and browser E2E remain open.
