@@ -1300,6 +1300,54 @@ regression (type-check, lint, contracts test 64/64, route-registry-parity
 52 routes, build) clean; recommendation-service rebuilt and redeployed
 healthy before every live check.
 
+**Phase 3 (Admin dashboard chart, §4.6), 2026-09-11:** third slice —
+the first item in this phase with an actual Gateway UI, since Admin's
+existing overview page was the direct target of the defect.
+
+**Scope, matching §4.6's own honesty requirement:** `admin.order_feed`
+only carries `pending`/`paid`/`shipped`/`failed` status — there is no
+`completed` (buyer-confirmed-receipt never reaches Admin) or `refunded`
+(charge.refunded isn't consumed by Admin) status in this feed. The
+revenue trend below is therefore "amount collected" (`paid` or `shipped`
+orders), not a full order-lifecycle view — documented on the new
+`AdminStats` contract type and in `getOrderFeedTrend`'s own comment
+rather than silently presented as more complete than it is. A genuine
+returned/refunded series would need Admin to consume a new event first,
+which is out of scope for this additive pass.
+
+Implemented, additively (existing `pendingArtists`/`pendingArtworks`/
+`openComplaints`/`totalOrders`/`revenue` fields on `GET /v1/admin/stats`
+unchanged): `revenueTrend` (daily series over a trailing 30-day window,
+with `period`/`from`/`to`/`timezone`/`currency` metadata as §4.6
+requires), `orderStatusCounts`, and `verificationStatusCounts`/
+`complaintStatusCounts` — all read from already-fetched, persisted,
+event-driven sources (`admin.order_feed`, the same artist/artwork/
+complaint queries `getStats` already made), never a module-level array.
+New `AdminStats` contract type replaces an ad-hoc `Record<string,
+number>` return type. New `RevenueTrendChart` component: a plain inline
+SVG bar chart — no charting library added for one series, per §4.6's own
+preference — with an `aria-label` on the `<svg>` carrying the same
+summary a sighted user reads below it, a visible text summary, and a
+visually-hidden (`sr-only`) data table repeating every point, so the
+chart doesn't depend on color or vision to be understood. Distinct
+empty state ("No revenue recorded...") when the trend is all zero; the
+page's existing fetch-error banner already covers the unavailable case,
+since the chart is part of the same `/api/admin/stats` response.
+
+Live-verified in a real Chrome session (`demo.admin@atelier.test`,
+already logged in from earlier in this pass — no new login): confirmed
+`GET /v1/admin/stats` returns real, non-trivial values for every new
+field (`orderStatusCounts` summing to 10 real order-feed rows,
+`verificationStatusCounts` matching the live pending-queue counts,
+`complaintStatusCounts` matching the live complaint count), then loaded
+`/admin` and confirmed the bar chart renders with the exact real data,
+confirmed the visible text summary matches, and confirmed via the
+accessibility tree that both the `aria-label` and the hidden data table
+are actually present (not just written in the component and never
+checked). Full regression (type-check, lint, contracts test 64/64,
+route-registry-parity 52 routes, build) clean; admin-service and
+web-gateway rebuilt and redeployed healthy before the live check.
+
 ### Phase 7 — Finish Gateway and MVP UI integration
 
 Status: **partial foundation; not accepted**. Gateway pages and room mutations exist; upload, signup correctness, dependency/error states, rejected labels and browser E2E remain open.

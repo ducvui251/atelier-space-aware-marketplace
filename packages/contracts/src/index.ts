@@ -93,6 +93,25 @@ export interface ArtistAudience {
 }
 
 export interface ArtworkSaveCount { artworkId: string; saves: number; }
+
+/**
+ * Admin overview chart data (§4.6 of the defect audit). `revenueTrend` is
+ * "amount collected" (order_feed status paid/shipped) — there is no
+ * completed/refunded status in admin.order_feed today (see
+ * getOrderFeedTrend in admin-repository.ts for why), so this is not a
+ * full order lifecycle view yet.
+ */
+export interface AdminStats {
+  pendingArtists: number;
+  pendingArtworks: number;
+  openComplaints: number;
+  totalOrders: number;
+  revenue: number;
+  revenueTrend: { period: "day"; from: string; to: string; timezone: "UTC"; currency: string; series: { period: string; amount: number }[] };
+  orderStatusCounts: Record<string, number>;
+  verificationStatusCounts: { artists: Record<string, number>; artworks: Record<string, number> };
+  complaintStatusCounts: Record<string, number>;
+}
 export type ComplaintStatus = "open" | "resolved" | "rejected";
 export interface Complaint { id: string; orderId: string; reporterId: string; reason: string; status: ComplaintStatus; resolutionNote?: string; }
 

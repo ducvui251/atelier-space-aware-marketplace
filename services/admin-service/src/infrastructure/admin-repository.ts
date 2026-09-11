@@ -91,12 +91,69 @@ export async function markOrderFeedFailed(input: { orderId: string; buyerId: str
   );
 }
 
+function countByVerificationStatus(items: Array<{ verificationStatus: string }>): Record<string, number> {
+  const counts: Record<string, number> = { pending: 0, verified: 0, rejected: 0 };
+  for (const item of items) counts[item.verificationStatus] = (counts[item.verificationStatus] ?? 0) + 1;
+  return counts;
+}
+
+/**
+ * Admin overview chart data (§4.6 of the defect audit). Everything here
+ * reads persisted, event-driven data — `admin.order_feed` (populated from
+ * Commerce's own OrderCreated/PaymentSucceeded/OrderShipped/PaymentFailed
+ * events) and the same artist/artwork/complaint sources getStats already
+ * fetches — never a module-level array or a fixture.
+ *
+ * `order_feed.status` only has pending/paid/shipped/failed — there is no
+ * `completed` (buyer-confirmed-receipt never reaches Admin) or `refunded`
+ * (charge.refunded isn't consumed here) status in this feed today, so the
+ * revenue trend below is "amount collected" (paid or shipped), not a full
+ * lifecycle view; a `returned/refunded` series would need Admin to consume
+ * a new event first, which is out of scope for this additive pass.
+ */
+async function getOrderFeedTrend(periodDays: number): Promise<{ period: "day"; from: string; to: string; timezone: "UTC"; currency: string; series: { period: string; amount: number }[] }> {
+  const to = new Date();
+  const from = new Date(to.getTime() - periodDays * 24 * 60 * 60 * 1000);
+  const rows = await query<{ bucket: string; amount: string | null }>(
+    `select date_trunc('day', created_at)::text as bucket, coalesce(sum(amount) filter (where status in ('paid', 'shipped')), 0)::text as amount
+     from admin.order_feed
+     where created_at >= $1::timestamptz and created_at < $2::timestamptz
+     group by bucket order by bucket`,
+    [from.toISOString(), to.toISOString()],
+  );
+  return {
+    period: "day", from: from.toISOString(), to: to.toISOString(), timezone: "UTC", currency: "USD",
+    series: rows.map((row) => ({ period: row.bucket, amount: Number(row.amount ?? 0) })),
+  };
+}
+
+async function getOrderStatusCounts(): Promise<Record<string, number>> {
+  const rows = await query<{ status: string; count: string }>(
+    `select status, count(*)::text as count from admin.order_feed group by status`,
+  );
+  const counts: Record<string, number> = { pending: 0, paid: 0, shipped: 0, failed: 0 };
+  for (const row of rows) counts[row.status] = Number(row.count);
+  return counts;
+}
+
+async function getComplaintStatusCounts(): Promise<Record<string, number>> {
+  const rows = await query<{ status: string; count: string }>(
+    `select status, count(*)::text as count from admin.complaints group by status`,
+  );
+  const counts: Record<string, number> = { open: 0, resolved: 0, rejected: 0 };
+  for (const row of rows) counts[row.status] = Number(row.count);
+  return counts;
+}
+
 export async function getStats() {
-  const [artists, artworks, complaints, commerceStats] = await Promise.all([
+  const [artists, artworks, complaints, commerceStats, revenueTrend, orderStatusCounts, complaintStatusCounts] = await Promise.all([
     requestInternalService<{ items: Array<{ verificationStatus: string }> }>("artist-artwork", "/v1/artist-artwork/artists"),
     requestInternalService<{ items: Array<{ verificationStatus: string }> }>("artist-artwork", "/v1/artist-artwork/artworks?status=all"),
     query<{ count: string }>(`select count(*)::text as count from admin.complaints where status = 'open'`),
     requestInternalService<{ totalOrders: number; revenue: number }>("commerce", "/v1/commerce/stats"),
+    getOrderFeedTrend(30),
+    getOrderStatusCounts(),
+    getComplaintStatusCounts(),
   ]);
   return {
     pendingArtists: artists.items.filter((item) => item.verificationStatus === "pending").length,
@@ -104,5 +161,12 @@ export async function getStats() {
     openComplaints: Number(complaints[0]?.count ?? 0),
     totalOrders: commerceStats.totalOrders,
     revenue: commerceStats.revenue,
+    revenueTrend,
+    orderStatusCounts,
+    verificationStatusCounts: {
+      artists: countByVerificationStatus(artists.items),
+      artworks: countByVerificationStatus(artworks.items),
+    },
+    complaintStatusCounts,
   };
 }
