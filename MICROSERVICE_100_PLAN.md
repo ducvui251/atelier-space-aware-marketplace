@@ -1422,6 +1422,66 @@ lint, contracts test 66/66, route-registry-parity 53 routes, build)
 clean; commerce-service and web-gateway rebuilt and redeployed healthy
 before every live check.
 
+**Phase 4 (full validation), 2026-09-11 — closes `ATELIER_FIX_AND_FEATURE_PLAN.md`'s
+Phase 1-3 work with a validation pass, not new features.** English copy
+migration (that plan's remaining Phase 2 item) is deliberately left for a
+separate pass, by the user's own request.
+
+- **Full regression, one more time from a clean state:** `pnpm type-check`
+  (13/13 packages/services), `pnpm lint` (0 warnings), `pnpm test`
+  (contracts 66/66; no other package currently has its own test suite),
+  `pnpm build` — all clean. `bash scripts/test-route-registry-parity.sh`:
+  53 routes, all registered.
+- **Schema isolation re-proven, not assumed still true:**
+  `bash scripts/test-schema-isolation.sh` — 64/64 checks pass. Every
+  service's least-privilege DB role can still read only its own schema
+  and is rejected by Postgres itself (not just "no code happens to query
+  it") from every other one, including the two schemas Phase 1-3 actually
+  changed (`artist_artwork` gained columns, `recommendation` gained a
+  table) — isolation held through both.
+- **Compose smoke test:** `bash scripts/smoke-test.sh` — every service's
+  `/health`/`/ready` plus a real business read, all 200 (first run 401'd
+  on the two internal reads because this shell session hadn't exported
+  `ATELIER_INTERNAL_SERVICE_TOKEN` — a local shell-environment gap, not a
+  service defect; re-ran with it exported and all checks passed).
+- **Migrations on a genuinely fresh database — not the long-running dev
+  volume this project has always tested against, which cannot prove a
+  migration file was ever actually runnable from scratch:** started a
+  disposable `postgres:16-alpine` container (its own throwaway Docker
+  volume, `supabase/migrations` mounted read-only — the same mechanism
+  `docker-compose.yml`'s `postgres` service uses) and let all 17
+  migrations run via `docker-entrypoint-initdb.d`'s normal first-boot
+  behavior. All 17 ran with zero errors; confirmed all 10 expected
+  schemas exist and spot-checked the columns/tables this session's own
+  work added (`artist_artwork.artworks`/`.artist_profiles`'s
+  `verification_note`/`reviewed_by`/`reviewed_at`,
+  `recommendation.follow_events`, `commerce.payment_events`) are all
+  present. Container and its volume deleted afterward — the shared dev
+  Postgres volume was never touched.
+- **Event delivery/retry through a real broker outage — re-verified
+  after Phase 1-3, not just cited from Phase 5/6:** stopped
+  `message-broker`, approved a real pending artwork
+  (`POST /v1/verification/artworks/:id/review`) — the request succeeded
+  and the decision was durably written (`verification.event_outbox` had
+  the `ArtworkVerified` row, `published_at` still null) while Artist &
+  Artwork's own projection correctly stayed `pending` (event not yet
+  delivered, nothing lost). Restarted the broker; within seconds,
+  `published_at` was set and **both** consumers had caught up
+  independently — Artist & Artwork's own projection flipped to
+  `verified`, and Catalog & Discovery's read model (a different service,
+  a different consumer of the same event) showed `verified` too — no
+  service restart needed, the outbox publisher's own reconnect/retry
+  loop did this on its own.
+- **Playwright:** not present in this repo and not added here. This
+  project has never used it — every phase closure to date, including
+  this one, has instead live-verified critical flows through a real
+  Chrome session or `curl` against the actual running stack (see every
+  phase's own evidence above). Introducing a whole new E2E framework
+  (new dependency, CI wiring, a test suite written from nothing) is a
+  standalone decision with its own cost, not something to fold silently
+  into a validation pass — flagged here rather than either quietly
+  skipped or quietly added.
+
 ### Phase 7 — Finish Gateway and MVP UI integration
 
 Status: **partial foundation; not accepted**. Gateway pages and room mutations exist; upload, signup correctness, dependency/error states, rejected labels and browser E2E remain open.
