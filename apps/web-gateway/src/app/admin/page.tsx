@@ -2,19 +2,29 @@
 
 import Link from "next/link";
 import { AlertTriangle, ShieldQuestion, Package, DollarSign } from "lucide-react";
+import type { AdminStats } from "@atelier/contracts";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { RequireRole } from "@/components/auth/RequireRole";
+import { RevenueTrendChart } from "@/components/admin/RevenueTrendChart";
 import { formatPrice } from "@/lib/utils";
 import { useApiResource } from "@/lib/client/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
-interface AdminStats {
-  pendingArtists: number;
-  pendingArtworks: number;
-  openComplaints: number;
-  totalOrders: number;
-  revenue: number;
+function StatusBreakdown({ title, counts }: { title: string; counts: Record<string, number> }) {
+  return (
+    <div className="rounded-lg border border-border bg-surface p-5">
+      <p className="text-caption text-muted-foreground">{title}</p>
+      <dl className="mt-3 flex flex-col gap-1.5">
+        {Object.entries(counts).map(([status, count]) => (
+          <div key={status} className="flex items-center justify-between text-body-sm">
+            <dt className="capitalize text-foreground">{status}</dt>
+            <dd className="font-medium text-foreground">{count}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
 }
 
 function StatCard({
@@ -75,6 +85,26 @@ function AdminOverview() {
           </>
         )}
       </div>
+
+      {loading ? (
+        <div className="mt-8">
+          <Skeleton className="h-40 w-full rounded-lg" />
+        </div>
+      ) : data?.revenueTrend ? (
+        <div className="mt-8 rounded-lg border border-border bg-surface p-5">
+          <p className="mb-4 text-caption text-muted-foreground">Revenue (last 30 days)</p>
+          <RevenueTrendChart series={data.revenueTrend.series} currency={data.revenueTrend.currency} from={data.revenueTrend.from} to={data.revenueTrend.to} />
+        </div>
+      ) : null}
+
+      {!loading && data ? (
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatusBreakdown title="Orders" counts={data.orderStatusCounts} />
+          <StatusBreakdown title="Artist verification" counts={data.verificationStatusCounts.artists} />
+          <StatusBreakdown title="Artwork verification" counts={data.verificationStatusCounts.artworks} />
+          <StatusBreakdown title="Complaints" counts={data.complaintStatusCounts} />
+        </div>
+      ) : null}
     </>
   );
 }
