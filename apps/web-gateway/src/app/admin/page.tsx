@@ -68,8 +68,8 @@ function AdminOverview() {
           [0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[104px] w-full rounded-lg" />)
         ) : (
           <>
-            <StatCard icon={ShieldQuestion} label="Nghệ sĩ chờ duyệt" value={String(data?.pendingArtists ?? 0)} href="/admin/verification" />
-            <StatCard icon={Package} label="Tác phẩm chờ duyệt" value={String(data?.pendingArtworks ?? 0)} href="/admin/verification" />
+            <StatCard icon={ShieldQuestion} label="Nghệ sĩ chờ duyệt" value={String(data?.pendingArtists ?? 0)} href="/admin/artists/pending" />
+            <StatCard icon={Package} label="Tác phẩm chờ duyệt" value={String(data?.pendingArtworks ?? 0)} href="/admin/artworks/pending" />
             <StatCard icon={AlertTriangle} label="Khiếu nại đang mở" value={String(data?.openComplaints ?? 0)} href="/admin/complaints" />
             <StatCard icon={DollarSign} label="Tổng doanh thu (đơn đã tạo)" value={formatPrice(data?.revenue ?? 0, "USD")} />
           </>
