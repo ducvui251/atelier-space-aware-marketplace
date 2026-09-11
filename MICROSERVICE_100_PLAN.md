@@ -1162,6 +1162,31 @@ sibling cards render correctly for `Verified` and `Pending review` rows
 too. Full regression (type-check, lint, build) clean; web-gateway rebuilt
 and redeployed healthy before the live check.
 
+**Phase 2 (split admin queues, §3.7/§4.5), 2026-09-11:** `/admin/page.tsx`
+sent both the "pending artists" and "pending artworks" stat cards to the
+same `/admin/verification` page, which rendered both queues in one
+component — the direct cause of §3.7.
+
+Fixed: split into `/admin/artists/pending` and `/admin/artworks/pending`
+(matching the plan's own route names; `/admin/complaints` already had its
+own page before this pass, so it needed no change). Both pages share a new
+`ReviewRow` component (extracted from the old combined page, English copy)
+and the existing `GET /api/admin/verification-queue` (which already
+returns `{artists, artworks}` together — no backend/contract change, each
+page just reads its own key; splitting that endpoint too is a separate,
+optional follow-up, not required by this defect). `/admin` now links each
+stat card to its own page; the old `/admin/verification` route is deleted
+outright (nothing else referenced it).
+
+Live-verified in a real Chrome session (`demo.admin@atelier.test`,
+existing account): confirmed `/admin/artworks/pending` lists exactly the
+10 pending artworks the stats card claims, `/admin/artists/pending` lists
+the 3 pending artists (with the "No image" fallback rendering correctly
+for artist rows with no portrait), and the old `/admin/verification` URL
+now 404s. Full regression (type-check, lint, contracts test 58/58,
+route-registry-parity, build) clean; web-gateway rebuilt and redeployed
+healthy before the live check.
+
 ### Phase 7 — Finish Gateway and MVP UI integration
 
 Status: **partial foundation; not accepted**. Gateway pages and room mutations exist; upload, signup correctness, dependency/error states, rejected labels and browser E2E remain open.
