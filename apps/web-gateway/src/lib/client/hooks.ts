@@ -58,7 +58,7 @@ export function useApiResource<T>(path: string | null): ApiResourceState<T> {
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(err instanceof ApiError ? err.message : "Không thể tải dữ liệu.");
+        setError(err instanceof ApiError ? err.message : "Couldn't load data.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

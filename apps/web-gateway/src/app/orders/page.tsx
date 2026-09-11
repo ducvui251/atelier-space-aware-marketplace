@@ -22,7 +22,7 @@ function ReviewForm({ orderId }: { orderId: string }) {
   const [submitted, setSubmitted] = React.useState(false);
 
   if (submitted) {
-    return <p className="text-caption text-success-foreground">Cảm ơn bạn đã đánh giá!</p>;
+    return <p className="text-caption text-success-foreground">Thanks for your review!</p>;
   }
 
   return (
@@ -32,7 +32,7 @@ function ReviewForm({ orderId }: { orderId: string }) {
           <button
             key={value}
             type="button"
-            aria-label={`${value} sao`}
+            aria-label={`${value} stars`}
             onClick={() => setRating(value)}
             className="focus-ring"
           >
@@ -49,7 +49,7 @@ function ReviewForm({ orderId }: { orderId: string }) {
         value={comment}
         onChange={(e) => setComment(e.target.value)}
         rows={2}
-        placeholder="Nhận xét của bạn (tuỳ chọn)"
+        placeholder="Your comment (optional)"
         className="focus-ring w-full rounded-md border border-border bg-surface px-3 py-2 text-body-sm text-foreground"
       />
       <Button
@@ -63,7 +63,7 @@ function ReviewForm({ orderId }: { orderId: string }) {
           setSubmitted(true);
         }}
       >
-        Gửi đánh giá
+        Submit review
       </Button>
     </div>
   );
@@ -75,13 +75,13 @@ function ComplaintForm({ orderId }: { orderId: string }) {
   const [submitted, setSubmitted] = React.useState(false);
 
   if (submitted) {
-    return <p className="text-caption text-warning-foreground">Đã gửi báo cáo sự cố, đội ngũ hỗ trợ sẽ liên hệ.</p>;
+    return <p className="text-caption text-warning-foreground">Your report has been submitted — our support team will follow up.</p>;
   }
 
   if (!open) {
     return (
       <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
-        Báo sự cố
+        Report a problem
       </Button>
     );
   }
@@ -92,7 +92,7 @@ function ComplaintForm({ orderId }: { orderId: string }) {
         value={reason}
         onChange={(e) => setReason(e.target.value)}
         rows={2}
-        placeholder="Mô tả sự cố (trễ, thất lạc, hư hỏng…)"
+        placeholder="Describe the problem (late, lost, damaged…)"
         className="focus-ring w-full rounded-md border border-border bg-surface px-3 py-2 text-body-sm text-foreground"
       />
       <Button
@@ -108,7 +108,7 @@ function ComplaintForm({ orderId }: { orderId: string }) {
           setSubmitted(true);
         }}
       >
-        Gửi báo cáo
+        Submit report
       </Button>
     </div>
   );
@@ -135,7 +135,7 @@ function OrderRow({ order, onChanged }: { order: Order; onChanged: () => void })
           <p className="text-body font-medium text-foreground">{artwork?.title ?? order.artworkId}</p>
           <p className="text-caption text-muted-foreground">
             {formatPrice(order.totalAmount, order.currency)} ·{" "}
-            {new Date(order.createdAt).toLocaleDateString("vi-VN")}
+            {new Date(order.createdAt).toLocaleDateString("en-US")}
           </p>
         </div>
         <Badge variant="outline" className="capitalize">
@@ -146,7 +146,7 @@ function OrderRow({ order, onChanged }: { order: Order; onChanged: () => void })
       <div className="mt-4 flex flex-wrap items-center gap-3">
         {order.status === "shipped" ? (
           <Button size="sm" disabled={confirming} onClick={confirmReceived}>
-            {confirming ? "Đang xác nhận…" : "Đã nhận hàng"}
+            {confirming ? "Confirming…" : "Mark as received"}
           </Button>
         ) : null}
         {order.status === "shipped" || order.status === "completed" ? <ComplaintForm orderId={order.id} /> : null}
@@ -174,7 +174,7 @@ function OrdersView() {
           role="status"
           className="mb-6 rounded-md border border-success bg-success-soft px-3 py-2 text-body-sm text-success-foreground"
         >
-          Đặt hàng thành công! Nghệ sĩ đã được thông báo.
+          Order placed successfully! The artist has been notified.
         </p>
       ) : null}
 
@@ -187,22 +187,22 @@ function OrdersView() {
       ) : error ? (
         <EmptyState
           icon={AlertTriangle}
-          title="Không thể tải đơn hàng"
+          title="Couldn't load your orders"
           description={error}
           action={
             <Button variant="outline" onClick={refresh}>
-              Thử lại
+              Retry
             </Button>
           }
         />
       ) : orders.length === 0 ? (
         <EmptyState
           icon={PackageOpen}
-          title="Chưa có đơn hàng"
-          description="Đơn hàng của bạn sẽ hiện ở đây sau khi checkout."
+          title="No orders yet"
+          description="Your orders will show up here after checkout."
           action={
             <Button asChild variant="outline">
-              <Link href="/artworks">Khám phá tác phẩm</Link>
+              <Link href="/artworks">Browse artworks</Link>
             </Button>
           }
         />

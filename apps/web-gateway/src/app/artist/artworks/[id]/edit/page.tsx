@@ -24,11 +24,11 @@ function EditArtworkView() {
     return (
       <EmptyState
         icon={PackageSearch}
-        title="Không tìm thấy tác phẩm"
-        description="Tác phẩm này không tồn tại hoặc không thuộc về bạn."
+        title="Artwork not found"
+        description="This artwork doesn't exist or doesn't belong to you."
         action={
           <Button asChild variant="outline">
-            <Link href="/artist">Quay lại dashboard</Link>
+            <Link href="/artist">Back to dashboard</Link>
           </Button>
         }
       />
@@ -40,7 +40,7 @@ function EditArtworkView() {
       await apiFetch<Artwork>(`/api/artist/artworks/${encodeURIComponent(params.id)}`, { method: "PATCH", body: JSON.stringify(input) });
       return { success: true as const };
     } catch (error) {
-      return { error: error instanceof ApiError ? error.message : "Không thể lưu thay đổi." };
+      return { error: error instanceof ApiError ? error.message : "Couldn't save changes." };
     }
   }
 
@@ -49,11 +49,11 @@ function EditArtworkView() {
       <p className="eyebrow">Artist dashboard</p>
       <h1 className="mt-2 font-display text-h2 text-foreground">Edit listing</h1>
       <p className="mt-3 max-w-xl text-body text-muted-foreground">
-        Chỉnh sửa metadata sẽ đưa tác phẩm trở lại trạng thái <strong>pending</strong> để duyệt lại.
+        Editing this artwork&apos;s details resets it to <strong>pending</strong> for re-review.
       </p>
 
       <div className="mt-8">
-        <ArtworkForm initial={artwork} submitLabel="Lưu thay đổi" onSubmit={onSubmit} onSuccess={() => router.push("/artist")} />
+        <ArtworkForm initial={artwork} submitLabel="Save changes" onSubmit={onSubmit} onSuccess={() => router.push("/artist")} />
       </div>
     </>
   );

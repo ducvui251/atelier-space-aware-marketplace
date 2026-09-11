@@ -31,11 +31,11 @@ function CartView() {
     return (
       <EmptyState
         icon={ShoppingBag}
-        title="Giỏ hàng trống"
-        description="Thêm tác phẩm vào giỏ để tiếp tục checkout."
+        title="Your cart is empty"
+        description="Add an artwork to your cart to continue to checkout."
         action={
           <Button asChild variant="outline">
-            <Link href="/artworks">Khám phá tác phẩm</Link>
+            <Link href="/artworks">Browse artworks</Link>
           </Button>
         }
       />
@@ -79,15 +79,15 @@ function CartView() {
       </div>
 
       <aside className="h-fit rounded-lg border border-border bg-surface p-5">
-        <p className="eyebrow mb-3">Tóm tắt đơn hàng</p>
+        <p className="eyebrow mb-3">Order summary</p>
         <div className="flex items-center justify-between text-body">
-          <span className="text-muted-foreground">Tạm tính</span>
+          <span className="text-muted-foreground">Subtotal</span>
           <span className="font-medium text-foreground">
             {formatPrice(total, items[0]?.currency ?? "USD")}
           </span>
         </div>
         <Button asChild size="lg" className="mt-5 w-full">
-          <Link href="/checkout">Tiến hành thanh toán</Link>
+          <Link href="/checkout">Proceed to checkout</Link>
         </Button>
       </aside>
     </div>
@@ -97,7 +97,7 @@ function CartView() {
 export default function CartPage() {
   return (
     <PageContainer className="py-10">
-      <p className="eyebrow">Giỏ hàng</p>
+      <p className="eyebrow">Cart</p>
       <h1 className="mt-2 font-display text-h1 text-foreground">Cart</h1>
       <div className="mt-8">
         <RequireRole role={["buyer", "artist", "admin"]}>

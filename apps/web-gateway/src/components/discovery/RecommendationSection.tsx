@@ -18,9 +18,9 @@ export function RecommendationSection() {
   return (
     <div>
       <p className="eyebrow mb-1">
-        {data?.reason === "personalized" ? "Vì bạn đã lưu tác phẩm tương tự" : "Curated for you"}
+        {data?.reason === "personalized" ? "Based on artworks you've saved" : "Curated for you"}
       </p>
-      <h2 className="mb-6 font-display text-h2 text-foreground">Có thể bạn sẽ thích</h2>
+      <h2 className="mb-6 font-display text-h2 text-foreground">You might also like</h2>
       <ArtworkGrid artworks={items} columns={3} />
     </div>
   );

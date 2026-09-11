@@ -11,13 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 const accountSchema = z.object({
-  fullName: z.string().trim().min(1, "Họ tên không được để trống"),
+  fullName: z.string().trim().min(1, "Full name is required"),
   phone: z.string().trim().optional(),
   bio: z.string().trim().optional(),
   portfolioUrl: z
     .string()
     .trim()
-    .url("Đường dẫn không hợp lệ")
+    .url("Invalid URL")
     .optional()
     .or(z.literal("")),
 });
@@ -58,7 +58,7 @@ export function AccountForm() {
       setFormError(result.error);
       return;
     }
-    setSavedMessage("Đã lưu thay đổi hồ sơ.");
+    setSavedMessage("Profile changes saved.");
   }
 
   return (
@@ -90,17 +90,17 @@ export function AccountForm() {
           </p>
         ) : null}
 
-        <Field label="Họ và tên" error={errors.fullName?.message}>
+        <Field label="Full name" error={errors.fullName?.message}>
           <Input {...register("fullName")} className={cn(errors.fullName && "border-destructive")} />
         </Field>
 
-        <Field label="Số điện thoại" error={errors.phone?.message}>
+        <Field label="Phone number" error={errors.phone?.message}>
           <Input {...register("phone")} />
         </Field>
 
         {currentArtist ? (
           <>
-            <Field label="Giới thiệu (bio)" error={errors.bio?.message}>
+            <Field label="Bio" error={errors.bio?.message}>
               <textarea
                 {...register("bio")}
                 rows={4}
@@ -118,7 +118,7 @@ export function AccountForm() {
         ) : null}
 
         <Button type="submit" className="mt-2 w-fit">
-          Lưu thay đổi
+          Save changes
         </Button>
       </form>
     </>

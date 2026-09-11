@@ -160,8 +160,8 @@ export function ArtworkDetailClient({ artwork, artist, related }: ArtworkDetailC
                 </>
               ) : (
                 <div className="rounded-lg border border-warning bg-warning-soft px-4 py-3 text-body-sm text-warning-foreground">
-                  Tác phẩm này hiện đã {artwork.availability === "sold" ? "được bán" : "được giữ chỗ"}.
-                  {related.length > 0 ? " Xem các tác phẩm tương tự bên dưới." : ""}
+                  This artwork is now {artwork.availability === "sold" ? "sold" : "reserved"}.
+                  {related.length > 0 ? " See similar artworks below." : ""}
                 </div>
               )}
               <Button asChild variant="outline" size="default">

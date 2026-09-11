@@ -55,7 +55,7 @@ export function AccountMenu({ className }: { className?: string }) {
               className="focus-ring flex items-center gap-2 rounded-sm px-2.5 py-2 text-body-sm text-foreground outline-none transition-colors hover:bg-muted"
             >
               <User className="size-4" />
-              Tài khoản
+              Account
             </Link>
           </DropdownMenu.Item>
           <DropdownMenu.Item asChild>
@@ -64,7 +64,7 @@ export function AccountMenu({ className }: { className?: string }) {
               className="focus-ring flex items-center gap-2 rounded-sm px-2.5 py-2 text-body-sm text-foreground outline-none transition-colors hover:bg-muted"
             >
               <Package className="size-4" />
-              Đơn hàng
+              Orders
             </Link>
           </DropdownMenu.Item>
           {currentUser.role === "artist" ? (
@@ -95,7 +95,7 @@ export function AccountMenu({ className }: { className?: string }) {
             className="focus-ring flex items-center gap-2 rounded-sm px-2.5 py-2 text-body-sm text-destructive outline-none transition-colors hover:bg-destructive-soft"
           >
             <LogOut className="size-4" />
-            Đăng xuất
+            Sign out
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>

@@ -15,7 +15,7 @@ function NewArtworkView() {
       const artwork = await apiFetch<Artwork>("/api/artist/artworks", { method: "POST", body: JSON.stringify(input) });
       return { success: true as const, id: artwork.id };
     } catch (error) {
-      return { error: error instanceof ApiError ? error.message : "Không thể tạo tác phẩm." };
+      return { error: error instanceof ApiError ? error.message : "Couldn't create the artwork." };
     }
   }
 
@@ -24,11 +24,11 @@ function NewArtworkView() {
       <p className="eyebrow">Artist dashboard</p>
       <h1 className="mt-2 font-display text-h2 text-foreground">New listing</h1>
       <p className="mt-3 max-w-xl text-body text-muted-foreground">
-        Tác phẩm sẽ ở trạng thái <strong>pending</strong> cho tới khi quản trị viên duyệt.
+        Your artwork will be <strong>pending</strong> until an admin reviews it.
       </p>
 
       <div className="mt-8">
-        <ArtworkForm submitLabel="Tạo listing" onSubmit={onSubmit} onSuccess={() => router.push("/artist")} />
+        <ArtworkForm submitLabel="Create listing" onSubmit={onSubmit} onSuccess={() => router.push("/artist")} />
       </div>
     </>
   );

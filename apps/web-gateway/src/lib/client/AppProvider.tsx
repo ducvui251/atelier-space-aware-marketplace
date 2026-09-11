@@ -128,7 +128,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         await refreshUser();
         return { success: true };
       } catch (error) {
-        return { error: error instanceof ApiError ? error.message : "Email hoặc mật khẩu không đúng." };
+        return { error: error instanceof ApiError ? error.message : "Incorrect email or password." };
       }
     },
     [refreshUser],
@@ -151,7 +151,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setCurrentArtist(result.artistProfile);
         return { success: true };
       } catch (error) {
-        return { error: error instanceof ApiError ? error.message : "Không thể lưu thay đổi." };
+        return { error: error instanceof ApiError ? error.message : "Couldn't save changes." };
       }
     },
     [],
@@ -164,7 +164,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         await refreshCart();
         return { success: true };
       } catch (error) {
-        return { error: error instanceof ApiError ? error.message : "Không thể thêm vào giỏ hàng." };
+        return { error: error instanceof ApiError ? error.message : "Couldn't add to cart." };
       }
     },
     [refreshCart],
