@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import { MapPin } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -7,6 +6,7 @@ import { Section } from "@/components/layout/Section";
 import { SectionHeader } from "@/components/layout/SectionHeader";
 import { Grid } from "@/components/layout/Grid";
 import { ArtworkCard } from "@/components/artwork/ArtworkCard";
+import { ArtworkImage } from "@/components/artwork/ArtworkImage";
 import { Badge } from "@/components/ui/badge";
 import { FollowButton } from "@/components/artist/FollowButton";
 import { findArtist, listArtworks } from "@/lib/gateway/clients/artwork.client";
@@ -49,7 +49,7 @@ export default async function ArtistProfilePage({
         <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
           {/* Portrait */}
           <div className="relative aspect-[4/5] w-full overflow-hidden rounded-xl bg-muted lg:sticky lg:top-24 lg:self-start">
-            <Image
+            <ArtworkImage
               src={artist.imageUrl}
               alt={`Portrait of ${artist.displayName}`}
               fill

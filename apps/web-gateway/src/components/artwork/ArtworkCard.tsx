@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import type { Artwork } from "@/types";
 import { cn } from "@/lib/utils";
 import { artworkAspect } from "@/lib/artwork-aspect";
 import { useAppState, useSaved } from "@/lib/client/hooks";
+import { ArtworkImage } from "./ArtworkImage";
 import { PriceDisplay } from "./PriceDisplay";
 import { SaveButton } from "./SaveButton";
 
@@ -47,7 +47,7 @@ export function ArtworkCard({ artwork, priority, className }: ArtworkCardProps) 
           artworkAspect(live.orientation),
         )}
       >
-        <Image
+        <ArtworkImage
           src={live.imageUrl}
           alt={live.title}
           fill

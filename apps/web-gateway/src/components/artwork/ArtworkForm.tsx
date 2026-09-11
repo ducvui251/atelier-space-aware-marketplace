@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -39,7 +40,7 @@ const artworkSchema = z.object({
   orientation: z.enum(["portrait", "landscape", "square"]),
   editionType: z.enum(["original", "limited-edition"]),
   year: z.coerce.number().int().min(1900).max(new Date().getFullYear() + 1),
-  imageUrl: z.string().trim().url("URL ảnh không hợp lệ"),
+  imageUrl: z.string().trim().url("Upload an image before saving"),
   coaUrl: z.string().trim().url("URL không hợp lệ").optional().or(z.literal("")),
   description: z.string().trim().optional(),
 });
@@ -105,12 +106,12 @@ export function ArtworkForm({ initial, submitLabel, onSubmit, onSuccess }: Artwo
       const response = await fetch("/api/uploads/image", { method: "POST", body });
       const data = await response.json().catch(() => null);
       if (!response.ok) {
-        setUploadError(typeof data?.error === "string" ? data.error : "Tải ảnh lên thất bại");
+        setUploadError(typeof data?.error === "string" ? data.error : "Image upload failed");
         return;
       }
       setValue("imageUrl", data.url, { shouldValidate: true });
     } catch {
-      setUploadError("Tải ảnh lên thất bại");
+      setUploadError("Image upload failed");
     } finally {
       setUploading(false);
     }
@@ -226,16 +227,13 @@ export function ArtworkForm({ initial, submitLabel, onSubmit, onSuccess }: Artwo
             disabled={uploading}
             className="text-body-sm text-foreground"
           />
-          {uploading ? <p className="text-caption text-muted-foreground">Đang tải ảnh lên…</p> : null}
+          {uploading ? <p className="text-caption text-muted-foreground">Uploading…</p> : null}
           {watch("imageUrl") ? (
-            // eslint-disable-next-line @next/next/no-img-element -- arbitrary uploaded/pasted URL, not a local static asset
-            <img src={watch("imageUrl")} alt="Xem trước" className="h-32 w-32 rounded-md border border-border object-cover" />
+            <div className="relative h-32 w-32 overflow-hidden rounded-md border border-border">
+              <Image src={watch("imageUrl")} alt="Preview" fill sizes="128px" className="object-cover" />
+            </div>
           ) : null}
-          <Input
-            {...register("imageUrl")}
-            placeholder="Hoặc dán URL ảnh: https://…"
-            className={cn(errors.imageUrl && "border-destructive")}
-          />
+          <input type="hidden" {...register("imageUrl")} />
         </div>
       </Field>
 

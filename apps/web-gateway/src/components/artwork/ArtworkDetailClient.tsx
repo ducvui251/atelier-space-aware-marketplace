@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -18,6 +17,7 @@ import { Section } from "@/components/layout/Section";
 import { SectionHeader } from "@/components/layout/SectionHeader";
 import { Grid } from "@/components/layout/Grid";
 import { ArtworkCard } from "@/components/artwork/ArtworkCard";
+import { ArtworkImage } from "@/components/artwork/ArtworkImage";
 import { PriceDisplay } from "@/components/artwork/PriceDisplay";
 import { VerificationBadge } from "@/components/artwork/VerificationBadge";
 import { Button } from "@/components/ui/button";
@@ -71,7 +71,7 @@ export function ArtworkDetailClient({ artwork, artist, related }: ArtworkDetailC
                 artworkAspect(artwork.orientation),
               )}
             >
-              <Image
+              <ArtworkImage
                 src={artwork.imageUrl}
                 alt={`${artwork.title} by ${artwork.artist}`}
                 fill
@@ -205,7 +205,7 @@ export function ArtworkDetailClient({ artwork, artist, related }: ArtworkDetailC
           <PageContainer>
             <div className="grid items-center gap-8 rounded-xl border border-border bg-surface p-8 md:grid-cols-[auto_1fr_auto] md:p-10">
               <div className="relative size-24 overflow-hidden rounded-full bg-muted md:size-28">
-                <Image
+                <ArtworkImage
                   src={artist.imageUrl}
                   alt={`Portrait of ${artist.displayName}`}
                   fill

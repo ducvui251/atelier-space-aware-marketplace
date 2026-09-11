@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,6 +12,7 @@ import { RequireRole } from "@/components/auth/RequireRole";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { ArtworkImage } from "@/components/artwork/ArtworkImage";
 import { cn, formatPrice } from "@/lib/utils";
 import { useAuth, useCart } from "@/lib/client/hooks";
 import { apiFetch, ApiError } from "@/lib/client/api";
@@ -150,7 +150,7 @@ function CheckoutView() {
           {items.map((artwork) => (
             <div key={artwork.id} className="flex items-center gap-3">
               <div className="relative size-14 shrink-0 overflow-hidden rounded-md bg-muted">
-                <Image src={artwork.imageUrl} alt={artwork.title} fill sizes="56px" className="object-cover" />
+                <ArtworkImage src={artwork.imageUrl} alt={artwork.title} fill sizes="56px" className="object-cover" />
               </div>
               <div className="flex-1">
                 <p className="text-body-sm text-foreground">{artwork.title}</p>
