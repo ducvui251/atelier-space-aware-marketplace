@@ -27,6 +27,10 @@ import {
   CreateBuyerRoomRequestSchema,
   CreateComplaintRequestSchema,
   CreateExhibitionPlacementRequestSchema,
+  CreateExhibitionBuilderPlacementRequestSchema,
+  CreateExhibitionBuilderRequestSchema,
+  UpdateExhibitionBuilderPlacementRequestSchema,
+  UpdateExhibitionBuilderRequestSchema,
   CreateExhibitionRequestSchema,
   CreatePlacementRequestSchema,
   CreateReservationRequestSchema,
@@ -122,6 +126,43 @@ describe("parseBody", () => {
   it("handles a completely malformed body (null / non-object) without throwing", () => {
     const result = parseBody(CartAddRequestSchema, null);
     expect(result.success).toBe(false);
+  });
+});
+
+describe("exhibition builder Gateway inputs", () => {
+  const artworkPlacement = {
+    artworkId: uuid1,
+    positionX: 0,
+    positionY: 1.6,
+    positionZ: -4.9,
+    rotationX: 0,
+    rotationY: 0,
+    rotationZ: 0,
+    scale: 1,
+    wallId: "front" as const,
+    frameStyle: "dark-wood" as const,
+  };
+
+  it("accepts supported room styles and rejects caller-supplied actor identity", () => {
+    const base = { title: "Spring works", slug: "spring-works" };
+    for (const roomTemplateId of ["white-cube", "warm-gallery", "black-box"]) {
+      expect(CreateExhibitionBuilderRequestSchema.safeParse({ ...base, roomTemplateId }).success).toBe(true);
+    }
+    expect(CreateExhibitionBuilderRequestSchema.safeParse({ ...base, roomTemplateId: "unknown-room" }).success).toBe(false);
+    expect(CreateExhibitionBuilderRequestSchema.safeParse({ ...base, roomTemplateId: "white-cube", creatorId: uuid1 }).success).toBe(false);
+  });
+
+  it("rejects empty patches, extra actor fields, and transforms outside the gallery", () => {
+    expect(UpdateExhibitionBuilderRequestSchema.safeParse({}).success).toBe(false);
+    expect(UpdateExhibitionBuilderRequestSchema.safeParse({ status: "published", requesterRole: "admin" }).success).toBe(false);
+    expect(CreateExhibitionBuilderPlacementRequestSchema.safeParse({ ...artworkPlacement, positionY: 4 }).success).toBe(false);
+    expect(UpdateExhibitionBuilderPlacementRequestSchema.safeParse({ scale: 0 }).success).toBe(false);
+    expect(UpdateExhibitionBuilderPlacementRequestSchema.safeParse({}).success).toBe(false);
+  });
+
+  it("accepts bounded transforms and frame/wall presets", () => {
+    expect(CreateExhibitionBuilderPlacementRequestSchema.safeParse(artworkPlacement).success).toBe(true);
+    expect(UpdateExhibitionBuilderPlacementRequestSchema.safeParse({ positionX: 2, wallId: "right" }).success).toBe(true);
   });
 });
 
@@ -518,6 +559,15 @@ describe("CreateExhibitionRequestSchema / UpdateExhibitionRequestSchema", () => 
   it("accepts a valid exhibition creation request", () => {
     expect(CreateExhibitionRequestSchema.safeParse(validCreate).success).toBe(true);
   });
+  it("accepts the supported gallery templates and rejects unknown templates", () => {
+    for (const roomTemplateId of ["white-cube", "warm-gallery", "black-box"]) {
+      expect(CreateExhibitionRequestSchema.safeParse({ ...validCreate, roomTemplateId }).success).toBe(true);
+      expect(UpdateExhibitionRequestSchema.safeParse({ requesterId: uuid1, requesterRole: "artist", roomTemplateId }).success).toBe(true);
+    }
+    expect(CreateExhibitionRequestSchema.safeParse({ ...validCreate, roomTemplateId: "unknown-room" }).success).toBe(false);
+    expect(UpdateExhibitionRequestSchema.safeParse({ requesterId: uuid1, requesterRole: "artist", roomTemplateId: "unknown-room" }).success).toBe(false);
+  });
+
 
   it("rejects a slug with uppercase letters, spaces, or underscores", () => {
     expect(CreateExhibitionRequestSchema.safeParse({ ...validCreate, slug: "Echoes Of Summer" }).success).toBe(false);

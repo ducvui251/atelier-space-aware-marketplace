@@ -361,13 +361,21 @@ const exhibitionSlugSchema = z
   .max(120)
   .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "slug must be lowercase letters, numbers, and hyphens");
 
+export const EXHIBITION_ROOM_TEMPLATE_IDS = [
+  "white-cube",
+  "warm-gallery",
+  "black-box",
+] as const;
+export const ExhibitionRoomTemplateIdSchema = z.enum(EXHIBITION_ROOM_TEMPLATE_IDS);
+export type ExhibitionRoomTemplateId = z.infer<typeof ExhibitionRoomTemplateIdSchema>;
+
 export const CreateExhibitionRequestSchema = z.object({
   creatorType: exhibitionCreatorTypeSchema,
   creatorId: z.string().uuid(),
   title: z.string().trim().min(1),
   slug: exhibitionSlugSchema,
   description: z.string().trim().optional(),
-  roomTemplateId: z.string().trim().min(1),
+  roomTemplateId: ExhibitionRoomTemplateIdSchema,
   featured: z.boolean().optional(),
 });
 
@@ -377,7 +385,7 @@ export const UpdateExhibitionRequestSchema = z.object({
   title: z.string().trim().min(1).optional(),
   slug: exhibitionSlugSchema.optional(),
   description: z.string().trim().optional(),
-  roomTemplateId: z.string().trim().min(1).optional(),
+  roomTemplateId: ExhibitionRoomTemplateIdSchema.optional(),
   status: exhibitionStatusSchema.optional(),
   featured: z.boolean().optional(),
 });
@@ -412,6 +420,60 @@ export const UpdateExhibitionPlacementRequestSchema = z.object({
   frameStyle: z.string().trim().optional(),
   order: z.coerce.number().int().optional(),
 });
+
+// Public Gateway inputs for the shared artist/admin exhibition builder. Actor
+// identity is deliberately absent: the Gateway derives it from Supabase auth.
+export const EXHIBITION_BUILDER_ROOM_TEMPLATE_ID = "white-cube" as const;
+
+export const CreateExhibitionBuilderRequestSchema = z.object({
+  title: z.string().trim().min(1).max(120),
+  slug: exhibitionSlugSchema,
+  description: z.string().trim().max(2000).optional(),
+  roomTemplateId: ExhibitionRoomTemplateIdSchema,
+}).strict();
+
+export const UpdateExhibitionBuilderRequestSchema = z.object({
+  title: z.string().trim().min(1).max(120).optional(),
+  slug: exhibitionSlugSchema.optional(),
+  description: z.string().trim().max(2000).optional(),
+  status: exhibitionStatusSchema.optional(),
+  featured: z.boolean().optional(),
+}).strict().refine((value) => Object.keys(value).length > 0, "At least one exhibition field is required");
+
+const builderPositionX = z.number().finite().min(-5).max(5);
+const builderPositionY = z.number().finite().min(0).max(3.2);
+const builderPositionZ = z.number().finite().min(-5).max(5);
+const builderRotation = z.number().finite().min(-360).max(360);
+const builderScale = z.number().finite().positive().max(5);
+const builderWall = z.enum(["front", "back", "left", "right"]);
+const builderFrame = z.enum(["dark-wood", "light-wood", "black", "white"]);
+
+export const CreateExhibitionBuilderPlacementRequestSchema = z.object({
+  artworkId: z.string().uuid(),
+  positionX: builderPositionX,
+  positionY: builderPositionY,
+  positionZ: builderPositionZ,
+  rotationX: builderRotation,
+  rotationY: builderRotation,
+  rotationZ: builderRotation,
+  scale: builderScale,
+  wallId: builderWall,
+  frameStyle: builderFrame,
+  order: z.number().int().nonnegative().optional(),
+}).strict();
+
+export const UpdateExhibitionBuilderPlacementRequestSchema = z.object({
+  positionX: builderPositionX.optional(),
+  positionY: builderPositionY.optional(),
+  positionZ: builderPositionZ.optional(),
+  rotationX: builderRotation.optional(),
+  rotationY: builderRotation.optional(),
+  rotationZ: builderRotation.optional(),
+  scale: builderScale.optional(),
+  wallId: builderWall.optional(),
+  frameStyle: builderFrame.optional(),
+  order: z.number().int().nonnegative().optional(),
+}).strict().refine((value) => Object.keys(value).length > 0, "At least one placement field is required");
 
 // --- Admin -----------------------------------------------------------------------
 
@@ -491,5 +553,9 @@ export type CreateExhibitionRequest = z.infer<typeof CreateExhibitionRequestSche
 export type UpdateExhibitionRequest = z.infer<typeof UpdateExhibitionRequestSchema>;
 export type CreateExhibitionPlacementRequest = z.infer<typeof CreateExhibitionPlacementRequestSchema>;
 export type UpdateExhibitionPlacementRequest = z.infer<typeof UpdateExhibitionPlacementRequestSchema>;
+export type CreateExhibitionBuilderRequest = z.infer<typeof CreateExhibitionBuilderRequestSchema>;
+export type UpdateExhibitionBuilderRequest = z.infer<typeof UpdateExhibitionBuilderRequestSchema>;
+export type CreateExhibitionBuilderPlacementRequest = z.infer<typeof CreateExhibitionBuilderPlacementRequestSchema>;
+export type UpdateExhibitionBuilderPlacementRequest = z.infer<typeof UpdateExhibitionBuilderPlacementRequestSchema>;
 export type CreateComplaintRequest = z.infer<typeof CreateComplaintRequestSchema>;
 export type ResolveComplaintRequest = z.infer<typeof ResolveComplaintRequestSchema>;

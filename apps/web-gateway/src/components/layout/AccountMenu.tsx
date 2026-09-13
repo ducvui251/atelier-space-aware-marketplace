@@ -67,6 +67,17 @@ export function AccountMenu({ className }: { className?: string }) {
               Orders
             </Link>
           </DropdownMenu.Item>
+          {currentUser.role === "artist" || currentUser.role === "admin" ? (
+            <DropdownMenu.Item asChild>
+              <Link
+                href="/exhibitions/manage"
+                className="focus-ring flex items-center gap-2 rounded-sm px-2.5 py-2 text-body-sm text-foreground outline-none transition-colors hover:bg-muted"
+              >
+                <LayoutDashboard className="size-4" />
+                Manage exhibitions
+              </Link>
+            </DropdownMenu.Item>
+          ) : null}
           {currentUser.role === "artist" ? (
             <DropdownMenu.Item asChild>
               <Link

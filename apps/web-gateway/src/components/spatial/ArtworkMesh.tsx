@@ -7,12 +7,14 @@ import type { ThreeEvent } from "@react-three/fiber";
 interface ArtworkMeshProps {
   position: [number, number, number];
   rotationY?: number;
+  rotation?: [number, number, number];
   widthMeters: number;
   heightMeters: number;
   color?: string;
   frameColor?: string;
   imageUrl?: string;
   sold?: boolean;
+  selected?: boolean;
   /** When provided, the artwork is hoverable/clickable and shows a highlight. */
   onSelect?: () => void;
 }
@@ -66,16 +68,19 @@ function TexturedPanel({
 export function ArtworkMesh({
   position,
   rotationY = 0,
+  rotation,
   widthMeters,
   heightMeters,
   color = "#8a8578",
   frameColor = "#2a2622",
   imageUrl,
   sold = false,
+  selected = false,
   onSelect,
 }: ArtworkMeshProps) {
   const [hovered, setHovered] = useState(false);
   const interactive = Boolean(onSelect);
+  const highlighted = hovered || selected;
 
   const handlePointerOver = (event: ThreeEvent<PointerEvent>) => {
     event.stopPropagation();
@@ -95,7 +100,7 @@ export function ArtworkMesh({
   return (
     <group
       position={position}
-      rotation={[0, rotationY, 0]}
+      rotation={rotation ?? [0, rotationY, 0]}
       onPointerOver={interactive ? handlePointerOver : undefined}
       onPointerOut={interactive ? handlePointerOut : undefined}
       onClick={interactive ? handleClick : undefined}
@@ -103,9 +108,9 @@ export function ArtworkMesh({
       <mesh castShadow receiveShadow>
         <boxGeometry args={[widthMeters + FRAME_BORDER, heightMeters + FRAME_BORDER, FRAME_DEPTH]} />
         <meshStandardMaterial
-          color={hovered ? HOVER_COLOR : frameColor}
-          emissive={hovered ? HOVER_COLOR : "#000000"}
-          emissiveIntensity={hovered ? 0.4 : 0}
+          color={highlighted ? HOVER_COLOR : frameColor}
+          emissive={highlighted ? HOVER_COLOR : "#000000"}
+          emissiveIntensity={highlighted ? 0.4 : 0}
         />
       </mesh>
       {imageUrl ? (

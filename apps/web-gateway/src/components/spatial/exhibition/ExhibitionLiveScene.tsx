@@ -17,6 +17,7 @@ export interface PlacedArtwork {
 }
 
 interface ExhibitionLiveSceneProps {
+  roomTemplateId?: string;
   placedArtworks: PlacedArtwork[];
   onLockChange?: (locked: boolean) => void;
   onArtworkSelect?: (artwork: Artwork) => void;
@@ -30,6 +31,7 @@ interface ExhibitionLiveSceneProps {
  * (the /exhibitions/demo spike, which uses a fixed 3-slot layout).
  */
 export function ExhibitionLiveScene({
+  roomTemplateId = "white-cube",
   placedArtworks,
   onLockChange,
   onArtworkSelect,
@@ -44,7 +46,7 @@ export function ExhibitionLiveScene({
 
   return (
     <>
-      <Lighting />
+      <Lighting templateId={roomTemplateId} />
       <PointerLockControls
         onLock={() => handleLockChange(true)}
         onUnlock={() => handleLockChange(false)}
@@ -52,7 +54,7 @@ export function ExhibitionLiveScene({
 
       <Player paused={paused} />
 
-      <RoomEnvironment />
+      <RoomEnvironment templateId={roomTemplateId} />
 
       {placedArtworks.map(({ placement, artwork }) => (
         <ArtworkMesh

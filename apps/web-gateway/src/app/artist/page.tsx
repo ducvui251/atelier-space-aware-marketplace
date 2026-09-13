@@ -109,6 +109,9 @@ function ArtistDashboard() {
         </div>
         <div className="flex gap-3">
           <Button asChild variant="outline">
+            <Link href="/exhibitions/manage">Exhibitions</Link>
+          </Button>
+          <Button asChild variant="outline">
             <Link href="/artist/analytics">Analytics</Link>
           </Button>
           <Button asChild variant="outline">

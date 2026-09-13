@@ -15,6 +15,12 @@ export async function listArtworks(): Promise<Artwork[]> {
   return result.items;
 }
 
+/** All persisted statuses; call only from the authenticated admin builder route. */
+export async function listAllArtworksForAdmin(): Promise<Artwork[]> {
+  const result = await requestService<ListResponse<Artwork>>("artist-artwork", "/v1/artist-artwork/artworks?status=all");
+  return result.items;
+}
+
 /**
  * The public catalog's actual read path (§3.2/§4.1 of the defect audit):
  * Catalog & Discovery's read model, which is verified-only and kept fresh
