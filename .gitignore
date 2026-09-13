@@ -49,6 +49,12 @@ PROJECT_PROMPT.md
 # local agent/tool artifacts
 /.token-optimizer/
 
+# resume/dedupe state for scripts/pull-*-artworks.mjs — local to whatever
+# dev database each was run against, not meant to be shared via git
+/.met-imported-ids.json
+/.aic-imported-ids.json
+/.cma-imported-ids.json
+
 # local reference and presentation documents
 *.pdf
 *.docx
