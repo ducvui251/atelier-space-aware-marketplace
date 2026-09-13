@@ -3,6 +3,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { ExhibitionDemoSceneLoader } from "@/components/spatial/ExhibitionDemoSceneLoader";
 import { listArtworks } from "@/lib/gateway/clients/artwork.client";
 import type { Artwork } from "@/types";
+import { isDisplayableImageUrl } from "@/lib/image-hosts";
 
 export const dynamic = "force-dynamic";
 
@@ -11,20 +12,8 @@ export const metadata: Metadata = {
   description: "Walkable gallery MVP for the 3D exhibition renderer.",
 };
 
-const DISPLAYABLE_HOSTS = ["images.unsplash.com", "openaccess-cdn.clevelandart.org"];
-
-function isDisplayableImage(url: string): boolean {
-  if (url.startsWith("/img/")) return true;
-  try {
-    const { hostname } = new URL(url);
-    return DISPLAYABLE_HOSTS.includes(hostname) || hostname.endsWith(".supabase.co");
-  } catch {
-    return false;
-  }
-}
-
 function pickExhibitionArtworks(artworks: Artwork[]): Artwork[] {
-  const displayable = artworks.filter((artwork) => isDisplayableImage(artwork.imageUrl));
+  const displayable = artworks.filter((artwork) => isDisplayableImageUrl(artwork.imageUrl));
   const available = displayable.filter((artwork) => artwork.availability === "available");
   const unavailable = displayable.filter((artwork) => artwork.availability !== "available");
   const picked = [...available.slice(0, 2), ...unavailable.slice(0, 1)];
