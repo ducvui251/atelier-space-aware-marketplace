@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { SearchX, WifiOff } from "lucide-react";
+import { ChevronLeft, ChevronRight, SearchX, WifiOff } from "lucide-react";
 import type { Artwork, ArtworkOrientation } from "@/types";
 import { SearchInput } from "@/components/discovery/SearchInput";
 import { ArtworkGrid, ArtworkGridSkeleton } from "@/components/artwork/ArtworkGrid";
@@ -29,6 +29,22 @@ const AVAILABILITY_OPTIONS: { value: string; label: string }[] = [
   { value: "reserved", label: "Reserved" },
   { value: "sold", label: "Sold" },
 ];
+
+const ELLIPSIS = "…" as const;
+type PageToken = number | typeof ELLIPSIS;
+
+/** First page, last page, current ± 1 sibling, "…" for any gap in between. */
+function getPageWindow(current: number, total: number): PageToken[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const tokens: PageToken[] = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  if (start > 2) tokens.push(ELLIPSIS);
+  for (let page = start; page <= end; page++) tokens.push(page);
+  if (end < total - 1) tokens.push(ELLIPSIS);
+  tokens.push(total);
+  return tokens;
+}
 
 function deriveOptions(artworks: Artwork[], pick: (artwork: Artwork) => string[]): { value: string; label: string }[] {
   const seen = new Set<string>();
@@ -191,15 +207,50 @@ export function FilterableArtworks({ results, allArtworks, query, unavailable, t
       </div>
 
       {totalPages > 1 ? (
-        <nav aria-label="Artwork catalog pages" className="flex items-center justify-center gap-5">
-          <Button variant="outline" size="sm" disabled={currentPage <= 1 || isPending} onClick={() => goToPage(currentPage - 1)}>
-            Previous
+        <nav aria-label="Artwork catalog pages" className="flex items-center justify-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            className="size-10 rounded-full"
+            aria-label="Previous page"
+            disabled={currentPage <= 1 || isPending}
+            onClick={() => goToPage(currentPage - 1)}
+          >
+            <ChevronLeft />
           </Button>
-          <span className="text-body-sm text-muted-foreground">
-            Page {currentPage} of {totalPages}
-          </span>
-          <Button variant="outline" size="sm" disabled={currentPage >= totalPages || isPending} onClick={() => goToPage(currentPage + 1)}>
-            Next
+          {getPageWindow(currentPage, totalPages).map((token, index) =>
+            token === ELLIPSIS ? (
+              <span key={`ellipsis-${index}`} className="px-1 text-body-sm text-muted-foreground">
+                {ELLIPSIS}
+              </span>
+            ) : (
+              <button
+                key={token}
+                type="button"
+                aria-label={`Page ${token}`}
+                aria-current={token === currentPage ? "page" : undefined}
+                disabled={isPending}
+                onClick={() => goToPage(token)}
+                className={cn(
+                  "focus-ring flex size-10 shrink-0 items-center justify-center rounded-full text-body-sm font-medium transition-colors duration-normal disabled:pointer-events-none disabled:opacity-50",
+                  token === currentPage
+                    ? "border border-foreground text-foreground"
+                    : "text-muted-foreground hover:bg-muted",
+                )}
+              >
+                {token}
+              </button>
+            ),
+          )}
+          <Button
+            variant="outline"
+            size="icon"
+            className="size-10 rounded-full"
+            aria-label="Next page"
+            disabled={currentPage >= totalPages || isPending}
+            onClick={() => goToPage(currentPage + 1)}
+          >
+            <ChevronRight />
           </Button>
         </nav>
       ) : null}
