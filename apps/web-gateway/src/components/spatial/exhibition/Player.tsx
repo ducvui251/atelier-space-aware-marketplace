@@ -28,6 +28,11 @@ const KEY_MAP: Record<string, MoveDirection> = {
 
 const pressedKeys = new Set<MoveDirection>();
 
+interface PlayerProps {
+  /** Freezes WASD movement (e.g. while an artwork detail panel is open). */
+  paused?: boolean;
+}
+
 /**
  * WASD + mouse-look player. Collision uses the simple room-bounding-box
  * backup from the exhibition plan (clamping X/Z to the room interior) rather
@@ -35,7 +40,7 @@ const pressedKeys = new Set<MoveDirection>();
  * with no interior obstacles yet. Look direction comes from the R3F default
  * camera, which PointerLockControls rotates elsewhere in the scene.
  */
-export function Player() {
+export function Player({ paused = false }: PlayerProps) {
   const { camera } = useThree();
   const position = useRef(new THREE.Vector3(...SPAWN_POSITION));
 
@@ -66,6 +71,8 @@ export function Player() {
   const moveDir = useMemo(() => new THREE.Vector3(), []);
 
   useFrame((_, delta) => {
+    if (paused) return;
+
     camera.getWorldDirection(forward);
     forward.y = 0;
     forward.normalize();

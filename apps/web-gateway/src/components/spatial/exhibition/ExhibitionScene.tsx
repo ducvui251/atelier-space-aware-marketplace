@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { Artwork } from "@atelier/contracts";
 import { PointerLockControls } from "@react-three/drei";
 import { Lighting } from "../Lighting";
@@ -26,23 +27,41 @@ const PLACEHOLDER_ARTWORKS = [
 interface ExhibitionSceneProps {
   onLockChange?: (locked: boolean) => void;
   artworks?: Artwork[];
+  onArtworkSelect?: (artwork: Artwork) => void;
+  /** Freezes WASD movement, e.g. while an artwork detail panel is open. */
+  paused?: boolean;
 }
 
 /**
- * Phase 3: the Phase 1/2 gallery with real artwork data (image, real
- * dimensions, sold state) in place of solid-color placeholders, falling
- * back to a placeholder per slot when there isn't enough live data.
+ * Phase 4: the Phase 1-3 gallery gains artwork interaction — hovering an
+ * artwork highlights its frame, clicking it selects it (see
+ * ArtworkDetailSheet in the parent, rendered outside the Canvas). Clicking
+ * is gated on the pointer already being locked so the very first click
+ * (which both requests pointer lock and would otherwise land on whatever's
+ * under the crosshair) can't accidentally open a panel.
  */
-export function ExhibitionScene({ onLockChange, artworks = [] }: ExhibitionSceneProps) {
+export function ExhibitionScene({
+  onLockChange,
+  artworks = [],
+  onArtworkSelect,
+  paused = false,
+}: ExhibitionSceneProps) {
+  const [isLocked, setIsLocked] = useState(false);
+
+  const handleLockChange = (locked: boolean) => {
+    setIsLocked(locked);
+    onLockChange?.(locked);
+  };
+
   return (
     <>
       <Lighting />
       <PointerLockControls
-        onLock={() => onLockChange?.(true)}
-        onUnlock={() => onLockChange?.(false)}
+        onLock={() => handleLockChange(true)}
+        onUnlock={() => handleLockChange(false)}
       />
 
-      <Player />
+      <Player paused={paused} />
 
       <RoomEnvironment />
 
@@ -58,6 +77,13 @@ export function ExhibitionScene({ onLockChange, artworks = [] }: ExhibitionScene
             heightMeters={artwork.heightCm * METERS_PER_CM}
             imageUrl={artwork.imageUrl}
             sold={artwork.availability !== "available"}
+            onSelect={
+              onArtworkSelect
+                ? () => {
+                    if (isLocked && !paused) onArtworkSelect(artwork);
+                  }
+                : undefined
+            }
           />
         ) : (
           <ArtworkMesh

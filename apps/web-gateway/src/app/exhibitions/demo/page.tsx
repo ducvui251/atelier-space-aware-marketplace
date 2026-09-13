@@ -46,8 +46,9 @@ export default async function ExhibitionDemoPage() {
         <p className="eyebrow">Walkable gallery MVP</p>
         <h1 className="mt-2 font-display text-h1 text-foreground">3D Exhibition Renderer</h1>
         <p className="mt-3 max-w-2xl text-body text-muted-foreground">
-          Internal-only preview of a procedural gallery room, now with real artwork images and
-          dimensions. Click the scene to look around and use WASD to walk.
+          Internal-only preview of a procedural gallery room with real artwork images and
+          dimensions. Click the scene to look around, use WASD to walk, and click a highlighted
+          artwork to see its details.
         </p>
       </div>
       <div className="mt-6">
