@@ -51,6 +51,57 @@ export interface BuyerRoom {
 export interface Placement {
   id: string; roomId: string; artworkId: string; scale: number; positionX: number; positionY: number; rotation: number; createdAt: string;
 }
+
+/**
+ * 3D exhibition domain (distinct from the 2D room-preview Placement above,
+ * which keeps its existing semantics untouched — see 3D Exhibition
+ * Implementation Plan §11). An artwork is referenced by id, not copied, so
+ * the same artwork can appear in multiple exhibitions.
+ */
+export type ExhibitionCreatorType = "artist" | "admin";
+export type ExhibitionStatus = "draft" | "published" | "archived";
+
+export interface ExhibitionRoomTemplate {
+  id: string;
+  name: string;
+  type: "procedural" | "model";
+  modelUrl?: string;
+  spawnPosition: [number, number, number];
+  environmentUrl?: string;
+}
+
+export interface Exhibition {
+  id: string;
+  title: string;
+  slug: string;
+  description?: string;
+  creatorType: ExhibitionCreatorType;
+  creatorId: string;
+  roomTemplateId: string;
+  status: ExhibitionStatus;
+  featured: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExhibitionPlacement {
+  id: string;
+  exhibitionId: string;
+  artworkId: string;
+  positionX: number;
+  positionY: number;
+  positionZ: number;
+  rotationX: number;
+  rotationY: number;
+  rotationZ: number;
+  scale: number;
+  wallId?: string;
+  frameStyle?: string;
+  order?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type DiscoveryView = "catalog" | "room";
 export type UserRole = "buyer" | "artist" | "admin";
 
