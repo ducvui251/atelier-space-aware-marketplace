@@ -1,16 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import type { Artwork } from "@atelier/contracts";
 import { SpatialCanvas } from "./SpatialCanvas";
 import { ExhibitionScene } from "./exhibition/ExhibitionScene";
 
-export function ExhibitionDemoScene() {
+interface ExhibitionDemoSceneProps {
+  artworks?: Artwork[];
+}
+
+export function ExhibitionDemoScene({ artworks = [] }: ExhibitionDemoSceneProps) {
   const [locked, setLocked] = useState(false);
 
   return (
     <div className="relative h-[70vh] w-full overflow-hidden rounded-lg border border-border">
       <SpatialCanvas cameraPosition={[0, 1.6, 2.5]}>
-        <ExhibitionScene onLockChange={setLocked} />
+        <ExhibitionScene onLockChange={setLocked} artworks={artworks} />
       </SpatialCanvas>
       {!locked ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-background/40">
