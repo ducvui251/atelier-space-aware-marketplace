@@ -6,7 +6,10 @@ export interface ArtworkFilterQuery {
   edition?: string;
   availability?: string;
   price?: string;
+  page?: string;
 }
+
+export const ARTWORKS_PAGE_SIZE = 18;
 
 export const PRICE_BUCKETS: { value: string; label: string; minPrice?: number; maxPrice?: number }[] = [
   { value: "under-700", label: "Under $700", maxPrice: 700 },

@@ -47,6 +47,12 @@ export const ArtworkSearchQuerySchema = z.object({
   availability: z.string().trim().optional(),
   minPrice: z.coerce.number().finite().nonnegative().optional(),
   maxPrice: z.coerce.number().finite().nonnegative().optional(),
+  // Both left optional (no default): a caller that omits them gets the full
+  // matched list, same as before pagination existed — e.g. the /artworks
+  // page's unfiltered fetch that backs its filter dropdown option lists
+  // needs every artwork, not one page of them.
+  page: z.coerce.number().int().min(1).max(10_000).optional(),
+  limit: z.coerce.number().int().min(1).max(60).optional(),
 });
 
 export const PublicDomainArtworkPageQuerySchema = z.object({
