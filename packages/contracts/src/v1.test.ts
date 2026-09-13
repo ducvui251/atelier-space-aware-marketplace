@@ -26,6 +26,8 @@ import {
   ConfirmReceivedRequestSchema,
   CreateBuyerRoomRequestSchema,
   CreateComplaintRequestSchema,
+  CreateExhibitionPlacementRequestSchema,
+  CreateExhibitionRequestSchema,
   CreatePlacementRequestSchema,
   CreateReservationRequestSchema,
   CollectionSchema,
@@ -37,6 +39,8 @@ import {
   StripeWebhookRelaySchema,
   ToggleFollowRequestSchema,
   ToggleSavedRequestSchema,
+  UpdateExhibitionPlacementRequestSchema,
+  UpdateExhibitionRequestSchema,
   parseBody,
 } from "./v1.ts";
 
@@ -499,6 +503,62 @@ describe("CreateBuyerRoomRequestSchema / CreatePlacementRequestSchema", () => {
 
   it("allows omitting placement transform fields", () => {
     expect(CreatePlacementRequestSchema.safeParse({ buyerId: uuid1, artworkId: uuid2 }).success).toBe(true);
+  });
+});
+
+describe("CreateExhibitionRequestSchema / UpdateExhibitionRequestSchema", () => {
+  const validCreate = {
+    creatorType: "artist" as const,
+    creatorId: uuid1,
+    title: "Echoes of Summer",
+    slug: "echoes-of-summer",
+    roomTemplateId: "white-cube",
+  };
+
+  it("accepts a valid exhibition creation request", () => {
+    expect(CreateExhibitionRequestSchema.safeParse(validCreate).success).toBe(true);
+  });
+
+  it("rejects a slug with uppercase letters, spaces, or underscores", () => {
+    expect(CreateExhibitionRequestSchema.safeParse({ ...validCreate, slug: "Echoes Of Summer" }).success).toBe(false);
+    expect(CreateExhibitionRequestSchema.safeParse({ ...validCreate, slug: "echoes_of_summer" }).success).toBe(false);
+  });
+
+  it("rejects an empty title", () => {
+    expect(CreateExhibitionRequestSchema.safeParse({ ...validCreate, title: "" }).success).toBe(false);
+  });
+
+  it("only accepts artist/admin as creatorType", () => {
+    expect(CreateExhibitionRequestSchema.safeParse({ ...validCreate, creatorType: "buyer" }).success).toBe(false);
+  });
+
+  it("allows a partial update carrying the requester's identity", () => {
+    expect(UpdateExhibitionRequestSchema.safeParse({ requesterId: uuid1, requesterRole: "artist", status: "published" }).success).toBe(true);
+    expect(UpdateExhibitionRequestSchema.safeParse({ requesterId: uuid1, requesterRole: "admin" }).success).toBe(true);
+  });
+
+  it("rejects an update missing the requester's identity", () => {
+    expect(UpdateExhibitionRequestSchema.safeParse({ status: "published" }).success).toBe(false);
+  });
+});
+
+describe("CreateExhibitionPlacementRequestSchema / UpdateExhibitionPlacementRequestSchema", () => {
+  it("allows omitting transform fields beyond the required identity and artwork", () => {
+    expect(
+      CreateExhibitionPlacementRequestSchema.safeParse({ requesterId: uuid1, requesterRole: "artist", artworkId: uuid2 }).success,
+    ).toBe(true);
+  });
+
+  it("requires artworkId to be a uuid", () => {
+    expect(
+      CreateExhibitionPlacementRequestSchema.safeParse({ requesterId: uuid1, requesterRole: "artist", artworkId: "not-a-uuid" }).success,
+    ).toBe(false);
+  });
+
+  it("allows a transform-only update carrying the requester's identity", () => {
+    expect(
+      UpdateExhibitionPlacementRequestSchema.safeParse({ requesterId: uuid1, requesterRole: "admin", positionX: 1.5, rotationY: 90 }).success,
+    ).toBe(true);
   });
 });
 

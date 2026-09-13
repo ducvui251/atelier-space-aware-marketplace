@@ -338,6 +338,75 @@ export const CreatePlacementRequestSchema = z.object({
   rotation: z.coerce.number().optional(),
 });
 
+// --- Room Preview: 3D Exhibitions --------------------------------------------------
+// Distinct from the 2D Placement schema above (see 3D Exhibition
+// Implementation Plan §11). Ownership travels in the request the same way
+// buyerId does for CreatePlacementRequest: the Gateway establishes identity
+// and role, requesterId/requesterRole let room-preview-service enforce it
+// server-side (exhibition-repository.ts) rather than trusting the caller.
+// Status starts at "draft" on create; only the update route can change it.
+
+const exhibitionCreatorTypeSchema = z.enum(["artist", "admin"]);
+const exhibitionStatusSchema = z.enum(["draft", "published", "archived"]);
+const exhibitionSlugSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(120)
+  .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "slug must be lowercase letters, numbers, and hyphens");
+
+export const CreateExhibitionRequestSchema = z.object({
+  creatorType: exhibitionCreatorTypeSchema,
+  creatorId: z.string().uuid(),
+  title: z.string().trim().min(1),
+  slug: exhibitionSlugSchema,
+  description: z.string().trim().optional(),
+  roomTemplateId: z.string().trim().min(1),
+  featured: z.boolean().optional(),
+});
+
+export const UpdateExhibitionRequestSchema = z.object({
+  requesterId: z.string().uuid(),
+  requesterRole: exhibitionCreatorTypeSchema,
+  title: z.string().trim().min(1).optional(),
+  slug: exhibitionSlugSchema.optional(),
+  description: z.string().trim().optional(),
+  roomTemplateId: z.string().trim().min(1).optional(),
+  status: exhibitionStatusSchema.optional(),
+  featured: z.boolean().optional(),
+});
+
+export const CreateExhibitionPlacementRequestSchema = z.object({
+  requesterId: z.string().uuid(),
+  requesterRole: exhibitionCreatorTypeSchema,
+  artworkId: z.string().uuid(),
+  positionX: z.coerce.number().optional(),
+  positionY: z.coerce.number().optional(),
+  positionZ: z.coerce.number().optional(),
+  rotationX: z.coerce.number().optional(),
+  rotationY: z.coerce.number().optional(),
+  rotationZ: z.coerce.number().optional(),
+  scale: z.coerce.number().positive().optional(),
+  wallId: z.string().trim().optional(),
+  frameStyle: z.string().trim().optional(),
+  order: z.coerce.number().int().optional(),
+});
+
+export const UpdateExhibitionPlacementRequestSchema = z.object({
+  requesterId: z.string().uuid(),
+  requesterRole: exhibitionCreatorTypeSchema,
+  positionX: z.coerce.number().optional(),
+  positionY: z.coerce.number().optional(),
+  positionZ: z.coerce.number().optional(),
+  rotationX: z.coerce.number().optional(),
+  rotationY: z.coerce.number().optional(),
+  rotationZ: z.coerce.number().optional(),
+  scale: z.coerce.number().positive().optional(),
+  wallId: z.string().trim().optional(),
+  frameStyle: z.string().trim().optional(),
+  order: z.coerce.number().int().optional(),
+});
+
 // --- Admin -----------------------------------------------------------------------
 
 export const CreateComplaintRequestSchema = z.object({
@@ -412,5 +481,9 @@ export type ArtworkVerificationReviewRequest = z.infer<typeof ArtworkVerificatio
 export type ArtistVerificationReviewRequest = z.infer<typeof ArtistVerificationReviewRequestSchema>;
 export type CreateBuyerRoomRequest = z.infer<typeof CreateBuyerRoomRequestSchema>;
 export type CreatePlacementRequest = z.infer<typeof CreatePlacementRequestSchema>;
+export type CreateExhibitionRequest = z.infer<typeof CreateExhibitionRequestSchema>;
+export type UpdateExhibitionRequest = z.infer<typeof UpdateExhibitionRequestSchema>;
+export type CreateExhibitionPlacementRequest = z.infer<typeof CreateExhibitionPlacementRequestSchema>;
+export type UpdateExhibitionPlacementRequest = z.infer<typeof UpdateExhibitionPlacementRequestSchema>;
 export type CreateComplaintRequest = z.infer<typeof CreateComplaintRequestSchema>;
 export type ResolveComplaintRequest = z.infer<typeof ResolveComplaintRequestSchema>;
