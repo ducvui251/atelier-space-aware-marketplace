@@ -6,6 +6,12 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["dev"],
       "port": 3000
+    },
+    {
+      "name": "web-gateway-local",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@atelier/web-gateway", "exec", "next", "dev", "--port", "3010"],
+      "port": 3010
     }
   ]
 }
