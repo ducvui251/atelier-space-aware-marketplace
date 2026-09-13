@@ -9,7 +9,10 @@ import { ArtworkCard } from "@/components/artwork/ArtworkCard";
 import { ArtworkImage } from "@/components/artwork/ArtworkImage";
 import { Badge } from "@/components/ui/badge";
 import { FollowButton } from "@/components/artist/FollowButton";
-import { findArtist, listArtworks } from "@/lib/gateway/clients/artwork.client";
+import { ExhibitionCard } from "@/components/exhibitions/ExhibitionCard";
+import { findArtist, findArtwork, listArtworks } from "@/lib/gateway/clients/artwork.client";
+import { listPublishedExhibitionsByCreator } from "@/lib/gateway/clients/exhibition.client";
+import { displayableImageUrl } from "@/lib/image-hosts";
 
 interface ArtistProfileProps {
   params: Promise<{ id: string }>;
@@ -28,12 +31,6 @@ export async function generateMetadata({
   };
 }
 
-const exhibitions = [
-  "Group show — Light & Matter, Copenhagen, 2024",
-  "Solo — The Quiet Wall, Paris, 2023",
-  "Fair — Contemporary Art Week, London, 2022",
-];
-
 export default async function ArtistProfilePage({
   params,
 }: ArtistProfileProps) {
@@ -41,7 +38,20 @@ export default async function ArtistProfilePage({
   const artist = await findArtist(id);
   if (!artist) notFound();
 
-  const works = (await listArtworks()).filter((a) => a.artistId === artist.id);
+  const [allArtworks, exhibitions] = await Promise.all([
+    listArtworks(),
+    // Exhibitions are a secondary section — a room-preview outage must not
+    // take down the whole artist profile.
+    listPublishedExhibitionsByCreator(artist.id).catch(() => []),
+  ]);
+  const works = allArtworks.filter((a) => a.artistId === artist.id);
+  const previewImageUrls = await Promise.all(
+    exhibitions.map(async (exhibition) =>
+      exhibition.previewArtworkId
+        ? displayableImageUrl((await findArtwork(exhibition.previewArtworkId).catch(() => null))?.imageUrl)
+        : "",
+    ),
+  );
 
   return (
     <>
@@ -92,21 +102,30 @@ export default async function ArtistProfilePage({
               </p>
             </div>
 
-            <div className="mt-8">
-              <h2 className="font-display text-h2 text-foreground">
-                Selected exhibitions
-              </h2>
-              <ul className="mt-4 space-y-3 border-l border-border pl-5">
-                {exhibitions.map((exhibition) => (
-                  <li key={exhibition} className="text-body-sm text-muted-foreground">
-                    {exhibition}
-                  </li>
-                ))}
-              </ul>
-            </div>
           </div>
         </div>
       </PageContainer>
+
+      {exhibitions.length > 0 ? (
+        <Section spacing="generous" className="border-t border-border">
+          <PageContainer>
+            <SectionHeader
+              eyebrow="Exhibitions"
+              title={`Exhibitions by ${artist.displayName}`}
+              description="Walk through the artist's curated 3D shows."
+            />
+            <Grid columns={3} className="mt-10">
+              {exhibitions.map((exhibition, index) => (
+                <ExhibitionCard
+                  key={exhibition.id}
+                  exhibition={exhibition}
+                  previewImageUrl={previewImageUrls[index]}
+                />
+              ))}
+            </Grid>
+          </PageContainer>
+        </Section>
+      ) : null}
 
       {works.length > 0 ? (
         <Section spacing="generous">

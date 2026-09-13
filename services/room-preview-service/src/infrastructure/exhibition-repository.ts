@@ -17,6 +17,8 @@ type ExhibitionRow = {
   room_template_id: string;
   status: string;
   featured: boolean;
+  artwork_count: number;
+  preview_artwork_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -39,7 +41,12 @@ type PlacementRow = {
   updated_at: string;
 };
 
-const EXHIBITION_COLUMNS = `id::text, title, slug, description, creator_type, creator_id::text, room_template_id, status, featured, created_at::text, updated_at::text`;
+// Every exhibition query aliases the table as `e` so these two correlated
+// subqueries (read-model enrichment, not stored columns) resolve the same
+// way in SELECT, INSERT ... RETURNING, and UPDATE ... RETURNING.
+const EXHIBITION_COLUMNS = `e.id::text, e.title, e.slug, e.description, e.creator_type, e.creator_id::text, e.room_template_id, e.status, e.featured, e.created_at::text, e.updated_at::text,
+  (select count(*) from room_preview.exhibition_placements p where p.exhibition_id = e.id)::int as artwork_count,
+  (select p.artwork_id::text from room_preview.exhibition_placements p where p.exhibition_id = e.id order by p.placement_order nulls last, p.created_at limit 1) as preview_artwork_id`;
 const PLACEMENT_COLUMNS = `id::text, exhibition_id::text, artwork_id::text, position_x::text, position_y::text, position_z::text, rotation_x::text, rotation_y::text, rotation_z::text, scale::text, wall_id, frame_style, placement_order, created_at::text, updated_at::text`;
 
 function mapExhibition(row: ExhibitionRow): Exhibition {
@@ -53,6 +60,8 @@ function mapExhibition(row: ExhibitionRow): Exhibition {
     roomTemplateId: row.room_template_id,
     status: row.status as Exhibition["status"],
     featured: row.featured,
+    artworkCount: row.artwork_count,
+    ...(row.preview_artwork_id ? { previewArtworkId: row.preview_artwork_id } : {}),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -105,7 +114,7 @@ export async function listExhibitions(filter: { creatorId?: string; status?: str
   }
   const where = conditions.length ? `where ${conditions.join(" and ")}` : "";
   const rows = await query<ExhibitionRow>(
-    `select ${EXHIBITION_COLUMNS} from room_preview.exhibitions ${where} order by created_at desc`,
+    `select ${EXHIBITION_COLUMNS} from room_preview.exhibitions e ${where} order by e.created_at desc`,
     params,
   );
   return rows.map(mapExhibition);
@@ -113,7 +122,7 @@ export async function listExhibitions(filter: { creatorId?: string; status?: str
 
 export async function findExhibitionById(id: string): Promise<Exhibition | null> {
   const rows = await query<ExhibitionRow>(
-    `select ${EXHIBITION_COLUMNS} from room_preview.exhibitions where id::text = $1`,
+    `select ${EXHIBITION_COLUMNS} from room_preview.exhibitions e where e.id::text = $1`,
     [id],
   );
   return rows[0] ? mapExhibition(rows[0]) : null;
@@ -133,7 +142,7 @@ export async function createExhibition(input: {
   if (existing[0]) return null;
 
   const rows = await query<ExhibitionRow>(
-    `insert into room_preview.exhibitions (title, slug, description, creator_type, creator_id, room_template_id, featured)
+    `insert into room_preview.exhibitions as e (title, slug, description, creator_type, creator_id, room_template_id, featured)
      values ($1, $2, $3, $4, $5::uuid, $6, $7)
      returning ${EXHIBITION_COLUMNS}`,
     [input.title, input.slug, input.description ?? null, input.creatorType, input.creatorId, input.roomTemplateId, input.featured ?? false],
@@ -167,7 +176,7 @@ export async function updateExhibition(
 
   params.push(id);
   const rows = await query<ExhibitionRow>(
-    `update room_preview.exhibitions set ${setClauses.join(", ")} where id::text = $${params.length}
+    `update room_preview.exhibitions as e set ${setClauses.join(", ")} where e.id::text = $${params.length}
      returning ${EXHIBITION_COLUMNS}`,
     params,
   );

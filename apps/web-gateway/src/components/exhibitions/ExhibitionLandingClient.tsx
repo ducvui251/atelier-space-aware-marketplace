@@ -7,6 +7,7 @@ import { ArtworkImage } from "@/components/artwork/ArtworkImage";
 import { Button } from "@/components/ui/button";
 import { ExhibitionViewerLoader } from "@/components/spatial/ExhibitionViewerLoader";
 import type { PlacedArtwork } from "@/components/spatial/exhibition/ExhibitionLiveScene";
+import { displayableImageUrl } from "@/lib/image-hosts";
 
 interface ExhibitionLandingClientProps {
   exhibition: Exhibition;
@@ -16,7 +17,7 @@ interface ExhibitionLandingClientProps {
 
 export function ExhibitionLandingClient({ exhibition, creatorName, placedArtworks }: ExhibitionLandingClientProps) {
   const [entered, setEntered] = useState(false);
-  const previewImageUrl = placedArtworks[0]?.artwork.imageUrl ?? "";
+  const previewImageUrl = displayableImageUrl(placedArtworks[0]?.artwork.imageUrl);
 
   if (entered) {
     return (

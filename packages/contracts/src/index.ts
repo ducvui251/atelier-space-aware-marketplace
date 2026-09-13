@@ -80,6 +80,10 @@ export interface Exhibition {
   roomTemplateId: string;
   status: ExhibitionStatus;
   featured: boolean;
+  /** Read-model enrichment computed by room-preview-service, not stored. */
+  artworkCount: number;
+  /** First placement's artwork id (by order, then creation) for card/landing previews. */
+  previewArtworkId?: string;
   createdAt: string;
   updatedAt: string;
 }
