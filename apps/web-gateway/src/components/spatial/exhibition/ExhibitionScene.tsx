@@ -1,8 +1,10 @@
 "use client";
 
+import { PointerLockControls } from "@react-three/drei";
 import { Lighting } from "../Lighting";
 import { RoomEnvironment, ROOM_DEPTH, ROOM_HEIGHT, ROOM_WIDTH } from "../RoomEnvironment";
 import { ArtworkMesh } from "../ArtworkMesh";
+import { Player } from "./Player";
 
 const ARTWORK_HEIGHT_Y = ROOM_HEIGHT / 2;
 const WALL_INSET = 0.06;
@@ -13,16 +15,27 @@ const PLACEHOLDER_ARTWORKS = [
   { widthMeters: 1.4, heightMeters: 1.0, color: "#a08a72" },
 ];
 
+interface ExhibitionSceneProps {
+  onLockChange?: (locked: boolean) => void;
+}
+
 /**
- * Phase 1 static gallery MVP: a fully enclosed procedural room with three
- * placeholder artworks. No navigation, no real artwork data yet.
+ * Phase 2: the Phase 1 static gallery plus WASD + mouse-look navigation and
+ * wall collision. Still no real artwork data.
  */
-export function ExhibitionScene() {
+export function ExhibitionScene({ onLockChange }: ExhibitionSceneProps) {
   const [back, side1, side2] = PLACEHOLDER_ARTWORKS;
 
   return (
     <>
       <Lighting />
+      <PointerLockControls
+        onLock={() => onLockChange?.(true)}
+        onUnlock={() => onLockChange?.(false)}
+      />
+
+      <Player />
+
       <RoomEnvironment />
 
       <ArtworkMesh
