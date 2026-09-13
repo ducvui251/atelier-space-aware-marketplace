@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "openaccess-cdn.clevelandart.org", pathname: "/**" },
+      { protocol: "https", hostname: "images.metmuseum.org", pathname: "/**" },
       // Artwork images uploaded via POST /api/uploads/image (G-05) are
       // served from the project's Supabase Storage public URL, which is
       // always <project-ref>.supabase.co — wildcard the subdomain instead
