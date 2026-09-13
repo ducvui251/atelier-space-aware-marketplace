@@ -82,9 +82,12 @@ interface FilterableArtworksProps {
   allArtworks: Artwork[];
   query: ArtworkFilterQuery;
   unavailable?: boolean;
+  totalResults?: number;
+  currentPage?: number;
+  totalPages?: number;
 }
 
-export function FilterableArtworks({ results, allArtworks, query, unavailable }: FilterableArtworksProps) {
+export function FilterableArtworks({ results, allArtworks, query, unavailable, totalResults, currentPage = 1, totalPages = 1 }: FilterableArtworksProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -93,18 +96,29 @@ export function FilterableArtworks({ results, allArtworks, query, unavailable }:
   const styleOptions = React.useMemo(() => deriveOptions(allArtworks, (a) => a.style), [allArtworks]);
   const colorOptions = React.useMemo(() => deriveOptions(allArtworks, (a) => a.dominantColors), [allArtworks]);
 
-  function updateQuery(patch: Partial<ArtworkFilterQuery>) {
+  function updateQuery(patch: Partial<ArtworkFilterQuery>, options: { resetPage?: boolean } = {}) {
     const params = new URLSearchParams(searchParams.toString());
     for (const [key, value] of Object.entries(patch)) {
       if (value) params.set(key, value);
       else params.delete(key);
     }
+    // Any filter/search change narrows or widens the result set, so a page
+    // number carried over from before would point at the wrong (or a now
+    // out-of-range) slice — reset to page 1 whenever something other than
+    // the page itself changes.
+    if (options.resetPage ?? true) params.delete("page");
     startTransition(() => {
       router.push(`${pathname}?${params.toString()}`, { scroll: false });
     });
   }
 
-  const active = Object.values(query).some((v) => Boolean(v));
+  function goToPage(target: number) {
+    updateQuery({ page: target > 1 ? String(target) : undefined }, { resetPage: false });
+  }
+
+  // page is a position in the results, not a filter — being on page 2 alone
+  // shouldn't surface "Clear all" when no actual filter is set.
+  const active = Object.entries(query).some(([key, value]) => key !== "page" && Boolean(value));
 
   function clearAll() {
     startTransition(() => {
@@ -147,7 +161,8 @@ export function FilterableArtworks({ results, allArtworks, query, unavailable }:
 
       <div className="flex items-center justify-between border-t border-border pt-4 text-caption text-muted-foreground">
         <span>
-          {results.length} {results.length === 1 ? "work" : "works"}
+          {totalResults ?? results.length} {(totalResults ?? results.length) === 1 ? "work" : "works"}
+          {totalPages > 1 ? ` · page ${currentPage} of ${totalPages}` : ""}
         </span>
         {active ? (
           <Button variant="ghost" size="sm" onClick={clearAll} disabled={isPending}>
@@ -174,6 +189,20 @@ export function FilterableArtworks({ results, allArtworks, query, unavailable }:
           />
         )}
       </div>
+
+      {totalPages > 1 ? (
+        <nav aria-label="Artwork catalog pages" className="flex items-center justify-center gap-5">
+          <Button variant="outline" size="sm" disabled={currentPage <= 1 || isPending} onClick={() => goToPage(currentPage - 1)}>
+            Previous
+          </Button>
+          <span className="text-body-sm text-muted-foreground">
+            Page {currentPage} of {totalPages}
+          </span>
+          <Button variant="outline" size="sm" disabled={currentPage >= totalPages || isPending} onClick={() => goToPage(currentPage + 1)}>
+            Next
+          </Button>
+        </nav>
+      ) : null}
     </div>
   );
 }

@@ -2,6 +2,13 @@ import { PublicDomainArtworkPageResponseSchema, type Artist, type Artwork, type 
 import { requestService, ServiceClientError } from "../http-client";
 
 interface ListResponse<T> { items: T[]; total: number; }
+interface PagedListResponse<T> extends ListResponse<T> {
+  page?: number;
+  limit?: number;
+  totalPages?: number;
+  hasPreviousPage?: boolean;
+  hasNextPage?: boolean;
+}
 
 export async function listArtworks(): Promise<Artwork[]> {
   const result = await requestService<ListResponse<Artwork>>("artist-artwork", "/v1/artist-artwork/artworks");
@@ -16,13 +23,13 @@ export async function listArtworks(): Promise<Artwork[]> {
  * rails, room preview, artist profile) — narrowing every one of those
  * call sites onto Catalog & Discovery is a separate pass, not this one.
  */
-export async function searchCatalogArtworks(query: Partial<ArtworkSearchQuery> = {}): Promise<ListResponse<Artwork>> {
+export async function searchCatalogArtworks(query: Partial<ArtworkSearchQuery> = {}): Promise<PagedListResponse<Artwork>> {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
     if (value !== undefined && value !== "") params.set(key, String(value));
   }
   const qs = params.toString();
-  return requestService<ListResponse<Artwork>>("catalog-discovery", `/v1/catalog/artworks${qs ? `?${qs}` : ""}`);
+  return requestService<PagedListResponse<Artwork>>("catalog-discovery", `/v1/catalog/artworks${qs ? `?${qs}` : ""}`);
 }
 
 export async function listFeaturedArtworks(): Promise<Artwork[]> { return (await listArtworks()).slice(0, 6); }

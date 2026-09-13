@@ -70,8 +70,28 @@ const routes: Record<string, ServiceRouteHandler> = {
   "GET /v1/catalog/artworks": async ({ url, response, correlationId }) => {
     const parsed = parseBody(ArtworkSearchQuerySchema, Object.fromEntries(url.searchParams.entries()));
     if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
-    const items = searchArtworks(await listReadModel(), parsed.data);
-    return writeServiceJson(response, 200, { items, total: items.length }, correlationId);
+    const matched = searchArtworks(await listReadModel(), parsed.data);
+    const { page, limit } = parsed.data;
+    // page/limit are both optional with no default (see ArtworkSearchQuerySchema)
+    // specifically so a caller that omits them still gets the full matched
+    // list, unchanged from before pagination existed.
+    if (page === undefined && limit === undefined) {
+      return writeServiceJson(response, 200, { items: matched, total: matched.length }, correlationId);
+    }
+    const effectivePage = page ?? 1;
+    const effectiveLimit = limit ?? 18;
+    const total = matched.length;
+    const totalPages = Math.max(1, Math.ceil(total / effectiveLimit));
+    const start = (effectivePage - 1) * effectiveLimit;
+    return writeServiceJson(response, 200, {
+      items: matched.slice(start, start + effectiveLimit),
+      total,
+      page: effectivePage,
+      limit: effectiveLimit,
+      totalPages,
+      hasPreviousPage: effectivePage > 1,
+      hasNextPage: effectivePage < totalPages,
+    }, correlationId);
   },
   "GET /v1/catalog/reference-artworks": async ({ url, response, correlationId }) => {
     const parsed = parseBody(PublicDomainArtworkPageQuerySchema, Object.fromEntries(url.searchParams.entries()));

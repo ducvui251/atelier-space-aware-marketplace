@@ -4,7 +4,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { DualViewToggle } from "@/components/discovery/DualViewToggle";
 import { FilterableArtworks } from "@/components/discovery/FilterableArtworks";
 import { searchCatalogArtworks } from "@/lib/gateway/clients/artwork.client";
-import { priceBucketToRange, type ArtworkFilterQuery } from "@/lib/artwork-filters";
+import { ARTWORKS_PAGE_SIZE, priceBucketToRange, type ArtworkFilterQuery } from "@/lib/artwork-filters";
 
 export const dynamic = "force-dynamic";
 
@@ -33,18 +33,27 @@ function toQuery(searchParams: Record<string, string | string[] | undefined>): A
     edition: firstValue(searchParams.edition),
     availability: firstValue(searchParams.availability),
     price: firstValue(searchParams.price),
+    page: firstValue(searchParams.page),
   };
+}
+
+function toPageNumber(value: string | undefined): number {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
 }
 
 export default async function ArtworksPage({ searchParams }: ArtworksPageProps) {
   const params = await searchParams;
   const query = toQuery(params);
   const { minPrice, maxPrice } = priceBucketToRange(query.price);
+  const page = toPageNumber(query.page);
 
   let unavailable = false;
   const [allResult, filteredResult] = await Promise.allSettled([
     // Unfiltered fetch backs the dropdown option lists — filtering must
-    // not shrink the universe of choices out from under the user.
+    // not shrink the universe of choices out from under the user. Deliberately
+    // NOT paginated: it needs every distinct style/color across the whole
+    // catalog, not just the artworks on the current results page.
     searchCatalogArtworks(),
     searchCatalogArtworks({
       q: query.q,
@@ -55,11 +64,19 @@ export default async function ArtworksPage({ searchParams }: ArtworksPageProps) 
       availability: query.availability,
       minPrice,
       maxPrice,
+      page,
+      limit: ARTWORKS_PAGE_SIZE,
     }),
   ]);
 
   const allArtworks = allResult.status === "fulfilled" ? allResult.value.items : [];
-  const filtered = filteredResult.status === "fulfilled" ? filteredResult.value.items : [];
+  const filteredResponse = filteredResult.status === "fulfilled" ? filteredResult.value : undefined;
+  const filtered = filteredResponse?.items ?? [];
+  const totalPages = filteredResponse?.totalPages ?? 1;
+  // A stale page number (e.g. a filter change shrank the result set out
+  // from under a deep page) still returns 200 with an empty items array —
+  // clamp what's shown to the reader instead of silently rendering nothing.
+  const currentPage = Math.min(page, totalPages);
   if (allResult.status === "rejected" || filteredResult.status === "rejected") unavailable = true;
 
   return (
@@ -94,6 +111,9 @@ export default async function ArtworksPage({ searchParams }: ArtworksPageProps) 
           allArtworks={allArtworks}
           query={query}
           unavailable={unavailable}
+          totalResults={filteredResponse?.total ?? filtered.length}
+          currentPage={currentPage}
+          totalPages={totalPages}
         />
       </div>
     </PageContainer>
