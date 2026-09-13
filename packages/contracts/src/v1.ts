@@ -49,6 +49,44 @@ export const ArtworkSearchQuerySchema = z.object({
   maxPrice: z.coerce.number().finite().nonnegative().optional(),
 });
 
+export const PublicDomainArtworkPageQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).max(10_000).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(24),
+});
+
+const PublicDomainArtworkImageLocationSchema = z.union([
+  z.string().url(),
+  z.string().regex(/^\/[A-Za-z0-9/_~.-]+$/).refine((path) =>
+    !path.startsWith("//") && !path.split("/").includes(".."), "Image path must be a safe same-site asset path"),
+]);
+
+export const PublicDomainArtworkSchema = z.object({
+  id: z.number().int().positive(),
+  title: z.string().trim().min(1),
+  artistName: z.string().trim().min(1),
+  dateDisplay: z.string(),
+  mediumDisplay: z.string(),
+  dimensions: z.string(),
+  imageUrl: PublicDomainArtworkImageLocationSchema,
+  imageFullUrl: PublicDomainArtworkImageLocationSchema,
+  imageAltText: z.string().trim().min(1).max(2000),
+  sourceUrl: z.string().url(),
+});
+
+export const PublicDomainArtworkPageResponseSchema = z.object({
+  items: z.array(PublicDomainArtworkSchema),
+  page: z.number().int().positive(),
+  limit: z.number().int().positive(),
+  total: z.number().int().nonnegative(),
+  totalPages: z.number().int().nonnegative(),
+  hasPreviousPage: z.boolean(),
+  hasNextPage: z.boolean(),
+});
+
+export type PublicDomainArtworkPageQuery = z.infer<typeof PublicDomainArtworkPageQuerySchema>;
+export type PublicDomainArtwork = z.infer<typeof PublicDomainArtworkSchema>;
+export type PublicDomainArtworkPageResponse = z.infer<typeof PublicDomainArtworkPageResponseSchema>;
+
 // The Gateway boundary (what the browser submits) and the internal-service
 // boundary (what commerce-service requires) are different contracts: the
 // browser never supplies buyerId — it's derived from the caller's validated
@@ -205,6 +243,52 @@ export const ToggleFollowRequestSchema = z.object({
   buyerId: z.string().uuid(),
   artistId: z.string().uuid(),
 });
+
+// Recommendation owns privacy-preserving, once-per-artwork-per-viewer/day
+// detail-view aggregates. The Gateway sends only the SHA-256 viewer hash;
+// neither a Supabase user id nor the anonymous cookie value is persisted.
+export const ArtworkViewRequestSchema = z.object({
+  artworkId: z.string().uuid(),
+  viewedOn: z.string().date(),
+  viewerHash: z.string().regex(/^[a-f0-9]{64}$/),
+});
+
+export const RecordArtworkViewResponseSchema = z.object({
+  recorded: z.boolean(),
+});
+
+export const ArtworkViewCountSchema = z.object({
+  artworkId: z.string().uuid(),
+  views: z.number().int().nonnegative(),
+});
+
+export const ArtistArtworkViewsQuerySchema = z
+  .object({
+    artistId: z.string().uuid(),
+    from: z.string().date(),
+    to: z.string().date(),
+  })
+  .refine((query) => query.from <= query.to, {
+    message: "to must be on or after from",
+    path: ["to"],
+  });
+
+export const ArtistArtworkViewsResponseSchema = z
+  .object({
+    artistId: z.string().uuid(),
+    from: z.string().date(),
+    to: z.string().date(),
+    items: z.array(ArtworkViewCountSchema),
+    totalViews: z.number().int().nonnegative(),
+  })
+  .refine((response) => response.from <= response.to, {
+    message: "to must be on or after from",
+    path: ["to"],
+  })
+  .refine((response) => response.totalViews === response.items.reduce((total, item) => total + item.views, 0), {
+    message: "totalViews must equal the sum of per-artwork views",
+    path: ["totalViews"],
+  });
 
 // Audience metric (§4.7): how many days back "the previous period" means.
 export const ArtistAudienceQuerySchema = z.object({

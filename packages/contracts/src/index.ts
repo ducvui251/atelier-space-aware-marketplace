@@ -93,6 +93,8 @@ export interface ArtistAudience {
 }
 
 export interface ArtworkSaveCount { artworkId: string; saves: number; }
+export interface ArtworkViewCount { artworkId: string; views: number; }
+export interface ArtistArtworkViews { artistId: string; from: string; to: string; items: ArtworkViewCount[]; totalViews: number; }
 
 /**
  * Top-selling artwork (§4.7's Artwork performance metric). "Sold" is

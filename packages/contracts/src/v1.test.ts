@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   AccountSyncRequestSchema,
   AccountUpdateRequestSchema,
+  ArtistArtworkViewsQuerySchema,
+  ArtistArtworkViewsResponseSchema,
   ArtistAudienceQuerySchema,
   ArtistEarningsQuerySchema,
   ArtistTopArtworksQuerySchema,
@@ -11,6 +13,11 @@ import {
   ArtworkCreateRequestSchema,
   ArtworkSearchQuerySchema,
   ArtworkUpdateRequestSchema,
+  ArtworkViewRequestSchema,
+  RecordArtworkViewResponseSchema,
+  PublicDomainArtworkPageQuerySchema,
+  PublicDomainArtworkPageResponseSchema,
+  PublicDomainArtworkSchema,
   ArtworkVerificationReviewRequestSchema,
   CartAddRequestSchema,
   CheckoutClientRequestSchema,
@@ -35,6 +42,63 @@ import {
 
 const uuid1 = "00000000-0000-4000-8000-000000000001";
 const uuid2 = "00000000-0000-4000-8000-000000000002";
+
+describe("ArtworkViewRequestSchema", () => {
+  const validView = {
+    artworkId: uuid1,
+    viewedOn: "2026-09-12",
+    viewerHash: "a".repeat(64),
+  };
+
+  it("accepts a valid privacy-preserving view record", () => {
+    expect(ArtworkViewRequestSchema.safeParse(validView).success).toBe(true);
+  });
+
+  it("rejects malformed viewer hashes and artwork ids", () => {
+    expect(ArtworkViewRequestSchema.safeParse({ ...validView, viewerHash: "visitor-id" }).success).toBe(false);
+    expect(ArtworkViewRequestSchema.safeParse({ ...validView, artworkId: "not-a-uuid" }).success).toBe(false);
+  });
+});
+
+describe("ArtistArtworkViewsQuerySchema", () => {
+  it("requires a valid, ordered date range", () => {
+    expect(ArtistArtworkViewsQuerySchema.safeParse({ artistId: uuid1, from: "2026-09-01", to: "2026-09-12" }).success).toBe(true);
+    expect(ArtistArtworkViewsQuerySchema.safeParse({ artistId: uuid1, from: "2026-09-13", to: "2026-09-12" }).success).toBe(false);
+  });
+});
+
+describe("artwork view response contracts", () => {
+  it("validates the idempotent write result and aggregate response", () => {
+    expect(RecordArtworkViewResponseSchema.safeParse({ recorded: false }).success).toBe(true);
+    expect(ArtistArtworkViewsResponseSchema.safeParse({
+      artistId: uuid1,
+      from: "2026-09-01",
+      to: "2026-09-12",
+      items: [{ artworkId: uuid2, views: 4 }],
+      totalViews: 4,
+    }).success).toBe(true);
+  });
+
+  it("rejects negative view counts", () => {
+    expect(ArtistArtworkViewsResponseSchema.safeParse({
+      artistId: uuid1,
+      from: "2026-09-01",
+      to: "2026-09-12",
+      items: [{ artworkId: uuid2, views: -1 }],
+      totalViews: 0,
+    }).success).toBe(false);
+  });
+
+  it("rejects an aggregate total that does not match its artwork rows", () => {
+    expect(ArtistArtworkViewsResponseSchema.safeParse({
+      artistId: uuid1,
+      from: "2026-09-01",
+      to: "2026-09-12",
+      items: [{ artworkId: uuid2, views: 4 }],
+      totalViews: 5,
+    }).success).toBe(false);
+  });
+});
 
 describe("parseBody", () => {
   it("returns success with parsed data on valid input", () => {
@@ -120,6 +184,89 @@ describe("ArtworkSearchQuerySchema", () => {
 
   it("rejects a negative price", () => {
     expect(ArtworkSearchQuerySchema.safeParse({ minPrice: "-1" }).success).toBe(false);
+  });
+});
+
+describe("PublicDomainArtworkPageQuerySchema", () => {
+  it("defaults to the first page and a bounded page size", () => {
+    expect(PublicDomainArtworkPageQuerySchema.parse({})).toEqual({ page: 1, limit: 24 });
+    expect(PublicDomainArtworkPageQuerySchema.parse({ page: "3", limit: "12" })).toEqual({ page: 3, limit: 12 });
+  });
+
+  it("rejects invalid page and limit values", () => {
+    expect(PublicDomainArtworkPageQuerySchema.safeParse({ page: "0" }).success).toBe(false);
+    expect(PublicDomainArtworkPageQuerySchema.safeParse({ limit: "51" }).success).toBe(false);
+  });
+});
+
+describe("PublicDomainArtworkPageResponseSchema", () => {
+  it("validates a read-only museum reference page", () => {
+    expect(PublicDomainArtworkPageResponseSchema.safeParse({
+      items: [{
+        id: 42,
+        title: "Open artwork",
+        artistName: "Artist",
+        dateDisplay: "1900",
+        mediumDisplay: "Oil on canvas",
+        dimensions: "20 × 30 cm",
+        imageUrl: "https://openaccess-cdn.clevelandart.org/42/42_web.jpg",
+        imageFullUrl: "https://openaccess-cdn.clevelandart.org/42/42_print.jpg",
+        imageAltText: "Open artwork",
+        sourceUrl: "https://clevelandart.org/art/42",
+      }],
+      page: 1,
+      limit: 24,
+      total: 1,
+      totalPages: 1,
+      hasPreviousPage: false,
+      hasNextPage: false,
+    }).success).toBe(true);
+  });
+
+  it("requires a full image URL for the in-page artwork preview", () => {
+    expect(PublicDomainArtworkPageResponseSchema.safeParse({
+      items: [{
+        id: 42,
+        title: "Open artwork",
+        artistName: "Artist",
+        dateDisplay: "1900",
+        mediumDisplay: "Oil on canvas",
+        dimensions: "20 × 30 cm",
+        imageUrl: "https://openaccess-cdn.clevelandart.org/42/42_web.jpg",
+        imageAltText: "Artwork",
+        sourceUrl: "https://clevelandart.org/art/42",
+      }],
+      page: 1,
+      limit: 24,
+      total: 1,
+      totalPages: 1,
+      hasPreviousPage: false,
+      hasNextPage: false,
+    }).success).toBe(false);
+  });
+});
+
+describe("PublicDomainArtworkSchema image locations", () => {
+  const localArtwork = {
+    id: 42,
+    title: "Downloaded artwork",
+    artistName: "Artist",
+    dateDisplay: "1900",
+    mediumDisplay: "Oil on canvas",
+    dimensions: "20 × 30 cm",
+    imageUrl: "/img/cma-open-access/42_web.jpg",
+    imageFullUrl: "/img/cma-open-access/42_web.jpg",
+    imageAltText: "Downloaded artwork",
+    sourceUrl: "https://clevelandart.org/art/42",
+  };
+
+  it("accepts locally hosted public assets", () => {
+    expect(PublicDomainArtworkSchema.safeParse(localArtwork).success).toBe(true);
+  });
+
+  it("rejects protocol-relative and parent-directory image paths", () => {
+    expect(PublicDomainArtworkSchema.safeParse({ ...localArtwork, imageUrl: "//images.example/art.jpg" }).success).toBe(false);
+    expect(PublicDomainArtworkSchema.safeParse({ ...localArtwork, imageFullUrl: "/img/../secret.jpg" }).success).toBe(false);
   });
 });
 

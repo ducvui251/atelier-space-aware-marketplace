@@ -116,3 +116,37 @@ export async function getArtistArtworkSaves(artworkIds: string[]): Promise<{ art
   );
   return rows.map((row) => ({ artworkId: row.artwork_id, saves: Number(row.saves) }));
 }
+
+/**
+ * Record one view for an artwork, visitor and UTC day. The composite primary
+ * key is also the idempotency boundary for browser retries and React Strict
+ * Mode's development effect replay.
+ */
+export async function recordArtworkView(input: { artworkId: string; viewedOn: string; viewerHash: string }): Promise<boolean> {
+  const rows = await query<{ artwork_id: string }>(
+    `insert into recommendation.artwork_views (artwork_id, viewed_on, viewer_hash)
+     values ($1::uuid, $2::date, $3)
+     on conflict (artwork_id, viewed_on, viewer_hash) do nothing
+     returning artwork_id::text`,
+    [input.artworkId, input.viewedOn, input.viewerHash],
+  );
+  return rows.length > 0;
+}
+
+/** Aggregate views only for artwork ids resolved by Recommendation over the
+ * Artist & Artwork HTTP API; this service never reads another service's DB. */
+export async function getArtistArtworkViews(
+  artworkIds: string[],
+  from: string,
+  to: string,
+): Promise<{ artworkId: string; views: number }[]> {
+  if (artworkIds.length === 0) return [];
+  const rows = await query<{ artwork_id: string; views: string }>(
+    `select artwork_id::text, count(*)::text as views
+     from recommendation.artwork_views
+     where artwork_id = any($1::uuid[]) and viewed_on >= $2::date and viewed_on <= $3::date
+     group by artwork_id`,
+    [artworkIds, from, to],
+  );
+  return rows.map((row) => ({ artworkId: row.artwork_id, views: Number(row.views) }));
+}

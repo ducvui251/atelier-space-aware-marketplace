@@ -1,12 +1,21 @@
-import type { ArtistAudience, ArtworkSaveCount } from "@atelier/contracts";
+import type { ArtistArtworkViews, ArtistAudience, ArtworkSaveCount } from "@atelier/contracts";
 import { requestService } from "../http-client";
 
-export function getArtistAudience(artistId: string, periodDays: number, timeoutMs: number) {
-  return requestService<ArtistAudience>("recommendation", `/v1/recommendation/artist-audience?artistId=${encodeURIComponent(artistId)}&periodDays=${periodDays}`, { timeoutMs });
+export function getArtistAudience(artistId: string, periodDays: number, timeoutMs: number, correlationId?: string) {
+  return requestService<ArtistAudience>("recommendation", `/v1/recommendation/artist-audience?artistId=${encodeURIComponent(artistId)}&periodDays=${periodDays}`, { timeoutMs, correlationId });
 }
 
-export function getArtistSaves(artistId: string, timeoutMs: number) {
-  return requestService<{ items: ArtworkSaveCount[]; total: number }>("recommendation", `/v1/recommendation/artist-saves?artistId=${encodeURIComponent(artistId)}`, { timeoutMs });
+export function getArtistSaves(artistId: string, timeoutMs: number, correlationId?: string) {
+  return requestService<{ items: ArtworkSaveCount[]; total: number }>("recommendation", `/v1/recommendation/artist-saves?artistId=${encodeURIComponent(artistId)}`, { timeoutMs, correlationId });
+}
+
+export function getArtistViews(artistId: string, query: { from: string; to: string }, timeoutMs: number, correlationId?: string) {
+  const params = new URLSearchParams({ artistId, from: query.from, to: query.to });
+  return requestService<ArtistArtworkViews>("recommendation", `/v1/recommendation/artist-views?${params}`, { timeoutMs, correlationId });
+}
+
+export function recordArtworkView(input: { artworkId: string; viewedOn: string; viewerHash: string }, timeoutMs: number, correlationId?: string) {
+  return requestService<{ recorded: boolean }>("recommendation", "/v1/recommendation/artwork-views", { method: "POST", body: input, timeoutMs, correlationId });
 }
 
 export async function getNetworkRecommendations(buyerId: string | null) {

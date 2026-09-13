@@ -1,4 +1,4 @@
-import type { Artist, ArtworkSearchQuery, Artwork } from "@atelier/contracts";
+import { PublicDomainArtworkPageResponseSchema, type Artist, type Artwork, type ArtworkSearchQuery, type PublicDomainArtworkPageQuery, type PublicDomainArtworkPageResponse } from "@atelier/contracts";
 import { requestService, ServiceClientError } from "../http-client";
 
 interface ListResponse<T> { items: T[]; total: number; }
@@ -26,8 +26,8 @@ export async function searchCatalogArtworks(query: Partial<ArtworkSearchQuery> =
 }
 
 export async function listFeaturedArtworks(): Promise<Artwork[]> { return (await listArtworks()).slice(0, 6); }
-export async function findArtwork(id: string): Promise<Artwork | null> {
-  try { return await requestService<Artwork>("artist-artwork", `/v1/artist-artwork/artworks/${encodeURIComponent(id)}`); } catch (error) { if (error instanceof ServiceClientError && error.status === 404) return null; throw error; }
+export async function findArtwork(id: string, options: { timeoutMs?: number; correlationId?: string } = {}): Promise<Artwork | null> {
+  try { return await requestService<Artwork>("artist-artwork", `/v1/artist-artwork/artworks/${encodeURIComponent(id)}`, options); } catch (error) { if (error instanceof ServiceClientError && error.status === 404) return null; throw error; }
 }
 export async function listArtists(): Promise<Artist[]> {
   const result = await requestService<ListResponse<Artist>>("artist-artwork", "/v1/artist-artwork/artists");
@@ -37,8 +37,14 @@ export async function findArtist(id: string): Promise<Artist | null> {
   try { return await requestService<Artist>("artist-artwork", `/v1/artist-artwork/artists/${encodeURIComponent(id)}`); } catch (error) { if (error instanceof ServiceClientError && error.status === 404) return null; throw error; }
 }
 
-export async function listArtistArtworks(artistId: string) {
-  return requestService<{ items: Artwork[]; total?: number }>("artist-artwork", `/v1/artist-artwork/artist/artworks?artistId=${encodeURIComponent(artistId)}`);
+export async function listArtistArtworks(artistId: string, options: { timeoutMs?: number; correlationId?: string } = {}) {
+  return requestService<{ items: Artwork[]; total?: number }>("artist-artwork", `/v1/artist-artwork/artist/artworks?artistId=${encodeURIComponent(artistId)}`, options);
+}
+
+export async function listPublicDomainArtworks(query: PublicDomainArtworkPageQuery): Promise<PublicDomainArtworkPageResponse> {
+  const params = new URLSearchParams({ page: String(query.page), limit: String(query.limit) });
+  const response = await requestService<unknown>("catalog-discovery", `/v1/catalog/reference-artworks?${params}`);
+  return PublicDomainArtworkPageResponseSchema.parse(response);
 }
 
 export async function createArtwork(input: Record<string, unknown>) {

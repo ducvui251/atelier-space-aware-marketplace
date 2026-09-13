@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { DualViewToggle } from "@/components/discovery/DualViewToggle";
 import { FilterableArtworks } from "@/components/discovery/FilterableArtworks";
@@ -74,6 +75,18 @@ export default async function ArtworksPage({ searchParams }: ArtworksPageProps) 
           <DualViewToggle />
         </div>
       </div>
+
+      <aside className="mt-6 flex flex-col gap-3 rounded-lg border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="eyebrow">Cleveland Museum of Art · Open Access</p>
+          <p className="mt-1 text-body-sm text-muted-foreground">
+            Explore thousands of real CC0 museum artworks, paged separately from Atelier listings.
+          </p>
+        </div>
+        <Link href="/artworks/reference" className="shrink-0 font-medium text-foreground underline underline-offset-4">
+          Browse museum collection
+        </Link>
+      </aside>
 
       <div className="mt-8">
         <FilterableArtworks

@@ -1,10 +1,10 @@
 import { createServiceServer, getPort, readJson, writeServiceError, writeServiceJson, type ServiceRouteHandler } from "@atelier/config/http";
 import { requestInternalService } from "@atelier/config/service-client";
-import { ArtistAudienceQuerySchema, ToggleFollowRequestSchema, ToggleSavedRequestSchema, parseBody, type Artwork } from "@atelier/contracts";
+import { ArtistArtworkViewsQuerySchema, ArtistArtworkViewsResponseSchema, ArtistAudienceQuerySchema, ArtworkViewRequestSchema, RecordArtworkViewResponseSchema, ToggleFollowRequestSchema, ToggleSavedRequestSchema, parseBody, type Artwork } from "@atelier/contracts";
 import { ping } from "@atelier/persistence";
 import { health } from "./health.ts";
 import { getRecommendations } from "./application/recommendations.ts";
-import { getArtistArtworkSaves, getArtistAudience, getSignals, listFollowedArtistIds, listSavedArtworkIds, toggleFollow, toggleSaved } from "./infrastructure/recommendation-repository.ts";
+import { getArtistArtworkSaves, getArtistArtworkViews, getArtistAudience, getSignals, listFollowedArtistIds, listSavedArtworkIds, recordArtworkView, toggleFollow, toggleSaved } from "./infrastructure/recommendation-repository.ts";
 
 async function sourceArtworks(): Promise<Artwork[]> {
   const baseUrl = process.env.ARTIST_ARTWORK_SERVICE_URL ?? "http://localhost:4103";
@@ -58,9 +58,31 @@ const routes: Record<string, ServiceRouteHandler> = {
     const { items: artworks } = await requestInternalService<{ items: { id: string }[] }>(
       "artist-artwork",
       `/v1/artist-artwork/artist/artworks?artistId=${encodeURIComponent(artistId)}`,
+      { correlationId },
     );
     const items = await getArtistArtworkSaves(artworks.map((a) => a.id));
     return writeServiceJson(response, 200, { items, total: items.length }, correlationId);
+  },
+  "POST /v1/recommendation/artwork-views": async ({ request, response, correlationId }) => {
+    const parsed = parseBody(ArtworkViewRequestSchema, await readJson(request));
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
+    const recorded = await recordArtworkView(parsed.data);
+    return writeServiceJson(response, 200, RecordArtworkViewResponseSchema.parse({ recorded }), correlationId);
+  },
+  "GET /v1/recommendation/artist-views": async ({ url, response, correlationId }) => {
+    const parsed = parseBody(ArtistArtworkViewsQuerySchema, Object.fromEntries(url.searchParams.entries()));
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
+    const { artistId, from, to } = parsed.data;
+    const { items: artworks } = await requestInternalService<{ items: { id: string }[] }>(
+      "artist-artwork",
+      `/v1/artist-artwork/artist/artworks?artistId=${encodeURIComponent(artistId)}`,
+      { correlationId },
+    );
+    const counts = await getArtistArtworkViews(artworks.map((artwork) => artwork.id), from, to);
+    const viewsByArtwork = new Map(counts.map((count) => [count.artworkId, count.views]));
+    const items = artworks.map((artwork) => ({ artworkId: artwork.id, views: viewsByArtwork.get(artwork.id) ?? 0 }));
+    const result = ArtistArtworkViewsResponseSchema.parse({ artistId, from, to, items, totalViews: items.reduce((total, item) => total + item.views, 0) });
+    return writeServiceJson(response, 200, result, correlationId);
   },
 };
 

@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
  * Only server actions / route handlers / server components should use this.
  * The anon key is public; the service-role key must never be used here.
  */
-export async function createClient() {
+export async function createClient(fetchOverride?: typeof fetch) {
   const cookieStore = await cookies();
   const supabaseKey =
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
@@ -16,6 +16,7 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     supabaseKey!,
     {
+      ...(fetchOverride ? { global: { fetch: fetchOverride } } : {}),
       cookies: {
         getAll() {
           return cookieStore.getAll();

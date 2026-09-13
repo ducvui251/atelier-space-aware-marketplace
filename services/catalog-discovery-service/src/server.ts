@@ -1,12 +1,13 @@
 import { createServiceServer, getPort, writeServiceError, writeServiceJson, type ServiceRouteHandler } from "@atelier/config/http";
 import { createLogger } from "@atelier/config/logger";
-import { ArtworkSearchQuerySchema, CollectionsListResponseSchema, parseBody, type Artwork } from "@atelier/contracts";
+import { ArtworkSearchQuerySchema, CollectionsListResponseSchema, PublicDomainArtworkPageQuerySchema, PublicDomainArtworkPageResponseSchema, parseBody, type Artwork } from "@atelier/contracts";
 import { ArtworkPublishedPayloadSchema, ArtworkReservedPayloadSchema, ArtworkSoldPayloadSchema, ArtworkVerifiedPayloadSchema } from "@atelier/contracts/events";
 import { consumeEvents } from "@atelier/events";
 import { ping } from "@atelier/persistence";
 import { health } from "./health.ts";
 import { searchArtworks } from "./domain/search-rules.ts";
 import { listCollections } from "./infrastructure/collections-repository.ts";
+import { listPublicDomainArtworks } from "./infrastructure/cleveland-snapshot.ts";
 import { listReadModel, removeReadModelArtwork, syncReadModel, upsertReadModelArtwork } from "./infrastructure/read-model-repository.ts";
 
 async function sourceArtworks(): Promise<Artwork[]> {
@@ -71,6 +72,31 @@ const routes: Record<string, ServiceRouteHandler> = {
     if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
     const items = searchArtworks(await listReadModel(), parsed.data);
     return writeServiceJson(response, 200, { items, total: items.length }, correlationId);
+  },
+  "GET /v1/catalog/reference-artworks": async ({ url, response, correlationId }) => {
+    const parsed = parseBody(PublicDomainArtworkPageQuerySchema, Object.fromEntries(url.searchParams.entries()));
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
+
+    try {
+      const page = await listPublicDomainArtworks(parsed.data);
+      const validated = PublicDomainArtworkPageResponseSchema.safeParse(page);
+      if (!validated.success) {
+        logger.error("reference artwork page failed its contract", { correlationId, issues: validated.error.issues });
+        return writeServiceError(response, 500, { code: "CONTRACT_VIOLATION", message: "Reference collection returned invalid data", correlationId, retryable: false });
+      }
+      return writeServiceJson(response, 200, validated.data, correlationId);
+    } catch (error) {
+      logger.error("Reference collection page failed unexpectedly", {
+        correlationId,
+        error: error instanceof Error ? error.message : "unknown error",
+      });
+      return writeServiceError(response, 500, {
+        code: "INTERNAL_ERROR",
+        message: "Reference collection could not be loaded",
+        correlationId,
+        retryable: false,
+      });
+    }
   },
   "GET /v1/catalog/collections": async ({ response, correlationId }) => {
     const items = await listCollections();

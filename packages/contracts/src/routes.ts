@@ -2,16 +2,22 @@ import type { ZodType } from "zod";
 import {
   AccountSyncRequestSchema,
   AccountUpdateRequestSchema,
+  ArtistArtworkViewsQuerySchema,
+  ArtistArtworkViewsResponseSchema,
   ArtistAudienceQuerySchema,
   ArtistEarningsQuerySchema,
   ArtistTopArtworksQuerySchema,
   ArtistVerificationReviewRequestSchema,
   ArtworkArtistVerificationRequestSchema,
+  ArtworkViewRequestSchema,
+  RecordArtworkViewResponseSchema,
   ArtworkAvailabilityRequestSchema,
   ArtworkCreateRequestSchema,
   ArtworkSearchQuerySchema,
   ArtworkUpdateRequestSchema,
   ArtworkVerificationReviewRequestSchema,
+  PublicDomainArtworkPageQuerySchema,
+  PublicDomainArtworkPageResponseSchema,
   CartAddRequestSchema,
   CheckoutConfirmRequestSchema,
   CheckoutRequestSchema,
@@ -44,6 +50,7 @@ export interface RouteDefinition {
   auth: "public" | "internal";
   requestSchema?: ZodType;
   requestLocation?: "body" | "query";
+  responseSchema?: ZodType;
   successStatus: number;
   errorStatuses: number[];
 }
@@ -56,6 +63,7 @@ export const ROUTES: RouteDefinition[] = [
 
   // catalog-discovery
   { method: "GET", path: "/v1/catalog/artworks", service: "catalog-discovery", summary: "Search the catalog read model", auth: "internal", requestSchema: ArtworkSearchQuerySchema, requestLocation: "query", successStatus: 200, errorStatuses: [400, 401] },
+  { method: "GET", path: "/v1/catalog/reference-artworks", service: "catalog-discovery", summary: "Page through the locally imported Cleveland Museum of Art CC0 reference collection", auth: "internal", requestSchema: PublicDomainArtworkPageQuerySchema, requestLocation: "query", responseSchema: PublicDomainArtworkPageResponseSchema, successStatus: 200, errorStatuses: [400, 401, 500] },
   { method: "GET", path: "/v1/catalog/collections", service: "catalog-discovery", summary: "List curated collections with live artwork counts", auth: "internal", successStatus: 200, errorStatuses: [401, 500] },
 
   // artist-artwork
@@ -99,6 +107,8 @@ export const ROUTES: RouteDefinition[] = [
   { method: "POST", path: "/v1/recommendation/follows", service: "recommendation", summary: "Toggle follow/unfollow for an artist", auth: "internal", requestSchema: ToggleFollowRequestSchema, requestLocation: "body", successStatus: 200, errorStatuses: [400, 401] },
   { method: "GET", path: "/v1/recommendation/artist-audience", service: "recommendation", summary: "Follower count and growth vs a previous period (§4.7)", auth: "internal", requestSchema: ArtistAudienceQuerySchema, requestLocation: "query", successStatus: 200, errorStatuses: [400, 401] },
   { method: "GET", path: "/v1/recommendation/artist-saves", service: "recommendation", summary: "Per-artwork save counts for an artist's own artworks (§4.7)", auth: "internal", successStatus: 200, errorStatuses: [400, 401] },
+  { method: "POST", path: "/v1/recommendation/artwork-views", service: "recommendation", summary: "Idempotently record one privacy-preserving artwork detail view per viewer and UTC day", auth: "internal", requestSchema: ArtworkViewRequestSchema, requestLocation: "body", responseSchema: RecordArtworkViewResponseSchema, successStatus: 200, errorStatuses: [400, 401, 500] },
+  { method: "GET", path: "/v1/recommendation/artist-views", service: "recommendation", summary: "Per-artwork unique daily view counts for an artist and date range", auth: "internal", requestSchema: ArtistArtworkViewsQuerySchema, requestLocation: "query", responseSchema: ArtistArtworkViewsResponseSchema, successStatus: 200, errorStatuses: [400, 401, 500, 503] },
 
   // verification
   { method: "POST", path: "/v1/verification/artworks/{id}/review", service: "verification", summary: "Record a verification decision for an artwork", auth: "internal", requestSchema: ArtworkVerificationReviewRequestSchema, requestLocation: "body", successStatus: 200, errorStatuses: [400, 401, 404] },

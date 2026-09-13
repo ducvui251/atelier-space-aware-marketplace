@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
 import {
   ArrowLeft,
   BadgeCheck,
@@ -35,6 +36,7 @@ interface ArtworkDetailClientProps {
 
 export function ArtworkDetailClient({ artwork, artist, related }: ArtworkDetailClientProps) {
   const router = useRouter();
+  const lastViewedArtworkId = useRef<string | null>(null);
   const { currentUser } = useAuth();
   const { cartArtworkIds, addToCart } = useCart();
   const { isSaved, toggleSaved } = useSaved();
@@ -42,6 +44,18 @@ export function ArtworkDetailClient({ artwork, artist, related }: ArtworkDetailC
   const available = artwork.availability === "available";
   const inCart = cartArtworkIds.includes(artwork.id);
   const saved = isSaved(artwork.id);
+
+  useEffect(() => {
+    if (lastViewedArtworkId.current === artwork.id) return;
+    lastViewedArtworkId.current = artwork.id;
+    void fetch(`/api/artworks/${encodeURIComponent(artwork.id)}/view`, {
+      method: "POST",
+      credentials: "same-origin",
+      keepalive: true,
+    }).catch(() => {
+      // View tracking is best-effort and must not block the artwork page.
+    });
+  }, [artwork.id]);
 
   function requireAuth(action: () => void) {
     if (!currentUser) {

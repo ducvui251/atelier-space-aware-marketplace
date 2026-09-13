@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Atelier catalog, search, filters, tags, and discovery service.",
   "exports": { ".": "./src/index.ts" },
-  "dependencies": { "@atelier/config": "workspace:*", "@atelier/contracts": "workspace:*", "@atelier/events": "workspace:*", "@atelier/persistence": "workspace:*" },
-  "scripts": { "dev": "node --experimental-strip-types src/server.ts", "start": "node --experimental-strip-types src/server.ts", "type-check": "tsc --noEmit" },
+  "dependencies": { "@atelier/config": "workspace:*", "@atelier/contracts": "workspace:*", "@atelier/events": "workspace:*", "@atelier/persistence": "workspace:*", "zod": "^4.5.2" },
+  "scripts": { "dev": "node --experimental-strip-types src/server.ts", "start": "node --experimental-strip-types src/server.ts", "type-check": "tsc --noEmit", "test": "node --experimental-strip-types --test src/infrastructure/cleveland-source.test.ts src/infrastructure/cleveland-snapshot.test.ts", "import:reference": "node --experimental-strip-types scripts/import-cleveland-reference.ts" },
   "devDependencies": { "typescript": "^5.7.0" }
 }

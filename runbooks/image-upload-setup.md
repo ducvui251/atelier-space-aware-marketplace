@@ -1,86 +1,75 @@
-# Setting up image upload (G-05)
+# Setting up artwork image uploads
 
-**What this feature does:** an artist selects a photo in the artwork form
-(`ArtworkForm.tsx`), the browser posts it to `POST /api/uploads/image`
-([route.ts](../apps/web-gateway/src/app/api/uploads/image/route.ts)), the
-Gateway validates the caller (must be logged in, must have the `artist`
-role), the MIME type (`image/jpeg`, `image/png`, `image/webp`,
-`image/avif`) and the size (5MB cap), then writes the bytes into a
-Supabase Storage bucket using a service-role key and returns the file's
-public URL. That URL fills the same `imageUrl` field the manual URL-paste
-input already used — pasting a URL directly still works as a fallback.
+The artwork form uploads a selected file to `POST /api/uploads/image`. The
+Gateway requires a signed-in artist, validates the image type and 5 MB size
+limit, then writes through the caller's cookie-bound Supabase session. Storage
+RLS limits inserts to `artist-<auth.uid()>/` paths. The bucket is public so
+marketplace visitors can read approved artwork images; uploads do not use a
+service-role key.
 
-**The code is already in place.** What's missing is the Supabase-side
-bucket and a service-role key, which only you can create — I don't have
-access to your Supabase dashboard. Until you do the steps below, the
-Gateway itself starts and runs fine; only `POST /api/uploads/image` fails
-with a `500` ("Image upload is not configured on this deployment").
+The image is stored under a SHA-256 content path. Retrying the same upload
+returns the existing public URL, and the Storage request has a 10-second
+timeout. The artwork form accepts files only; the resulting URL is kept as a
+hidden form value and shown as an image preview.
 
-## What you need to do (steps I can't do for you)
+## One-time Supabase setup
 
-### 1. Create the Storage bucket
+### 1. Create or verify the bucket
 
-In the [Supabase dashboard](https://supabase.com/dashboard), open your
-project → **Storage** (left sidebar) → **New bucket**.
+In the [Supabase dashboard](https://supabase.com/dashboard), open the project
+and choose **Storage**. Create the bucket if it does not already exist; if it
+exists, verify these settings:
 
-- Name: `artwork-images` (must match exactly, or set
-  `SUPABASE_STORAGE_BUCKET` below to whatever name you actually used).
-- **Public bucket**: turn this **ON**. Artwork photos need to be viewable
-  by anyone browsing the marketplace, and the Gateway generates public URLs
-  (`getPublicUrl`), not signed ones.
-- Leave the file-size/MIME restrictions at the bucket level as-is — the
-  Gateway already enforces its own 5MB cap and MIME allow-list before it
-  ever reaches Storage, so bucket-level limits are redundant, not required.
+- Name: `artwork-images` (the Gateway uses this fixed name).
+- Public bucket: **on**, so the returned public URLs can be displayed in the
+  catalog.
+- Maximum file size: 5 MB.
+- Allowed MIME types: `image/jpeg`, `image/png`, `image/webp`, and
+  `image/avif`.
 
-Click **Save**. No storage policies (RLS) need to be added: uploads always
-go through the service-role key (below), which bypasses Storage RLS
-entirely, so there is nothing for an `anon`/`authenticated`-role INSERT
-policy to grant. Public **read** is handled by the "Public bucket" toggle
-itself, not by an RLS policy.
+### 2. Restrict uploads to each artist's folder
 
-### 2. Copy the service-role key
+Run this policy in the Supabase SQL Editor after creating the bucket. It grants
+only authenticated inserts to the matching Supabase auth user's folder. The
+Gateway uses `upsert: false`, so the policy does not need update or select
+permissions.
 
-Project **Settings** (gear icon) → **API** → **Project API keys** →
-copy the **`service_role`** key (NOT the `anon`/`publishable` key you
-already used for `NEXT_PUBLIC_SUPABASE_ANON_KEY`).
+```sql
+drop policy if exists atelier_artist_artwork_uploads on storage.objects;
 
-**This key bypasses every Row Level Security policy in your project.**
-Treat it like a root password:
-- Never prefix it `NEXT_PUBLIC_` — that would ship it to every visitor's
-  browser.
-- Never commit it to git (`.env` is already gitignored; only `.env.example`
-  is tracked, and it ships with an empty placeholder).
-- Only `apps/web-gateway/src/lib/supabase/service-role.ts` reads it, and
-  only inside the one upload route handler — it is never forwarded to any
-  other service.
-
-### 3. Set the environment variables
-
-In your `.env` (the untracked file `docker compose` actually reads):
-
-```
-SUPABASE_SERVICE_ROLE_KEY=<the service_role key you just copied>
-SUPABASE_STORAGE_BUCKET=artwork-images
+create policy atelier_artist_artwork_uploads
+on storage.objects
+for insert
+to authenticated
+with check (
+  bucket_id = 'artwork-images'
+  and (storage.foldername(name))[1] = 'artist-' || (select auth.uid()::text)
+);
 ```
 
-`SUPABASE_STORAGE_BUCKET` defaults to `artwork-images` in
-`docker-compose.yml` if you leave it unset — only set it if you named the
-bucket something else in step 1.
+The Gateway writes paths in this form:
 
-### 4. Rebuild and restart the Gateway
+```text
+artist-<Supabase auth user UUID>/<sha256>.<jpg|png|webp|avif>
+```
+
+### 3. Configure the public Supabase client values
+
+Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in
+the usual host `.env.local` and Compose `.env` files. These are public client
+configuration; no Storage secret or service-role key is needed. Rebuild the
+Gateway after changing `NEXT_PUBLIC_*` values because Next.js embeds them at
+build time:
 
 ```bash
 docker compose build web-gateway
 docker compose up -d web-gateway
 ```
 
-(`SUPABASE_SERVICE_ROLE_KEY`/`SUPABASE_STORAGE_BUCKET` are read at runtime,
-not baked into the build — a `docker compose up -d web-gateway` alone,
-without rebuilding, is also enough once the image already exists.)
+### 4. Verify
 
-### 5. Verify
-
-Log in as an artist, open the artwork create/edit form, and pick an image
-file. It should upload and show a preview; the URL field underneath fills
-in automatically. If it still 500s, check `docker compose logs web-gateway`
-— the error message names exactly which piece (key, bucket) is missing.
+Sign in as an artist, open the artwork create/edit form, choose a supported
+image, and confirm that the upload completes and the preview appears. The
+form submits the returned Storage URL with the artwork record. Invalid files
+return `400`, missing artist access returns `401` or `403`, Storage failures
+return `502`, and a Storage timeout returns `504`.

@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { ArrowLeft, WifiOff } from "lucide-react";
-import type { ArtistAudience, ArtistEarnings } from "@atelier/contracts";
+import type { ArtistArtworkViews, ArtistAudience, ArtistEarnings } from "@atelier/contracts";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { RequireRole } from "@/components/auth/RequireRole";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,6 +25,7 @@ interface ArtworkPerformanceRow {
   availability: string;
   verificationStatus: string;
   saves: number;
+  views: number | null;
   salesCount: number;
   revenue: number;
 }
@@ -34,8 +36,9 @@ interface ArtistAnalyticsResponse {
   correlationId: string;
   earnings: Section<ArtistEarnings>;
   audience: Section<ArtistAudience>;
+  views: Section<ArtistArtworkViews>;
   artworkPerformance: Section<ArtworkPerformanceRow[]>;
-  conversion: { data: null; unavailable: boolean; reason: string };
+  conversion: { data: { eligibleOrders: number; views: number; rate: number | null } | null; unavailable: boolean; reason: string | null };
 }
 
 function UnavailableCard({ label }: { label: string }) {
@@ -57,7 +60,8 @@ function KpiCard({ label, value }: { label: string; value: string }) {
 }
 
 function ArtistAnalyticsView() {
-  const { data, loading, error, refresh } = useApiResource<ArtistAnalyticsResponse>("/api/artist/analytics?period=month");
+  const [period, setPeriod] = useState<"day" | "week" | "month">("month");
+  const { data, loading, error, refresh } = useApiResource<ArtistAnalyticsResponse>(`/api/artist/analytics?period=${period}`);
 
   return (
     <>
@@ -68,7 +72,24 @@ function ArtistAnalyticsView() {
 
       <p className="eyebrow mt-6">Artist dashboard</p>
       <h1 className="mt-2 font-display text-h2 text-foreground">Analytics</h1>
-      <p className="mt-2 text-body-sm text-muted-foreground">Last 30 days.</p>
+      <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
+        <p className="text-body-sm text-muted-foreground">
+          Revenue, views, and sales cover the last 90 days; saves show current totals. Select revenue grouping.
+        </p>
+        <label className="flex flex-col gap-1.5 text-label text-foreground" htmlFor="analytics-period">
+          Revenue grouping
+          <select
+            id="analytics-period"
+            value={period}
+            onChange={(event) => setPeriod(event.target.value as typeof period)}
+            className="focus-ring h-11 min-w-36 rounded-md border border-border bg-surface px-4 text-body text-foreground"
+          >
+            <option value="day">By day</option>
+            <option value="week">By week</option>
+            <option value="month">By month</option>
+          </select>
+        </label>
+      </div>
 
       {error ? (
         <div className="mt-6 flex items-center justify-between gap-3 rounded-md border border-destructive bg-destructive-soft px-4 py-3 text-body-sm text-destructive-foreground">
@@ -102,7 +123,7 @@ function ArtistAnalyticsView() {
             ) : (
               <KpiCard
                 label="Followers"
-                value={`${data.audience.data.totalFollowers} (${data.audience.data.growth >= 0 ? "+" : ""}${data.audience.data.growth} vs 30d ago)`}
+                value={`${data.audience.data.totalFollowers} (${data.audience.data.growth >= 0 ? "+" : ""}${data.audience.data.growth} vs previous ${period})`}
               />
             )}
           </div>
@@ -123,7 +144,24 @@ function ArtistAnalyticsView() {
 
           <div className="mt-6 rounded-lg border border-border bg-surface p-5">
             <p className="text-caption text-muted-foreground">Conversion</p>
-            <p className="mt-2 text-body-sm text-muted-foreground">No data — {data.conversion.reason}.</p>
+            {data.conversion.unavailable || !data.conversion.data ? (
+              <p className="mt-2 text-body-sm text-muted-foreground">
+                Unavailable — {data.conversion.reason ?? "Required analytics data is unavailable"}.
+              </p>
+            ) : data.conversion.data.rate === null ? (
+              <p className="mt-2 text-body-sm text-muted-foreground">
+                No views yet ({data.conversion.data.eligibleOrders} eligible orders, 0 unique daily views).
+              </p>
+            ) : (
+              <>
+                <p className="mt-2 font-display text-h3 text-foreground">
+                  {(data.conversion.data.rate * 100).toFixed(1)}%
+                </p>
+                <p className="mt-1 text-body-sm text-muted-foreground">
+                  {data.conversion.data.eligibleOrders} eligible orders / {data.conversion.data.views} unique daily views in the last 90 days.
+                </p>
+              </>
+            )}
           </div>
 
           <div className="mt-8">
@@ -139,6 +177,7 @@ function ArtistAnalyticsView() {
                     <tr>
                       <th className="px-4 py-3 text-left">Artwork</th>
                       <th className="px-4 py-3 text-left">Status</th>
+                      <th className="px-4 py-3 text-left">Views</th>
                       <th className="px-4 py-3 text-left">Saves</th>
                       <th className="px-4 py-3 text-left">Sales</th>
                       <th className="px-4 py-3 text-left">Revenue</th>
@@ -157,6 +196,9 @@ function ArtistAnalyticsView() {
                           <Badge variant={row.verificationStatus === "verified" ? "success" : row.verificationStatus === "rejected" ? "destructive" : "warning"}>
                             {row.verificationStatus}
                           </Badge>
+                        </td>
+                        <td className="px-4 py-3" aria-label={row.views === null ? "Views unavailable" : `${row.views} views`}>
+                          {row.views ?? "—"}
                         </td>
                         <td className="px-4 py-3">{row.saves}</td>
                         <td className="px-4 py-3">{row.salesCount}</td>

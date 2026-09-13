@@ -1,0 +1,17 @@
+node_modules
+**/node_modules
+.pnpm-store
+.next
+**/.next
+.git
+.tools
+.token-optimizer
+.runtime-logs
+coverage
+**/coverage
+playwright-report
+test-results
+*.log
+.env
+.env.*
+!.env.example

@@ -30,6 +30,9 @@ const statusDescriptions: Record<number, string> = {
   403: "Caller does not own this resource",
   404: "Resource not found",
   409: "Conflict with current resource state",
+  502: "Invalid response from an external integration",
+  503: "External integration unavailable",
+  504: "External integration timed out",
 };
 
 function toJsonSchema(schema: z.ZodType) {
@@ -60,7 +63,10 @@ for (const route of ROUTES) {
   }
 
   const responses: Record<string, unknown> = {
-    [route.successStatus]: { description: "Success" },
+    [route.successStatus]: {
+      description: "Success",
+      ...(route.responseSchema ? { content: { "application/json": { schema: toJsonSchema(route.responseSchema) } } } : {}),
+    },
   };
   for (const status of route.errorStatuses) {
     responses[status] = {

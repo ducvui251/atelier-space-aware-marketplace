@@ -1,14 +1,14 @@
 import type { ArtistEarnings, ArtworkSaleCount } from "@atelier/contracts";
 import { requestService } from "../http-client";
 
-export function getArtistEarnings(artistId: string, query: { period?: string; from?: string; to?: string }, timeoutMs: number) {
+export function getArtistEarnings(artistId: string, query: { period?: string; from?: string; to?: string }, timeoutMs: number, correlationId?: string) {
   const params = new URLSearchParams({ artistId, ...(query.period ? { period: query.period } : {}), ...(query.from ? { from: query.from } : {}), ...(query.to ? { to: query.to } : {}) });
-  return requestService<ArtistEarnings>("commerce", `/v1/commerce/artist-earnings?${params}`, { timeoutMs });
+  return requestService<ArtistEarnings>("commerce", `/v1/commerce/artist-earnings?${params}`, { timeoutMs, correlationId });
 }
 
-export function getArtistTopArtworks(artistId: string, query: { from?: string; to?: string; limit?: number }, timeoutMs: number) {
+export function getArtistTopArtworks(artistId: string, query: { from?: string; to?: string; limit?: number }, timeoutMs: number, correlationId?: string) {
   const params = new URLSearchParams({ artistId, ...(query.from ? { from: query.from } : {}), ...(query.to ? { to: query.to } : {}), ...(query.limit ? { limit: String(query.limit) } : {}) });
-  return requestService<{ items: ArtworkSaleCount[]; total: number }>("commerce", `/v1/commerce/artist-top-artworks?${params}`, { timeoutMs });
+  return requestService<{ items: ArtworkSaleCount[]; total: number }>("commerce", `/v1/commerce/artist-top-artworks?${params}`, { timeoutMs, correlationId });
 }
 
 export async function getCart(authUserId: string) {
