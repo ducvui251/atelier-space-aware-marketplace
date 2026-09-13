@@ -88,7 +88,7 @@ export function canManageExhibition(exhibition: Exhibition, actor: Actor): boole
   return exhibition.creatorType === "artist" && exhibition.creatorId === actor.id;
 }
 
-export async function listExhibitions(filter: { creatorId?: string; status?: string }): Promise<Exhibition[]> {
+export async function listExhibitions(filter: { creatorId?: string; status?: string; slug?: string }): Promise<Exhibition[]> {
   const conditions: string[] = [];
   const params: string[] = [];
   if (filter.creatorId) {
@@ -98,6 +98,10 @@ export async function listExhibitions(filter: { creatorId?: string; status?: str
   if (filter.status) {
     params.push(filter.status);
     conditions.push(`status = $${params.length}`);
+  }
+  if (filter.slug) {
+    params.push(filter.slug);
+    conditions.push(`slug = $${params.length}`);
   }
   const where = conditions.length ? `where ${conditions.join(" and ")}` : "";
   const rows = await query<ExhibitionRow>(

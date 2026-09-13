@@ -73,6 +73,7 @@ const routes: Record<string, ServiceRouteHandler> = {
     const items = await listExhibitions({
       creatorId: url.searchParams.get("creatorId") ?? undefined,
       status: url.searchParams.get("status") ?? undefined,
+      slug: url.searchParams.get("slug") ?? undefined,
     });
     return writeServiceJson(response, 200, { items, total: items.length }, correlationId);
   },
