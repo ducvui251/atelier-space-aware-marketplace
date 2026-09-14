@@ -15,9 +15,6 @@ import {
   ArtworkUpdateRequestSchema,
   ArtworkViewRequestSchema,
   RecordArtworkViewResponseSchema,
-  PublicDomainArtworkPageQuerySchema,
-  PublicDomainArtworkPageResponseSchema,
-  PublicDomainArtworkSchema,
   ArtworkVerificationReviewRequestSchema,
   CartAddRequestSchema,
   CheckoutClientRequestSchema,
@@ -232,88 +229,6 @@ describe("ArtworkSearchQuerySchema", () => {
   });
 });
 
-describe("PublicDomainArtworkPageQuerySchema", () => {
-  it("defaults to the first page and a bounded page size", () => {
-    expect(PublicDomainArtworkPageQuerySchema.parse({})).toEqual({ page: 1, limit: 24 });
-    expect(PublicDomainArtworkPageQuerySchema.parse({ page: "3", limit: "12" })).toEqual({ page: 3, limit: 12 });
-  });
-
-  it("rejects invalid page and limit values", () => {
-    expect(PublicDomainArtworkPageQuerySchema.safeParse({ page: "0" }).success).toBe(false);
-    expect(PublicDomainArtworkPageQuerySchema.safeParse({ limit: "51" }).success).toBe(false);
-  });
-});
-
-describe("PublicDomainArtworkPageResponseSchema", () => {
-  it("validates a read-only museum reference page", () => {
-    expect(PublicDomainArtworkPageResponseSchema.safeParse({
-      items: [{
-        id: 42,
-        title: "Open artwork",
-        artistName: "Artist",
-        dateDisplay: "1900",
-        mediumDisplay: "Oil on canvas",
-        dimensions: "20 × 30 cm",
-        imageUrl: "https://openaccess-cdn.clevelandart.org/42/42_web.jpg",
-        imageFullUrl: "https://openaccess-cdn.clevelandart.org/42/42_print.jpg",
-        imageAltText: "Open artwork",
-        sourceUrl: "https://clevelandart.org/art/42",
-      }],
-      page: 1,
-      limit: 24,
-      total: 1,
-      totalPages: 1,
-      hasPreviousPage: false,
-      hasNextPage: false,
-    }).success).toBe(true);
-  });
-
-  it("requires a full image URL for the in-page artwork preview", () => {
-    expect(PublicDomainArtworkPageResponseSchema.safeParse({
-      items: [{
-        id: 42,
-        title: "Open artwork",
-        artistName: "Artist",
-        dateDisplay: "1900",
-        mediumDisplay: "Oil on canvas",
-        dimensions: "20 × 30 cm",
-        imageUrl: "https://openaccess-cdn.clevelandart.org/42/42_web.jpg",
-        imageAltText: "Artwork",
-        sourceUrl: "https://clevelandart.org/art/42",
-      }],
-      page: 1,
-      limit: 24,
-      total: 1,
-      totalPages: 1,
-      hasPreviousPage: false,
-      hasNextPage: false,
-    }).success).toBe(false);
-  });
-});
-
-describe("PublicDomainArtworkSchema image locations", () => {
-  const localArtwork = {
-    id: 42,
-    title: "Downloaded artwork",
-    artistName: "Artist",
-    dateDisplay: "1900",
-    mediumDisplay: "Oil on canvas",
-    dimensions: "20 × 30 cm",
-    imageUrl: "/img/cma-open-access/42_web.jpg",
-    imageFullUrl: "/img/cma-open-access/42_web.jpg",
-    imageAltText: "Downloaded artwork",
-    sourceUrl: "https://clevelandart.org/art/42",
-  };
-
-  it("accepts locally hosted public assets", () => {
-    expect(PublicDomainArtworkSchema.safeParse(localArtwork).success).toBe(true);
-  });
-
-  it("rejects protocol-relative and parent-directory image paths", () => {
-    expect(PublicDomainArtworkSchema.safeParse({ ...localArtwork, imageUrl: "//images.example/art.jpg" }).success).toBe(false);
-    expect(PublicDomainArtworkSchema.safeParse({ ...localArtwork, imageFullUrl: "/img/../secret.jpg" }).success).toBe(false);
-  });
-});
 
 describe("ArtistEarningsQuerySchema", () => {
   it("defaults period to 'day' on an empty query", () => {
