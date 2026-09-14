@@ -3,6 +3,7 @@ import { getAuthUser } from "@/lib/server/auth";
 import { json, errorResponse } from "@/lib/server/respond";
 import { CheckoutClientRequestSchema } from "@atelier/contracts";
 import { checkout } from "@/lib/gateway/clients/commerce-checkout.client";
+import { ServiceClientError } from "@/lib/gateway/http-client";
 
 export async function POST(request: NextRequest) {
   const user = await getAuthUser(request);
@@ -17,7 +18,10 @@ export async function POST(request: NextRequest) {
     const result = await checkout(user.id, { shippingAddress, method }, request.headers.get("idempotency-key") ?? crypto.randomUUID());
     return json(result, 201);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Checkout failed";
-    return errorResponse(message, message.includes("available") ? 409 : 503);
+    if (error instanceof ServiceClientError) {
+      if (error.status < 500) return errorResponse(error.message, error.status);
+      return errorResponse("Checkout is temporarily unavailable. Please try again.", 503);
+    }
+    return errorResponse("Checkout is temporarily unavailable. Please try again.", 503);
   }
 }

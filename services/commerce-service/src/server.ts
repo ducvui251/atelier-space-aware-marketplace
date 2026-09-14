@@ -4,6 +4,8 @@ import { createLogger } from "@atelier/config/logger";
 import { ArtistEarningsQuerySchema, ArtistTopArtworksQuerySchema, CartAddRequestSchema, CheckoutConfirmRequestSchema, CheckoutRequestSchema, ConfirmReceivedRequestSchema, OrderReviewRequestSchema, ShipOrderRequestSchema, StripeWebhookRelaySchema, parseBody, type Artwork } from "@atelier/contracts";
 import { runOutboxPublisher } from "@atelier/events";
 import { ping } from "@atelier/persistence";
+import { resolveCartArtworks } from "./application/checkout-cart.ts";
+import { interpretReservationResponse, type ReservationResponseResult } from "./application/reservation-response.ts";
 import { health } from "./health.ts";
 import { addCartItem, listCart, removeCartItem } from "./infrastructure/cart-repository.ts";
 import { confirmCheckoutSession, getCheckoutSession, getIdempotencyRecord, handleChargeRefunded, handlePaymentFailed, persistPendingCheckout, recordPaymentEvent, saveCheckoutSession, saveIdempotencyRecord } from "./infrastructure/commerce-repository.ts";
@@ -15,27 +17,51 @@ function artistArtworkHeaders(): Record<string, string> {
   return process.env.ATELIER_INTERNAL_SERVICE_TOKEN ? { "x-service-token": process.env.ATELIER_INTERNAL_SERVICE_TOKEN } : {};
 }
 
-async function sourceArtworks(): Promise<Artwork[]> {
+async function sourceArtworks(correlationId: string): Promise<Artwork[]> {
   const baseUrl = process.env.ARTIST_ARTWORK_SERVICE_URL ?? "http://localhost:4103";
-  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/v1/artist-artwork/artworks`, { headers: artistArtworkHeaders() });
-  if (!response.ok) throw new Error(`Artist artwork service returned ${response.status}`);
-  return ((await response.json()) as { items?: Artwork[] }).items ?? [];
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3000);
+  try {
+    const response = await fetch(`${baseUrl.replace(/\/$/, "")}/v1/artist-artwork/artworks?status=all`, {
+      headers: { ...artistArtworkHeaders(), "x-correlation-id": correlationId },
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`Artist artwork service returned ${response.status}`);
+    const body: unknown = await response.json().catch(() => null);
+    if (typeof body !== "object" || body === null || !("items" in body) || !Array.isArray(body.items)
+      || !body.items.every((item) => typeof item === "object" && item !== null && "id" in item && typeof item.id === "string")) {
+      throw new Error("Artist artwork service returned an invalid artwork list");
+    }
+    return body.items as Artwork[];
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 /**
  * Atomic available -> reserved via the reservation contract
  * (MICROSERVICE_100_PLAN.md Phase 5), replacing the old
  * PATCH-availability-to-sold-with-manual-compensation step. Returns the
- * reservation id on success, null if the artwork was already taken by a
- * concurrent checkout.
+ * explicit inventory conflict if another checkout already reserved it, and a
+ * dependency failure for transport, server, or contract errors.
  */
-async function reserveArtworkRemote(artworkId: string, buyerId: string): Promise<string | null> {
+async function reserveArtworkRemote(artworkId: string, buyerId: string, correlationId: string): Promise<ReservationResponseResult> {
   const baseUrl = process.env.ARTIST_ARTWORK_SERVICE_URL ?? "http://localhost:4103";
-  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/v1/artist-artwork/reservations`, {
-    method: "POST", headers: { "content-type": "application/json", ...artistArtworkHeaders() }, body: JSON.stringify({ artworkId, buyerId }),
-  });
-  if (!response.ok) return null;
-  return ((await response.json()) as { id: string }).id;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3000);
+  try {
+    const response = await fetch(`${baseUrl.replace(/\/$/, "")}/v1/artist-artwork/reservations`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...artistArtworkHeaders(), "x-correlation-id": correlationId },
+      body: JSON.stringify({ artworkId, buyerId }),
+      signal: controller.signal,
+    });
+    return await interpretReservationResponse(response);
+  } catch {
+    return { kind: "dependency-failure", status: 503, reason: "transport" };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function commitReservationRemote(reservationId: string): Promise<boolean> {
@@ -46,11 +72,20 @@ async function commitReservationRemote(reservationId: string): Promise<boolean> 
   return response.ok;
 }
 
-async function releaseReservationRemote(reservationId: string): Promise<void> {
+async function releaseReservationRemote(reservationId: string, correlationId?: string): Promise<void> {
   const baseUrl = process.env.ARTIST_ARTWORK_SERVICE_URL ?? "http://localhost:4103";
-  await fetch(`${baseUrl.replace(/\/$/, "")}/v1/artist-artwork/reservations/${encodeURIComponent(reservationId)}/release`, {
-    method: "POST", headers: artistArtworkHeaders(),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3000);
+  try {
+    const response = await fetch(`${baseUrl.replace(/\/$/, "")}/v1/artist-artwork/reservations/${encodeURIComponent(reservationId)}/release`, {
+      method: "POST",
+      headers: { ...artistArtworkHeaders(), ...(correlationId ? { "x-correlation-id": correlationId } : {}) },
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`Artist artwork service failed to release reservation with status ${response.status}`);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function hashCheckoutRequest(buyerId: string, shippingAddress: unknown, method: string): string {
@@ -58,6 +93,14 @@ function hashCheckoutRequest(buyerId: string, shippingAddress: unknown, method: 
 }
 
 const logger = createLogger("commerce");
+
+async function releaseReservationsBestEffort(reservationIds: string[], correlationId: string): Promise<void> {
+  const results = await Promise.allSettled(reservationIds.map((id) => releaseReservationRemote(id, correlationId)));
+  const failedReservationIds = results.flatMap((result, index) => result.status === "rejected" ? [reservationIds[index]] : []);
+  if (failedReservationIds.length > 0) {
+    logger.error("failed to release checkout reservations", { correlationId, reservationIds: failedReservationIds });
+  }
+}
 
 const routes: Record<string, ServiceRouteHandler> = {
   "GET /v1/commerce/cart": async ({ url, response, correlationId }) => {
@@ -94,19 +137,54 @@ const routes: Record<string, ServiceRouteHandler> = {
     }
 
     const artworkIds = await listCart(buyerId);
-    const source = await sourceArtworks();
-    const items = artworkIds.map((id) => source.find((artwork) => artwork.id === id)).filter((item): item is Artwork => Boolean(item));
-    if (items.length !== artworkIds.length) return writeServiceError(response, 409, { code: "CONFLICT", message: "Artwork is no longer available", correlationId, retryable: false });
+    let source: Artwork[];
+    try {
+      source = await sourceArtworks(correlationId);
+    } catch (error) {
+      logger.error("artwork availability lookup failed during checkout", { correlationId, error });
+      return writeServiceError(response, 503, {
+        code: "DEPENDENCY_UNAVAILABLE",
+        message: "Artwork availability could not be confirmed. Please try again.",
+        correlationId,
+        retryable: true,
+      });
+    }
+    const resolvedCart = resolveCartArtworks(artworkIds, source);
+    if (resolvedCart.missingArtworkIds.length > 0) {
+      // Gateway cart reads hide 404 artworks; remove their stale Commerce cart references.
+      await Promise.all(resolvedCart.missingArtworkIds.map((id) => removeCartItem(buyerId, id)));
+    }
+    const items = resolvedCart.items;
+    if (items.length === 0) {
+      return writeServiceError(response, 409, { code: "CONFLICT", message: "Your cart changed. Please review it and try again.", correlationId, retryable: false });
+    }
+    if (items.some((item) => item.verificationStatus !== "verified")) {
+      return writeServiceError(response, 409, { code: "CONFLICT", message: "One or more artworks are not verified for purchase", correlationId, retryable: false });
+    }
     if (items.some((item) => item.availability !== "available")) return writeServiceError(response, 409, { code: "CONFLICT", message: "Artwork is no longer available", correlationId, retryable: false });
 
     const reservations: { artworkId: string; reservationId: string }[] = [];
     for (const item of items) {
-      const reservationId = await reserveArtworkRemote(item.id, buyerId);
-      if (!reservationId) {
-        await Promise.all(reservations.map((r) => releaseReservationRemote(r.reservationId)));
-        return writeServiceError(response, 409, { code: "CONFLICT", message: "Artwork is no longer available", correlationId, retryable: false });
+      const reservation = await reserveArtworkRemote(item.id, buyerId, correlationId);
+      if (reservation.kind !== "reserved") {
+        await releaseReservationsBestEffort(reservations.map((r) => r.reservationId), correlationId);
+        if (reservation.kind === "unavailable") {
+          return writeServiceError(response, 409, { code: "CONFLICT", message: "Artwork is no longer available", correlationId, retryable: false });
+        }
+        logger.error("artwork reservation dependency failed", {
+          correlationId,
+          artworkId: item.id,
+          reason: reservation.reason,
+          upstreamStatus: reservation.status,
+        });
+        return writeServiceError(response, 503, {
+          code: "DEPENDENCY_UNAVAILABLE",
+          message: "Artwork availability could not be confirmed. Please try again.",
+          correlationId,
+          retryable: true,
+        });
       }
-      reservations.push({ artworkId: item.id, reservationId });
+      reservations.push({ artworkId: item.id, reservationId: reservation.reservationId });
     }
 
     try {
@@ -123,7 +201,7 @@ const routes: Record<string, ServiceRouteHandler> = {
       await saveIdempotencyRecord(buyerId, idempotencyKey, requestHash, orders.map((order) => order.id));
       return writeServiceJson(response, 201, { orders, checkoutUrl: session.url }, correlationId);
     } catch (error) {
-      await Promise.all(reservations.map((r) => releaseReservationRemote(r.reservationId)));
+      await releaseReservationsBestEffort(reservations.map((r) => r.reservationId), correlationId);
       throw error;
     }
   },
@@ -189,7 +267,7 @@ const routes: Record<string, ServiceRouteHandler> = {
         const metadata = data.object.metadata as { orderIds?: string } | undefined;
         const orderIds: string[] = metadata?.orderIds ? JSON.parse(metadata.orderIds) : [];
         const result = await handlePaymentFailed(orderIds, correlationId);
-        if (result) await Promise.all(result.reservationIds.map((id) => releaseReservationRemote(id)));
+        if (result) await releaseReservationsBestEffort(result.reservationIds, correlationId);
         break;
       }
       case "charge.refunded": {
