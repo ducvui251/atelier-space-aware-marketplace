@@ -225,7 +225,7 @@ export function ArtworkForm({ initial, submitLabel, onSubmit, onSuccess }: Artwo
             accept={IMAGE_UPLOAD_ALLOWED_MIME_TYPES.join(",")}
             onChange={handleFileChange}
             disabled={uploading}
-            className="text-body-sm text-foreground"
+            className="text-body-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-label file:font-medium file:text-primary-foreground file:transition-colors file:duration-normal hover:file:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
           />
           {uploading ? <p className="text-caption text-muted-foreground">Uploading…</p> : null}
           {watch("imageUrl") ? (
