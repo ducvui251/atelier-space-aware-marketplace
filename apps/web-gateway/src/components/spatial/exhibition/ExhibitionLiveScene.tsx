@@ -18,6 +18,9 @@ export interface PlacedArtwork {
 
 interface ExhibitionLiveSceneProps {
   roomTemplateId?: string;
+  roomWidth?: number;
+  roomDepth?: number;
+  wallColor?: string;
   placedArtworks: PlacedArtwork[];
   onLockChange?: (locked: boolean) => void;
   onArtworkSelect?: (artwork: Artwork) => void;
@@ -32,6 +35,9 @@ interface ExhibitionLiveSceneProps {
  */
 export function ExhibitionLiveScene({
   roomTemplateId = "white-cube",
+  roomWidth,
+  roomDepth,
+  wallColor,
   placedArtworks,
   onLockChange,
   onArtworkSelect,
@@ -52,9 +58,9 @@ export function ExhibitionLiveScene({
         onUnlock={() => handleLockChange(false)}
       />
 
-      <Player paused={paused} />
+      <Player paused={paused} roomWidth={roomWidth} roomDepth={roomDepth} />
 
-      <RoomEnvironment templateId={roomTemplateId} />
+      <RoomEnvironment templateId={roomTemplateId} width={roomWidth} depth={roomDepth} wallColor={wallColor} />
 
       {placedArtworks.map(({ placement, artwork }) => (
         <ArtworkMesh

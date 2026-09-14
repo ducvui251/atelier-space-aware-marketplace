@@ -11,6 +11,9 @@ const ExhibitionViewer = dynamic(
 interface ExhibitionViewerLoaderProps {
   title: string;
   roomTemplateId?: string;
+  roomWidth?: number;
+  roomDepth?: number;
+  wallColor?: string;
   placedArtworks: PlacedArtwork[];
   onExit: () => void;
 }

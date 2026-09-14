@@ -22,7 +22,15 @@ export function ExhibitionLandingClient({ exhibition, creatorName, placedArtwork
   if (entered) {
     return (
       <div className="fixed inset-0 z-40">
-        <ExhibitionViewerLoader title={exhibition.title} roomTemplateId={exhibition.roomTemplateId} placedArtworks={placedArtworks} onExit={() => setEntered(false)} />
+        <ExhibitionViewerLoader
+          title={exhibition.title}
+          roomTemplateId={exhibition.roomTemplateId}
+          roomWidth={exhibition.roomWidth}
+          roomDepth={exhibition.roomDepth}
+          wallColor={exhibition.wallColor}
+          placedArtworks={placedArtworks}
+          onExit={() => setEntered(false)}
+        />
       </div>
     );
   }

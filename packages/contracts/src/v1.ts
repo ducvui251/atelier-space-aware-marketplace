@@ -331,6 +331,12 @@ export const EXHIBITION_ROOM_TEMPLATE_IDS = [
 export const ExhibitionRoomTemplateIdSchema = z.enum(EXHIBITION_ROOM_TEMPLATE_IDS);
 export type ExhibitionRoomTemplateId = z.infer<typeof ExhibitionRoomTemplateIdSchema>;
 
+// Capped at 10 (the fixed template size) so the existing placement position
+// bounds (+/-5, see builderPositionX/Z below) and camera far plane stay
+// valid without also having to widen those.
+const exhibitionRoomDimensionSchema = z.coerce.number().finite().min(6).max(10);
+const exhibitionWallColorSchema = z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, "wallColor must be a 6-digit hex color, e.g. #f5f3ee");
+
 export const CreateExhibitionRequestSchema = z.object({
   creatorType: exhibitionCreatorTypeSchema,
   creatorId: z.string().uuid(),
@@ -338,6 +344,9 @@ export const CreateExhibitionRequestSchema = z.object({
   slug: exhibitionSlugSchema,
   description: z.string().trim().optional(),
   roomTemplateId: ExhibitionRoomTemplateIdSchema,
+  roomWidth: exhibitionRoomDimensionSchema.optional(),
+  roomDepth: exhibitionRoomDimensionSchema.optional(),
+  wallColor: exhibitionWallColorSchema.optional(),
   featured: z.boolean().optional(),
 });
 
@@ -348,6 +357,9 @@ export const UpdateExhibitionRequestSchema = z.object({
   slug: exhibitionSlugSchema.optional(),
   description: z.string().trim().optional(),
   roomTemplateId: ExhibitionRoomTemplateIdSchema.optional(),
+  roomWidth: exhibitionRoomDimensionSchema.optional(),
+  roomDepth: exhibitionRoomDimensionSchema.optional(),
+  wallColor: exhibitionWallColorSchema.optional(),
   status: exhibitionStatusSchema.optional(),
   featured: z.boolean().optional(),
 });
@@ -392,12 +404,18 @@ export const CreateExhibitionBuilderRequestSchema = z.object({
   slug: exhibitionSlugSchema,
   description: z.string().trim().max(2000).optional(),
   roomTemplateId: ExhibitionRoomTemplateIdSchema,
+  roomWidth: exhibitionRoomDimensionSchema.optional(),
+  roomDepth: exhibitionRoomDimensionSchema.optional(),
+  wallColor: exhibitionWallColorSchema.optional(),
 }).strict();
 
 export const UpdateExhibitionBuilderRequestSchema = z.object({
   title: z.string().trim().min(1).max(120).optional(),
   slug: exhibitionSlugSchema.optional(),
   description: z.string().trim().max(2000).optional(),
+  roomWidth: exhibitionRoomDimensionSchema.optional(),
+  roomDepth: exhibitionRoomDimensionSchema.optional(),
+  wallColor: exhibitionWallColorSchema.optional(),
   status: exhibitionStatusSchema.optional(),
   featured: z.boolean().optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, "At least one exhibition field is required");

@@ -23,16 +23,19 @@ export interface BuilderArtworkPlacement {
 
 export interface ExhibitionBuilderViewportProps {
   roomTemplateId: string;
+  roomWidth?: number;
+  roomDepth?: number;
+  wallColor?: string;
   placedArtworks: BuilderArtworkPlacement[];
   selectedPlacementId: string | null;
   onSelect: (placementId: string) => void;
 }
 
-export function ExhibitionBuilderViewport({ roomTemplateId, placedArtworks, selectedPlacementId, onSelect }: ExhibitionBuilderViewportProps) {
+export function ExhibitionBuilderViewport({ roomTemplateId, roomWidth, roomDepth, wallColor, placedArtworks, selectedPlacementId, onSelect }: ExhibitionBuilderViewportProps) {
   return (
     <Canvas dpr={[1, 1.5]} camera={{ position: [0, 2.1, 3.7], fov: 52, near: 0.1, far: 100 }}>
       <Lighting templateId={roomTemplateId} />
-      <RoomEnvironment templateId={roomTemplateId} />
+      <RoomEnvironment templateId={roomTemplateId} width={roomWidth} depth={roomDepth} wallColor={wallColor} />
       <OrbitControls enableDamping enablePan={false} minDistance={1.5} maxDistance={7.5} target={[0, 1.6, 0]} />
       {placedArtworks.map(({ placement, artwork }) => (
         <ArtworkMesh

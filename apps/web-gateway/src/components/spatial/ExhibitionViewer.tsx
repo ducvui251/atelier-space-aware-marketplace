@@ -11,11 +11,14 @@ import { Button } from "@/components/ui/button";
 interface ExhibitionViewerProps {
   title: string;
   roomTemplateId?: string;
+  roomWidth?: number;
+  roomDepth?: number;
+  wallColor?: string;
   placedArtworks: PlacedArtwork[];
   onExit: () => void;
 }
 
-export function ExhibitionViewer({ title, roomTemplateId, placedArtworks, onExit }: ExhibitionViewerProps) {
+export function ExhibitionViewer({ title, roomTemplateId, roomWidth, roomDepth, wallColor, placedArtworks, onExit }: ExhibitionViewerProps) {
   const [locked, setLocked] = useState(false);
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
 
@@ -24,6 +27,9 @@ export function ExhibitionViewer({ title, roomTemplateId, placedArtworks, onExit
       <SpatialCanvas cameraPosition={[0, 1.6, 2.5]}>
         <ExhibitionLiveScene
           roomTemplateId={roomTemplateId}
+          roomWidth={roomWidth}
+          roomDepth={roomDepth}
+          wallColor={wallColor}
           placedArtworks={placedArtworks}
           onLockChange={setLocked}
           onArtworkSelect={setSelectedArtwork}
