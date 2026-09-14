@@ -37,17 +37,17 @@ export function RoomEnvironment({ templateId = EXHIBITION_BUILDER_ROOM_TEMPLATE_
 
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[roomWidth, roomDepth]} />
         <meshStandardMaterial color={appearance.floor} />
       </mesh>
 
-      <mesh position={[0, ROOM_HEIGHT, 0]} rotation={[Math.PI / 2, 0, 0]} receiveShadow>
+      <mesh position={[0, ROOM_HEIGHT, 0]} rotation={[Math.PI / 2, 0, 0]}>
         <planeGeometry args={[roomWidth, roomDepth]} />
         <meshStandardMaterial color={appearance.ceiling} />
       </mesh>
 
-      <mesh position={[0, ROOM_HEIGHT / 2, -roomDepth / 2]} receiveShadow>
+      <mesh position={[0, ROOM_HEIGHT / 2, -roomDepth / 2]}>
         <planeGeometry args={[roomWidth, ROOM_HEIGHT]} />
         <meshStandardMaterial color={wall} />
       </mesh>
