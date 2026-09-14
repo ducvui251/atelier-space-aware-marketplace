@@ -35,6 +35,10 @@ export function ArtworkDetailSheet({ artwork, onClose }: ArtworkDetailSheetProps
               {artwork.availability}
             </Badge>
 
+            {artwork.description ? (
+              <p className="text-body-sm text-muted-foreground">{artwork.description}</p>
+            ) : null}
+
             <dl className="flex flex-col gap-3 text-body-sm">
               <div className="flex items-center justify-between">
                 <dt className="text-muted-foreground">Dimensions</dt>
