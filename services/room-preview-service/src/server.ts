@@ -138,7 +138,7 @@ const routes: Record<string, ServiceRouteHandler> = {
       return writeServiceError(response, 403, { code: "FORBIDDEN", message: "You do not have permission to edit this exhibition", correlationId, retryable: false });
     }
     if (!(await canUseArtwork(placementInput.artworkId, actor, correlationId))) {
-      return writeServiceError(response, 403, { code: "FORBIDDEN", message: "You may only place your own artworks", correlationId, field: "artworkId", retryable: false });
+      return writeServiceError(response, 403, { code: "FORBIDDEN", message: "This artwork can't be placed — it must be your own (or, for admins, any artist's) and verified", correlationId, field: "artworkId", retryable: false });
     }
     const placement = await createExhibitionPlacement(id, placementInput);
     return writeServiceJson(response, 201, placement, correlationId);
