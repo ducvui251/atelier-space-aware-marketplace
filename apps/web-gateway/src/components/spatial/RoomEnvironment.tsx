@@ -25,17 +25,17 @@ export function RoomEnvironment({ templateId = EXHIBITION_BUILDER_ROOM_TEMPLATE_
 
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[ROOM_WIDTH, ROOM_DEPTH]} />
         <meshStandardMaterial color={appearance.floor} />
       </mesh>
 
-      <mesh position={[0, ROOM_HEIGHT, 0]} rotation={[Math.PI / 2, 0, 0]} receiveShadow>
+      <mesh position={[0, ROOM_HEIGHT, 0]} rotation={[Math.PI / 2, 0, 0]}>
         <planeGeometry args={[ROOM_WIDTH, ROOM_DEPTH]} />
         <meshStandardMaterial color={appearance.ceiling} />
       </mesh>
 
-      <mesh position={[0, ROOM_HEIGHT / 2, -ROOM_DEPTH / 2]} receiveShadow>
+      <mesh position={[0, ROOM_HEIGHT / 2, -ROOM_DEPTH / 2]}>
         <planeGeometry args={[ROOM_WIDTH, ROOM_HEIGHT]} />
         <meshStandardMaterial color={appearance.wall} />
       </mesh>
@@ -43,7 +43,6 @@ export function RoomEnvironment({ templateId = EXHIBITION_BUILDER_ROOM_TEMPLATE_
       <mesh
         position={[0, ROOM_HEIGHT / 2, ROOM_DEPTH / 2]}
         rotation={[0, Math.PI, 0]}
-        receiveShadow
       >
         <planeGeometry args={[ROOM_WIDTH, ROOM_HEIGHT]} />
         <meshStandardMaterial color={appearance.wall} />
@@ -52,7 +51,6 @@ export function RoomEnvironment({ templateId = EXHIBITION_BUILDER_ROOM_TEMPLATE_
       <mesh
         position={[-ROOM_WIDTH / 2, ROOM_HEIGHT / 2, 0]}
         rotation={[0, Math.PI / 2, 0]}
-        receiveShadow
       >
         <planeGeometry args={[ROOM_DEPTH, ROOM_HEIGHT]} />
         <meshStandardMaterial color={appearance.wall} />
@@ -61,7 +59,6 @@ export function RoomEnvironment({ templateId = EXHIBITION_BUILDER_ROOM_TEMPLATE_
       <mesh
         position={[ROOM_WIDTH / 2, ROOM_HEIGHT / 2, 0]}
         rotation={[0, -Math.PI / 2, 0]}
-        receiveShadow
       >
         <planeGeometry args={[ROOM_DEPTH, ROOM_HEIGHT]} />
         <meshStandardMaterial color={appearance.wall} />

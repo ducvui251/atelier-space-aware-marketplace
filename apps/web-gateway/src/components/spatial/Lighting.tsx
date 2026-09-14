@@ -18,8 +18,6 @@ export function Lighting({ templateId = EXHIBITION_BUILDER_ROOM_TEMPLATE_ID }: {
         position={[4, 6, 4]}
         intensity={lighting.directional}
         color={lighting.color}
-        castShadow
-        shadow-mapSize={[1024, 1024]}
       />
       {templateId === "black-box" ? (
         <>
