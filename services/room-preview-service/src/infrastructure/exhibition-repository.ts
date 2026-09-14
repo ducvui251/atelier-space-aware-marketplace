@@ -198,17 +198,23 @@ export async function listExhibitionPlacements(exhibitionId: string): Promise<Ex
 
 /**
  * An artist may only place their own artworks (§12); admins may place any
- * artwork. Ownership is verified over HTTP against artist-artwork-service,
+ * artist's. Ownership is verified over HTTP against artist-artwork-service,
  * never by joining across schemas.
+ *
+ * Every placement, regardless of who makes it, additionally requires the
+ * artwork itself to be `verified` — a pending or rejected piece has not
+ * cleared the marketplace's authenticity review and must not appear in a
+ * public 3D exhibition. This applies to admins too: verification review is
+ * a separate gate from ownership, not something the admin role bypasses.
  */
 export async function canUseArtwork(artworkId: string, actor: Actor, correlationId: string): Promise<boolean> {
-  if (actor.role === "admin") return true;
-  const artwork = await requestInternalService<{ artistId: string }>(
+  const artwork = await requestInternalService<{ artistId: string; verificationStatus: string }>(
     "artist-artwork",
     `/v1/artist-artwork/artworks/${encodeURIComponent(artworkId)}`,
     { correlationId },
   ).catch(() => null);
-  return artwork?.artistId === actor.id;
+  if (!artwork || artwork.verificationStatus !== "verified") return false;
+  return actor.role === "admin" || artwork.artistId === actor.id;
 }
 
 export async function createExhibitionPlacement(
