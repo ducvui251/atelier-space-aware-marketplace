@@ -1,4 +1,4 @@
-import { PublicDomainArtworkPageResponseSchema, type Artist, type Artwork, type ArtworkSearchQuery, type PublicDomainArtworkPageQuery, type PublicDomainArtworkPageResponse } from "@atelier/contracts";
+import { type Artist, type Artwork, type ArtworkSearchQuery } from "@atelier/contracts";
 import { requestService, ServiceClientError } from "../http-client";
 
 interface ListResponse<T> { items: T[]; total: number; }
@@ -52,12 +52,6 @@ export async function findArtist(id: string): Promise<Artist | null> {
 
 export async function listArtistArtworks(artistId: string, options: { timeoutMs?: number; correlationId?: string } = {}) {
   return requestService<{ items: Artwork[]; total?: number }>("artist-artwork", `/v1/artist-artwork/artist/artworks?artistId=${encodeURIComponent(artistId)}`, options);
-}
-
-export async function listPublicDomainArtworks(query: PublicDomainArtworkPageQuery): Promise<PublicDomainArtworkPageResponse> {
-  const params = new URLSearchParams({ page: String(query.page), limit: String(query.limit) });
-  const response = await requestService<unknown>("catalog-discovery", `/v1/catalog/reference-artworks?${params}`);
-  return PublicDomainArtworkPageResponseSchema.parse(response);
 }
 
 export async function createArtwork(input: Record<string, unknown>) {

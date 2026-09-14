@@ -55,44 +55,6 @@ export const ArtworkSearchQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(60).optional(),
 });
 
-export const PublicDomainArtworkPageQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).max(10_000).default(1),
-  limit: z.coerce.number().int().min(1).max(50).default(24),
-});
-
-const PublicDomainArtworkImageLocationSchema = z.union([
-  z.string().url(),
-  z.string().regex(/^\/[A-Za-z0-9/_~.-]+$/).refine((path) =>
-    !path.startsWith("//") && !path.split("/").includes(".."), "Image path must be a safe same-site asset path"),
-]);
-
-export const PublicDomainArtworkSchema = z.object({
-  id: z.number().int().positive(),
-  title: z.string().trim().min(1),
-  artistName: z.string().trim().min(1),
-  dateDisplay: z.string(),
-  mediumDisplay: z.string(),
-  dimensions: z.string(),
-  imageUrl: PublicDomainArtworkImageLocationSchema,
-  imageFullUrl: PublicDomainArtworkImageLocationSchema,
-  imageAltText: z.string().trim().min(1).max(2000),
-  sourceUrl: z.string().url(),
-});
-
-export const PublicDomainArtworkPageResponseSchema = z.object({
-  items: z.array(PublicDomainArtworkSchema),
-  page: z.number().int().positive(),
-  limit: z.number().int().positive(),
-  total: z.number().int().nonnegative(),
-  totalPages: z.number().int().nonnegative(),
-  hasPreviousPage: z.boolean(),
-  hasNextPage: z.boolean(),
-});
-
-export type PublicDomainArtworkPageQuery = z.infer<typeof PublicDomainArtworkPageQuerySchema>;
-export type PublicDomainArtwork = z.infer<typeof PublicDomainArtworkSchema>;
-export type PublicDomainArtworkPageResponse = z.infer<typeof PublicDomainArtworkPageResponseSchema>;
-
 // The Gateway boundary (what the browser submits) and the internal-service
 // boundary (what commerce-service requires) are different contracts: the
 // browser never supplies buyerId — it's derived from the caller's validated

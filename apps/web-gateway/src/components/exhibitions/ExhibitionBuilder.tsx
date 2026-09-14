@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Check, ExternalLink, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, ExternalLink, Lock, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import type { Artwork, Exhibition, ExhibitionPlacement, UpdateExhibitionBuilderPlacementRequest } from "@atelier/contracts";
 import { apiFetch, ApiError } from "@/lib/client/api";
 import { useAuth, useApiResource } from "@/lib/client/hooks";
@@ -348,6 +348,10 @@ export function ExhibitionBuilder({ id }: { id: string }) {
                   <div className="mt-2">
                     {placement ? (
                       <span className="text-caption text-muted-foreground">In gallery</span>
+                    ) : artwork.verificationStatus !== "verified" ? (
+                      <Button size="sm" variant="outline" className="w-full" disabled title={`This artwork must pass verification before it can go in an exhibition (currently ${artwork.verificationStatus}).`}>
+                        <Lock className="size-3.5" /> Needs verification
+                      </Button>
                     ) : (
                       <Button size="sm" variant="outline" className="w-full" disabled={busy || placementsResource.loading || Boolean(placementsResource.error)} onClick={() => void addArtwork(artwork)}><Plus className="size-3.5" /> Add to gallery</Button>
                     )}
