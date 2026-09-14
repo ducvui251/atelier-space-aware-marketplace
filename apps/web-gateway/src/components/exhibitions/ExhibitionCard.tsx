@@ -29,6 +29,9 @@ export function ExhibitionCard({ exhibition, previewImageUrl }: ExhibitionCardPr
         <p className="text-body-sm text-muted-foreground">
           {count} {count === 1 ? "artwork" : "artworks"}
         </p>
+        {exhibition.description ? (
+          <p className="mt-1 line-clamp-2 text-body-sm text-muted-foreground">{exhibition.description}</p>
+        ) : null}
         <Button asChild variant="outline" size="sm" className="mt-3 w-fit">
           <Link href={href}>Enter Exhibition</Link>
         </Button>
