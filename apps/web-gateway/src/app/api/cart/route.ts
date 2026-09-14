@@ -3,6 +3,7 @@ import { getAuthUser } from "@/lib/server/auth";
 import { json, errorResponse } from "@/lib/server/respond";
 import { addCartItem, getCart } from "@/lib/gateway/clients/commerce.client";
 import { findArtwork } from "@/lib/gateway/clients/artwork.client";
+import { ServiceClientError } from "@/lib/gateway/http-client";
 
 export async function GET(request: NextRequest) {
   const user = await getAuthUser(request);
@@ -22,5 +23,10 @@ export async function POST(request: NextRequest) {
   if (!artworkId) return errorResponse("artworkId is required", 400);
 
   try { return json(await addCartItem(user.id, artworkId), 201); }
-  catch { return errorResponse("Artwork could not be added to cart", 409); }
+  catch (error) {
+    if (error instanceof ServiceClientError && error.status < 500) {
+      return errorResponse(error.message, error.status);
+    }
+    return errorResponse("Artwork could not be added to cart", 503);
+  }
 }

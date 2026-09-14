@@ -33,7 +33,7 @@ function CheckoutView() {
   const { currentUser } = useAuth();
   const [formError, setFormError] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
-  const [unavailableIds, setUnavailableIds] = React.useState<string[]>([]);
+  const [checkoutConflict, setCheckoutConflict] = React.useState(false);
 
   const {
     register,
@@ -67,7 +67,7 @@ function CheckoutView() {
 
   async function onSubmit(values: CheckoutFormValues) {
     setFormError(null);
-    setUnavailableIds([]);
+    setCheckoutConflict(false);
     setSubmitting(true);
     try {
       const result = await apiFetch<{ checkoutUrl?: string }>("/api/checkout", {
@@ -91,7 +91,7 @@ function CheckoutView() {
     } catch (error) {
       const message = error instanceof ApiError ? error.message : "Checkout failed. Please try again.";
       setFormError(message);
-      if (error instanceof ApiError && error.status === 409) setUnavailableIds(items.map((item) => item.id));
+      if (error instanceof ApiError && error.status === 409) setCheckoutConflict(true);
     } finally {
       setSubmitting(false);
     }
@@ -106,9 +106,9 @@ function CheckoutView() {
             className="rounded-md border border-destructive bg-destructive-soft px-3 py-2 text-body-sm text-destructive-foreground"
           >
             <p>{formError}</p>
-            {unavailableIds.length > 0 ? (
+            {checkoutConflict ? (
               <Link href="/cart" className="mt-1 inline-block underline underline-offset-2">
-                Back to cart to see alternatives
+                Review your cart before trying again
               </Link>
             ) : null}
           </div>
@@ -156,7 +156,6 @@ function CheckoutView() {
                 <p className="text-body-sm text-foreground">{artwork.title}</p>
                 <p className="text-caption text-muted-foreground">
                   {formatPrice(artwork.price, artwork.currency)}
-                  {unavailableIds.includes(artwork.id) ? " · just sold out" : ""}
                 </p>
               </div>
             </div>
