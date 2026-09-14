@@ -15,6 +15,9 @@ type ExhibitionRow = {
   creator_type: string;
   creator_id: string;
   room_template_id: string;
+  room_width: string | null;
+  room_depth: string | null;
+  wall_color: string | null;
   status: string;
   featured: boolean;
   artwork_count: number;
@@ -44,7 +47,7 @@ type PlacementRow = {
 // Every exhibition query aliases the table as `e` so these two correlated
 // subqueries (read-model enrichment, not stored columns) resolve the same
 // way in SELECT, INSERT ... RETURNING, and UPDATE ... RETURNING.
-const EXHIBITION_COLUMNS = `e.id::text, e.title, e.slug, e.description, e.creator_type, e.creator_id::text, e.room_template_id, e.status, e.featured, e.created_at::text, e.updated_at::text,
+const EXHIBITION_COLUMNS = `e.id::text, e.title, e.slug, e.description, e.creator_type, e.creator_id::text, e.room_template_id, e.room_width::text, e.room_depth::text, e.wall_color, e.status, e.featured, e.created_at::text, e.updated_at::text,
   (select count(*) from room_preview.exhibition_placements p where p.exhibition_id = e.id)::int as artwork_count,
   (select p.artwork_id::text from room_preview.exhibition_placements p where p.exhibition_id = e.id order by p.placement_order nulls last, p.created_at limit 1) as preview_artwork_id`;
 const PLACEMENT_COLUMNS = `id::text, exhibition_id::text, artwork_id::text, position_x::text, position_y::text, position_z::text, rotation_x::text, rotation_y::text, rotation_z::text, scale::text, wall_id, frame_style, placement_order, created_at::text, updated_at::text`;
@@ -58,6 +61,9 @@ function mapExhibition(row: ExhibitionRow): Exhibition {
     creatorType: row.creator_type as ExhibitionCreatorType,
     creatorId: row.creator_id,
     roomTemplateId: row.room_template_id,
+    ...(row.room_width !== null ? { roomWidth: Number(row.room_width) } : {}),
+    ...(row.room_depth !== null ? { roomDepth: Number(row.room_depth) } : {}),
+    ...(row.wall_color ? { wallColor: row.wall_color } : {}),
     status: row.status as Exhibition["status"],
     featured: row.featured,
     artworkCount: row.artwork_count,
@@ -136,16 +142,30 @@ export async function createExhibition(input: {
   slug: string;
   description?: string;
   roomTemplateId: string;
+  roomWidth?: number;
+  roomDepth?: number;
+  wallColor?: string;
   featured?: boolean;
 }): Promise<Exhibition | null> {
   const existing = await query<{ id: string }>(`select id::text from room_preview.exhibitions where slug = $1`, [input.slug]);
   if (existing[0]) return null;
 
   const rows = await query<ExhibitionRow>(
-    `insert into room_preview.exhibitions as e (title, slug, description, creator_type, creator_id, room_template_id, featured)
-     values ($1, $2, $3, $4, $5::uuid, $6, $7)
+    `insert into room_preview.exhibitions as e (title, slug, description, creator_type, creator_id, room_template_id, room_width, room_depth, wall_color, featured)
+     values ($1, $2, $3, $4, $5::uuid, $6, $7, $8, $9, $10)
      returning ${EXHIBITION_COLUMNS}`,
-    [input.title, input.slug, input.description ?? null, input.creatorType, input.creatorId, input.roomTemplateId, input.featured ?? false],
+    [
+      input.title,
+      input.slug,
+      input.description ?? null,
+      input.creatorType,
+      input.creatorId,
+      input.roomTemplateId,
+      input.roomWidth ?? null,
+      input.roomDepth ?? null,
+      input.wallColor ?? null,
+      input.featured ?? false,
+    ],
   );
   return mapExhibition(rows[0]);
 }
@@ -153,7 +173,17 @@ export async function createExhibition(input: {
 /** Returns null when the slug is already taken by a different exhibition. */
 export async function updateExhibition(
   id: string,
-  patch: { title?: string; slug?: string; description?: string; roomTemplateId?: string; status?: Exhibition["status"]; featured?: boolean },
+  patch: {
+    title?: string;
+    slug?: string;
+    description?: string;
+    roomTemplateId?: string;
+    roomWidth?: number;
+    roomDepth?: number;
+    wallColor?: string;
+    status?: Exhibition["status"];
+    featured?: boolean;
+  },
 ): Promise<Exhibition | null> {
   if (patch.slug) {
     const existing = await query<{ id: string }>(`select id::text from room_preview.exhibitions where slug = $1 and id::text != $2`, [patch.slug, id]);
@@ -170,6 +200,9 @@ export async function updateExhibition(
   if (patch.slug !== undefined) addSet("slug", patch.slug);
   if (patch.description !== undefined) addSet("description", patch.description);
   if (patch.roomTemplateId !== undefined) addSet("room_template_id", patch.roomTemplateId);
+  if (patch.roomWidth !== undefined) addSet("room_width", patch.roomWidth);
+  if (patch.roomDepth !== undefined) addSet("room_depth", patch.roomDepth);
+  if (patch.wallColor !== undefined) addSet("wall_color", patch.wallColor);
   if (patch.status !== undefined) addSet("status", patch.status);
   if (patch.featured !== undefined) addSet("featured", patch.featured);
   if (setClauses.length === 0) return findExhibitionById(id);

@@ -78,6 +78,11 @@ export interface Exhibition {
   creatorType: ExhibitionCreatorType;
   creatorId: string;
   roomTemplateId: string;
+  /** Overrides the template's fixed 10x10 footprint when set (6-10m each). */
+  roomWidth?: number;
+  roomDepth?: number;
+  /** Overrides the template's wall color when set; floor/ceiling/trim stay from the template. */
+  wallColor?: string;
   status: ExhibitionStatus;
   featured: boolean;
   /** Read-model enrichment computed by room-preview-service, not stored. */

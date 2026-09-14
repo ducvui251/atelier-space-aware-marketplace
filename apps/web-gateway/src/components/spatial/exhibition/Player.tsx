@@ -10,9 +10,6 @@ const PLAYER_RADIUS = 0.35;
 const EYE_HEIGHT = 1.6;
 const SPAWN_POSITION: [number, number, number] = [0, EYE_HEIGHT, 2.5];
 
-const BOUNDS_X = ROOM_WIDTH / 2 - PLAYER_RADIUS;
-const BOUNDS_Z = ROOM_DEPTH / 2 - PLAYER_RADIUS;
-
 type MoveDirection = "forward" | "backward" | "left" | "right";
 
 const KEY_MAP: Record<string, MoveDirection> = {
@@ -31,6 +28,9 @@ const pressedKeys = new Set<MoveDirection>();
 interface PlayerProps {
   /** Freezes WASD movement (e.g. while an artwork detail panel is open). */
   paused?: boolean;
+  /** Room footprint for the collision bounds — must match the RoomEnvironment rendered alongside this Player. */
+  roomWidth?: number;
+  roomDepth?: number;
 }
 
 /**
@@ -40,9 +40,11 @@ interface PlayerProps {
  * with no interior obstacles yet. Look direction comes from the R3F default
  * camera, which PointerLockControls rotates elsewhere in the scene.
  */
-export function Player({ paused = false }: PlayerProps) {
+export function Player({ paused = false, roomWidth = ROOM_WIDTH, roomDepth = ROOM_DEPTH }: PlayerProps) {
   const { camera } = useThree();
   const position = useRef(new THREE.Vector3(...SPAWN_POSITION));
+  const boundsX = roomWidth / 2 - PLAYER_RADIUS;
+  const boundsZ = roomDepth / 2 - PLAYER_RADIUS;
 
   useEffect(() => {
     camera.position.copy(position.current);
@@ -88,8 +90,8 @@ export function Player({ paused = false }: PlayerProps) {
       moveDir.normalize().multiplyScalar(MOVE_SPEED * delta);
       position.current.x += moveDir.x;
       position.current.z += moveDir.z;
-      position.current.x = THREE.MathUtils.clamp(position.current.x, -BOUNDS_X, BOUNDS_X);
-      position.current.z = THREE.MathUtils.clamp(position.current.z, -BOUNDS_Z, BOUNDS_Z);
+      position.current.x = THREE.MathUtils.clamp(position.current.x, -boundsX, boundsX);
+      position.current.z = THREE.MathUtils.clamp(position.current.z, -boundsZ, boundsZ);
       camera.position.x = position.current.x;
       camera.position.z = position.current.z;
     }

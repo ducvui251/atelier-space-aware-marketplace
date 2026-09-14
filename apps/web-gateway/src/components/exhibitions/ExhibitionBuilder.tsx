@@ -32,6 +32,13 @@ const FRAME_STYLES: Array<{ id: FrameStyle; label: string }> = [
 ];
 const EMPTY_ARTWORKS: Artwork[] = [];
 
+// Matches RoomEnvironment's fixed default and the contract bounds
+// (exhibitionRoomDimensionSchema in packages/contracts/src/v1.ts).
+const DEFAULT_ROOM_SIZE = 10;
+const MIN_ROOM_SIZE = 6;
+const MAX_ROOM_SIZE = 10;
+const WALL_INSET = 0.1;
+
 const TRANSFORM_GROUPS: Array<{ title: string; fields: Array<{ name: TransformField; label: string; min: number; max: number; step: number }> }> = [
   { title: "Position (m)", fields: [
     { name: "positionX", label: "X", min: -5, max: 5, step: 0.05 },
@@ -45,22 +52,24 @@ const TRANSFORM_GROUPS: Array<{ title: string; fields: Array<{ name: TransformFi
   ] },
 ];
 
-function defaultWallSlot(index: number) {
+function defaultWallSlot(index: number, roomWidth: number, roomDepth: number) {
   const wall = WALLS[Math.floor(index / 5) % WALLS.length].id;
+  const halfWidth = roomWidth / 2 - WALL_INSET;
+  const halfDepth = roomDepth / 2 - WALL_INSET;
   const along = ((index % 5) - 2) * 1.65;
   const placement = {
     positionX: along,
     positionY: 1.6,
-    positionZ: -4.9,
+    positionZ: -halfDepth,
     rotationX: 0,
     rotationY: 0,
     rotationZ: 0,
     scale: 1,
     wallId: wall,
   };
-  if (wall === "back") return { ...placement, positionZ: 4.9, rotationY: 180 };
-  if (wall === "left") return { ...placement, positionX: -4.9, positionZ: along, rotationY: 90 };
-  if (wall === "right") return { ...placement, positionX: 4.9, positionZ: along, rotationY: -90 };
+  if (wall === "back") return { ...placement, positionZ: halfDepth, rotationY: 180 };
+  if (wall === "left") return { ...placement, positionX: -halfWidth, positionZ: along, rotationY: 90 };
+  if (wall === "right") return { ...placement, positionX: halfWidth, positionZ: along, rotationY: -90 };
   return placement;
 }
 
@@ -105,6 +114,9 @@ export function ExhibitionBuilder({ id }: { id: string }) {
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
   const [featured, setFeatured] = useState(false);
+  const [roomWidth, setRoomWidth] = useState(DEFAULT_ROOM_SIZE);
+  const [roomDepth, setRoomDepth] = useState(DEFAULT_ROOM_SIZE);
+  const [wallColor, setWallColor] = useState<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
@@ -117,6 +129,9 @@ export function ExhibitionBuilder({ id }: { id: string }) {
     setSlug(exhibition.slug);
     setDescription(exhibition.description ?? "");
     setFeatured(exhibition.featured);
+    setRoomWidth(exhibition.roomWidth ?? DEFAULT_ROOM_SIZE);
+    setRoomDepth(exhibition.roomDepth ?? DEFAULT_ROOM_SIZE);
+    setWallColor(exhibition.wallColor);
   }, [exhibitionResource.data]);
 
   useEffect(() => {
@@ -159,7 +174,7 @@ export function ExhibitionBuilder({ id }: { id: string }) {
     }
     setBusy(true);
     setError(null);
-    const slot = defaultWallSlot(placements.length);
+    const slot = defaultWallSlot(placements.length, roomWidth, roomDepth);
     try {
       const placement = await apiFetch<ExhibitionPlacement>(`/api/exhibitions/${id}/placements`, {
         method: "POST",
@@ -210,11 +225,14 @@ export function ExhibitionBuilder({ id }: { id: string }) {
     setError(null);
     setSavedMessage(null);
     try {
-      const patch: Record<string, string | boolean> = {};
+      const patch: Record<string, string | boolean | number> = {};
       if (title.trim() !== savedExhibition.title) patch.title = title.trim();
       if (slug.trim() !== savedExhibition.slug) patch.slug = slug.trim();
       if (description.trim() !== (savedExhibition.description ?? "")) patch.description = description.trim();
       if (isAdmin && featured !== savedExhibition.featured) patch.featured = featured;
+      if (roomWidth !== (savedExhibition.roomWidth ?? DEFAULT_ROOM_SIZE)) patch.roomWidth = roomWidth;
+      if (roomDepth !== (savedExhibition.roomDepth ?? DEFAULT_ROOM_SIZE)) patch.roomDepth = roomDepth;
+      if (wallColor !== savedExhibition.wallColor && wallColor) patch.wallColor = wallColor;
 
       let updated = savedExhibition;
       if (Object.keys(patch).length) {
@@ -251,16 +269,18 @@ export function ExhibitionBuilder({ id }: { id: string }) {
 
   function changeWall(wallId: WallId) {
     if (!selectedPlacement) return;
+    const halfWidth = roomWidth / 2 - WALL_INSET;
+    const halfDepth = roomDepth / 2 - WALL_INSET;
     const along = selectedPlacement.wallId === "left" || selectedPlacement.wallId === "right"
       ? selectedPlacement.positionZ
       : selectedPlacement.positionX;
     const wallTransform = wallId === "front"
-      ? { positionX: along, positionZ: -4.9, rotationY: 0 }
+      ? { positionX: along, positionZ: -halfDepth, rotationY: 0 }
       : wallId === "back"
-        ? { positionX: along, positionZ: 4.9, rotationY: 180 }
+        ? { positionX: along, positionZ: halfDepth, rotationY: 180 }
         : wallId === "left"
-          ? { positionX: -4.9, positionZ: along, rotationY: 90 }
-          : { positionX: 4.9, positionZ: along, rotationY: -90 };
+          ? { positionX: -halfWidth, positionZ: along, rotationY: 90 }
+          : { positionX: halfWidth, positionZ: along, rotationY: -90 };
     setPlacements((current) => current.map((placement) => placement.id === selectedPlacement.id
       ? { ...placement, ...wallTransform, wallId }
       : placement));
@@ -340,7 +360,15 @@ export function ExhibitionBuilder({ id }: { id: string }) {
         </aside>
 
         <section aria-label="3D gallery viewport" className="relative h-[420px] overflow-hidden rounded-lg border border-border bg-muted sm:h-[540px] lg:h-[min(72vh,760px)]">
-          <ExhibitionBuilderViewportLoader roomTemplateId={savedExhibition.roomTemplateId} placedArtworks={placedArtworks} selectedPlacementId={selectedPlacementId} onSelect={setSelectedPlacementId} />
+          <ExhibitionBuilderViewportLoader
+            roomTemplateId={savedExhibition.roomTemplateId}
+            roomWidth={roomWidth}
+            roomDepth={roomDepth}
+            wallColor={wallColor}
+            placedArtworks={placedArtworks}
+            selectedPlacementId={selectedPlacementId}
+            onSelect={setSelectedPlacementId}
+          />
           {!placedArtworks.length ? (
             <div className="absolute inset-0 grid place-items-center p-6 text-center">
               <div className="max-w-sm rounded-lg border border-border bg-surface/95 p-6 shadow-sm">
@@ -401,6 +429,53 @@ export function ExhibitionBuilder({ id }: { id: string }) {
           ) : (
             <p className="pt-4 text-body-sm text-muted-foreground">Add an artwork or select one from the room to edit its placement.</p>
           )}
+          <div className="mt-5 border-t border-border pt-4">
+            <h2 className="font-medium text-foreground">Room</h2>
+            <p className="mt-1 text-caption text-muted-foreground">Resize the {roomName} room and recolor its walls.</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <label className="grid gap-1 text-caption text-muted-foreground">
+                Width (m)
+                <Input
+                  type="number"
+                  min={MIN_ROOM_SIZE}
+                  max={MAX_ROOM_SIZE}
+                  step={0.5}
+                  value={roomWidth}
+                  disabled={busy}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    if (Number.isFinite(value)) setRoomWidth(Math.min(MAX_ROOM_SIZE, Math.max(MIN_ROOM_SIZE, value)));
+                  }}
+                />
+              </label>
+              <label className="grid gap-1 text-caption text-muted-foreground">
+                Depth (m)
+                <Input
+                  type="number"
+                  min={MIN_ROOM_SIZE}
+                  max={MAX_ROOM_SIZE}
+                  step={0.5}
+                  value={roomDepth}
+                  disabled={busy}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    if (Number.isFinite(value)) setRoomDepth(Math.min(MAX_ROOM_SIZE, Math.max(MIN_ROOM_SIZE, value)));
+                  }}
+                />
+              </label>
+            </div>
+            <label className="mt-3 flex items-center gap-2 text-caption font-medium text-foreground">
+              Wall color
+              <input
+                type="color"
+                className="h-8 w-14 cursor-pointer rounded border border-border bg-transparent p-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+                value={wallColor ?? "#f5f3ee"}
+                disabled={busy}
+                onChange={(event) => setWallColor(event.target.value)}
+              />
+            </label>
+          </div>
+
           <div className="mt-5 border-t border-border pt-4">
             <label className="grid gap-1.5 text-caption font-medium text-foreground">Exhibition link
               <Input value={slug} maxLength={120} disabled={busy} onChange={(event) => setSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/-{2,}/g, "-").replace(/^-+|-+$/g, ""))} />
