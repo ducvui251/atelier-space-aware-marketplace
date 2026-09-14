@@ -135,7 +135,7 @@ export function ArtworkMesh({
       onPointerOut={interactive ? handlePointerOut : undefined}
       onClick={interactive ? handleClick : undefined}
     >
-      <mesh castShadow receiveShadow>
+      <mesh>
         <boxGeometry args={[widthMeters + FRAME_BORDER, heightMeters + FRAME_BORDER, FRAME_DEPTH]} />
         <meshStandardMaterial
           color={highlighted ? HOVER_COLOR : frameColor}
