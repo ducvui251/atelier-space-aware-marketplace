@@ -26,7 +26,12 @@ export function displayableImageUrl(url: string | undefined | null): string {
 
 // Must be one of next/image's configured `deviceSizes` (the defaults, since
 // next.config.ts doesn't override them) or the optimizer rejects the request.
-const TEXTURE_WIDTH = 1080;
+// A room with several placed artworks keeps every one of their textures
+// resident in GPU memory at once (three.js doesn't unmount off-screen
+// meshes, only skips drawing them), so this was reported as visibly janky
+// camera rotation with 4-7 artworks in one room at the previous 1080 —
+// 768 is still sharp at the distances artwork is actually viewed from.
+const TEXTURE_WIDTH = 768;
 
 /**
  * Same-origin URL for loading an artwork image as a WebGL texture, or
