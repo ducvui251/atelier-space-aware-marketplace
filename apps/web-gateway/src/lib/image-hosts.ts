@@ -6,7 +6,7 @@
  * "No image" placeholder. The mock dataset still contains artworks with
  * example.com / wikipedia page URLs, which is exactly the case this guards.
  */
-const DISPLAYABLE_HOSTS = ["images.unsplash.com", "openaccess-cdn.clevelandart.org"];
+const DISPLAYABLE_HOSTS = ["images.unsplash.com", "openaccess-cdn.clevelandart.org", "images.metmuseum.org"];
 
 export function isDisplayableImageUrl(url: string): boolean {
   if (!url) return false;
@@ -22,4 +22,27 @@ export function isDisplayableImageUrl(url: string): boolean {
 /** The URL if next/image can serve it, otherwise "" (ArtworkImage's placeholder case). */
 export function displayableImageUrl(url: string | undefined | null): string {
   return url && isDisplayableImageUrl(url) ? url : "";
+}
+
+// Must be one of next/image's configured `deviceSizes` (the defaults, since
+// next.config.ts doesn't override them) or the optimizer rejects the request.
+const TEXTURE_WIDTH = 1080;
+
+/**
+ * Same-origin URL for loading an artwork image as a WebGL texture, or
+ * undefined when the host isn't servable (the 3D scene then renders a plain
+ * colour panel instead of firing a request that can only fail).
+ *
+ * The 3D scene can't load the CDN URL directly the way an <img> can: WebGL
+ * textures are tainted-canvas territory, so the browser requires a CORS
+ * `Access-Control-Allow-Origin` header on the image response — and the
+ * museum CDNs the catalog is sourced from don't reliably send one (Cleveland
+ * never does; the Met sends it on HEAD but not on the actual GET). Routing
+ * through next/image's optimizer makes the request same-origin, which needs
+ * no CORS at all, and reuses the host allowlist above.
+ */
+export function textureImageUrl(url: string | undefined | null): string | undefined {
+  if (!url || !isDisplayableImageUrl(url)) return undefined;
+  if (url.startsWith("/")) return url;
+  return `/_next/image?url=${encodeURIComponent(url)}&w=${TEXTURE_WIDTH}&q=80`;
 }

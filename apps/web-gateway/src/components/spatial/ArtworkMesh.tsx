@@ -1,8 +1,10 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Component, Suspense, useLayoutEffect, useState, type ReactNode } from "react";
 import { useTexture, Html } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
+import { SRGBColorSpace } from "three";
+import { textureImageUrl } from "@/lib/image-hosts";
 
 interface ArtworkMeshProps {
   position: [number, number, number];
@@ -43,13 +45,19 @@ function ColorPanel({
 function TexturedPanel({
   widthMeters,
   heightMeters,
-  imageUrl,
+  textureUrl,
 }: {
   widthMeters: number;
   heightMeters: number;
-  imageUrl: string;
+  textureUrl: string;
 }) {
-  const texture = useTexture(imageUrl);
+  const texture = useTexture(textureUrl);
+  // Photos are sRGB; left at the loader's default (no colour space) they
+  // render washed out under the renderer's sRGB output.
+  useLayoutEffect(() => {
+    texture.colorSpace = SRGBColorSpace;
+    texture.needsUpdate = true;
+  }, [texture]);
   return (
     <mesh position={[0, 0, FRAME_DEPTH / 2 + 0.001]}>
       <planeGeometry args={[widthMeters, heightMeters]} />
@@ -59,11 +67,31 @@ function TexturedPanel({
 }
 
 /**
+ * useTexture surfaces a failed image load by throwing, and without a boundary
+ * that unmounts the whole Canvas (the builder/viewer page died to a single
+ * un-loadable image). Fall back to the placeholder panel for just this one
+ * artwork instead. Keyed on the URL by the caller so a new image gets a fresh
+ * attempt.
+ */
+class TextureErrorBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
+/**
  * Artwork frame rendered at real dimensions (widthMeters/heightMeters come
  * from the artwork's widthCm/heightCm, converted 1cm = 0.01 three.js units).
  * Renders the real image when `imageUrl` is given, falling back to a
- * placeholder color panel while it loads or when no image is available.
- * Hoverable/clickable (highlighted frame) when `onSelect` is provided.
+ * placeholder color panel while it loads, when it fails to load, or when no
+ * image is available. Hoverable/clickable (highlighted frame) when `onSelect`
+ * is provided.
  */
 export function ArtworkMesh({
   position,
@@ -81,6 +109,8 @@ export function ArtworkMesh({
   const [hovered, setHovered] = useState(false);
   const interactive = Boolean(onSelect);
   const highlighted = hovered || selected;
+  const textureUrl = textureImageUrl(imageUrl);
+  const placeholder = <ColorPanel widthMeters={widthMeters} heightMeters={heightMeters} color={color} />;
 
   const handlePointerOver = (event: ThreeEvent<PointerEvent>) => {
     event.stopPropagation();
@@ -113,12 +143,14 @@ export function ArtworkMesh({
           emissiveIntensity={highlighted ? 0.4 : 0}
         />
       </mesh>
-      {imageUrl ? (
-        <Suspense fallback={<ColorPanel widthMeters={widthMeters} heightMeters={heightMeters} color={color} />}>
-          <TexturedPanel widthMeters={widthMeters} heightMeters={heightMeters} imageUrl={imageUrl} />
-        </Suspense>
+      {textureUrl ? (
+        <TextureErrorBoundary key={textureUrl} fallback={placeholder}>
+          <Suspense fallback={placeholder}>
+            <TexturedPanel widthMeters={widthMeters} heightMeters={heightMeters} textureUrl={textureUrl} />
+          </Suspense>
+        </TextureErrorBoundary>
       ) : (
-        <ColorPanel widthMeters={widthMeters} heightMeters={heightMeters} color={color} />
+        placeholder
       )}
       {sold ? (
         <Html position={[0, -heightMeters / 2 - 0.12, FRAME_DEPTH / 2 + 0.01]} center distanceFactor={8}>

@@ -60,7 +60,11 @@ export function ExhibitionLiveScene({
         <ArtworkMesh
           key={placement.id}
           position={[placement.positionX, placement.positionY, placement.positionZ]}
-          rotationY={placement.rotationY * DEGREES_TO_RADIANS}
+          rotation={[
+            placement.rotationX * DEGREES_TO_RADIANS,
+            placement.rotationY * DEGREES_TO_RADIANS,
+            placement.rotationZ * DEGREES_TO_RADIANS,
+          ]}
           widthMeters={artwork.widthCm * METERS_PER_CM * placement.scale}
           heightMeters={artwork.heightCm * METERS_PER_CM * placement.scale}
           imageUrl={artwork.imageUrl}
