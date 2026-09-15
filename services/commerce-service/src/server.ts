@@ -270,6 +270,22 @@ const routes: Record<string, ServiceRouteHandler> = {
         if (result) await releaseReservationsBestEffort(result.reservationIds, correlationId);
         break;
       }
+      case "checkout.session.expired": {
+        // A buyer who never attempts a card charge gets no
+        // payment_intent.payment_failed — Stripe just expires the Checkout
+        // Session (24h by default) and sends this instead. Without handling
+        // it, the order/payment/reservation stay "pending"/"open" forever,
+        // which is exactly the stuck-order gap noted in stripe-integration.md.
+        // orderIds live on the PaymentIntent's metadata, not the Session's
+        // (see createCheckoutSession), so look the session up by id instead.
+        const sessionId = typeof data.object.id === "string" ? data.object.id : "";
+        const session = sessionId ? await getCheckoutSession(sessionId) : null;
+        if (session && session.status === "open") {
+          const result = await handlePaymentFailed(session.orderIds, correlationId);
+          if (result) await releaseReservationsBestEffort(result.reservationIds, correlationId);
+        }
+        break;
+      }
       case "charge.refunded": {
         const paymentIntentId = typeof data.object.payment_intent === "string" ? data.object.payment_intent : "";
         if (paymentIntentId) {
