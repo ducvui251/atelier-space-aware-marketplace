@@ -117,6 +117,8 @@ function ComplaintForm({ orderId }: { orderId: string }) {
 function OrderRow({ order, onChanged }: { order: Order; onChanged: () => void }) {
   const { data: artwork } = useApiResource<Artwork>(`/api/artworks/${encodeURIComponent(order.artworkId)}`);
   const [confirming, setConfirming] = React.useState(false);
+  const [resuming, setResuming] = React.useState(false);
+  const [resumeError, setResumeError] = React.useState<string | null>(null);
 
   async function confirmReceived() {
     setConfirming(true);
@@ -125,6 +127,18 @@ function OrderRow({ order, onChanged }: { order: Order; onChanged: () => void })
       onChanged();
     } finally {
       setConfirming(false);
+    }
+  }
+
+  async function continueCheckout() {
+    setResuming(true);
+    setResumeError(null);
+    try {
+      const { checkoutUrl } = await apiFetch<{ checkoutUrl: string }>(`/api/orders/${encodeURIComponent(order.id)}/resume-checkout`);
+      window.location.href = checkoutUrl;
+    } catch {
+      setResumeError("This checkout link has expired. Start a new purchase to try again.");
+      setResuming(false);
     }
   }
 
@@ -144,6 +158,11 @@ function OrderRow({ order, onChanged }: { order: Order; onChanged: () => void })
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
+        {order.status === "pending" ? (
+          <Button size="sm" disabled={resuming} onClick={continueCheckout}>
+            {resuming ? "Opening checkout…" : "Continue checkout"}
+          </Button>
+        ) : null}
         {order.status === "shipped" ? (
           <Button size="sm" disabled={confirming} onClick={confirmReceived}>
             {confirming ? "Confirming…" : "Mark as received"}
@@ -151,6 +170,7 @@ function OrderRow({ order, onChanged }: { order: Order; onChanged: () => void })
         ) : null}
         {order.status === "shipped" || order.status === "completed" ? <ComplaintForm orderId={order.id} /> : null}
       </div>
+      {resumeError ? <p role="alert" className="mt-2 text-caption text-destructive">{resumeError}</p> : null}
 
       {order.status === "completed" ? (
         <div className="mt-4 border-t border-border pt-4">

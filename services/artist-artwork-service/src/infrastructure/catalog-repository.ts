@@ -103,19 +103,30 @@ export async function createPersistedArtwork(input: {
   return artwork;
 }
 
-export async function updatePersistedArtwork(id: string, input: Partial<Pick<Artwork, "title" | "description" | "medium" | "price" | "widthCm" | "heightCm" | "year" | "currency" | "orientation" | "dominantColors" | "style">>): Promise<Artwork | null> {
+export async function updatePersistedArtwork(id: string, input: Partial<Pick<Artwork, "title" | "description" | "medium" | "price" | "widthCm" | "heightCm" | "year" | "currency" | "orientation" | "dominantColors" | "style" | "imageUrl">>): Promise<Artwork | null> {
   const current = await findPersistedArtwork(id);
   if (!current) return null;
-  // Re-submitting for review clears the prior decision (note/reviewer/
-  // timestamp) from the projection — a fresh pending row must not display a
-  // rejection reason left over from before this edit as if it belonged to
-  // the new submission. The decision itself stays intact in Verification's
-  // own audit trail (verification.artwork_verifications), this only clears
-  // the projection's copy.
-  await query(
-    `update artist_artwork.artworks set title = $2, description = $3, medium = $4, price = $5, width_cm = $6, height_cm = $7, creation_year = $8, currency = $9, orientation = $10, dominant_colors = $11::jsonb, styles = $12::jsonb, verification_status = 'pending', verification_note = null, reviewed_by = null, reviewed_at = null, updated_at = now() where id::text = $1`,
-    [id, input.title ?? current.title, input.description ?? current.description ?? null, input.medium ?? current.medium, input.price ?? current.price, input.widthCm ?? current.widthCm, input.heightCm ?? current.heightCm, input.year ?? current.year, input.currency ?? current.currency, input.orientation ?? current.orientation, JSON.stringify(input.dominantColors ?? current.dominantColors), JSON.stringify(input.style ?? current.style)],
-  );
+  await transaction(async (client) => {
+    // Re-submitting for review clears the prior decision (note/reviewer/
+    // timestamp) from the projection — a fresh pending row must not display
+    // a rejection reason left over from before this edit as if it belonged
+    // to the new submission. The decision itself stays intact in
+    // Verification's own audit trail (verification.artwork_verifications),
+    // this only clears the projection's copy.
+    await client.query(
+      `update artist_artwork.artworks set title = $2, description = $3, medium = $4, price = $5, width_cm = $6, height_cm = $7, creation_year = $8, currency = $9, orientation = $10, dominant_colors = $11::jsonb, styles = $12::jsonb, verification_status = 'pending', verification_note = null, reviewed_by = null, reviewed_at = null, updated_at = now() where id::text = $1`,
+      [id, input.title ?? current.title, input.description ?? current.description ?? null, input.medium ?? current.medium, input.price ?? current.price, input.widthCm ?? current.widthCm, input.heightCm ?? current.heightCm, input.year ?? current.year, input.currency ?? current.currency, input.orientation ?? current.orientation, JSON.stringify(input.dominantColors ?? current.dominantColors), JSON.stringify(input.style ?? current.style)],
+    );
+    // The primary image row always exists (createPersistedArtwork inserts
+    // exactly one, and nothing else deletes it), so this is a plain update
+    // rather than an upsert.
+    if (input.imageUrl && input.imageUrl !== current.imageUrl) {
+      await client.query(
+        `update artist_artwork.artwork_images set image_url = $2 where artwork_id = $1::uuid and is_primary = true`,
+        [id, input.imageUrl],
+      );
+    }
+  });
   return findPersistedArtwork(id);
 }
 
@@ -142,8 +153,9 @@ export async function ensureArtistProfile(userId: string, displayName: string): 
   return mapArtist(rows[0]);
 }
 
-export async function listPersistedArtists(): Promise<Artist[]> {
-  return (await query<ArtistRow>(`select ${artistColumns} from artist_artwork.artist_profiles`)).map(mapArtist);
+export async function listPersistedArtists(options: { includeAllStatuses?: boolean } = {}): Promise<Artist[]> {
+  const where = options.includeAllStatuses ? "" : "where verification_status = 'verified'";
+  return (await query<ArtistRow>(`select ${artistColumns} from artist_artwork.artist_profiles ${where}`)).map(mapArtist);
 }
 
 export async function findPersistedArtist(id: string): Promise<Artist | null> {
@@ -244,7 +256,7 @@ export interface Reservation {
   expiresAt: string;
 }
 
-const RESERVATION_LEASE_MS = Number(process.env.RESERVATION_LEASE_MS ?? 10 * 60_000);
+const RESERVATION_LEASE_MS = Number(process.env.RESERVATION_LEASE_MS ?? 15 * 60_000);
 
 /**
  * Atomic available -> reserved, guarded the same way

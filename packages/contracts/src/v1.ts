@@ -145,6 +145,7 @@ export const ArtworkUpdateRequestSchema = z.object({
   orientation: orientationEnum.optional(),
   dominantColors: z.array(z.string()).optional(),
   style: z.array(z.string()).optional(),
+  imageUrl: z.string().trim().url().optional(),
 });
 
 export const ArtworkAvailabilityRequestSchema = z.object({
