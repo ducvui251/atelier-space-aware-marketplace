@@ -258,7 +258,11 @@ services:
     restart: unless-stopped
     deploy:
       resources:
-        limits: { memory: 512m, cpus: "1.0" }
+        # Was 512m - the catalog has grown to ~4,700 artworks since this
+        # limit was set for the original small mock dataset, and pages like
+        # /artists/[id] were getting OOM-killed under that ceiling (docker
+        # stats showed 489MB/512MB at idle). 1024m gives real headroom.
+        limits: { memory: 1024m, cpus: "1.0" }
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
     depends_on:
