@@ -38,7 +38,9 @@ export async function searchCatalogArtworks(query: Partial<ArtworkSearchQuery> =
   return requestService<PagedListResponse<Artwork>>("catalog-discovery", `/v1/catalog/artworks${qs ? `?${qs}` : ""}`);
 }
 
-export async function listFeaturedArtworks(): Promise<Artwork[]> { return (await listArtworks()).slice(0, 6); }
+export async function listFeaturedArtworks(): Promise<Artwork[]> {
+  return (await listArtworks()).filter((artwork) => artwork.availability === "available").slice(0, 6);
+}
 export async function findArtwork(id: string, options: { timeoutMs?: number; correlationId?: string } = {}): Promise<Artwork | null> {
   try { return await requestService<Artwork>("artist-artwork", `/v1/artist-artwork/artworks/${encodeURIComponent(id)}`, options); } catch (error) { if (error instanceof ServiceClientError && error.status === 404) return null; throw error; }
 }
