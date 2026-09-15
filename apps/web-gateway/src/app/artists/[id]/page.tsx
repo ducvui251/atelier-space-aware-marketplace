@@ -36,7 +36,11 @@ export default async function ArtistProfilePage({
 }: ArtistProfileProps) {
   const { id } = await params;
   const artist = await findArtist(id);
-  if (!artist) notFound();
+  // Unverified/rejected profiles aren't ready for public viewing (the same
+  // rule already enforced for artworks and for /artists and the homepage's
+  // listArtists() calls) - findArtist() itself stays unfiltered since
+  // verification-service needs it to look up a still-pending artist by id.
+  if (!artist || artist.verificationStatus !== "verified") notFound();
 
   const [allArtworks, exhibitions] = await Promise.all([
     listArtworks(),
@@ -75,11 +79,7 @@ export default async function ArtistProfilePage({
               <h1 className="font-display text-h1 text-foreground">
                 {artist.displayName}
               </h1>
-              {artist.verificationStatus === "verified" ? (
-                <Badge variant="success">Verified artist</Badge>
-              ) : (
-                <Badge variant="warning">Verification pending</Badge>
-              )}
+              <Badge variant="success">Verified artist</Badge>
             </div>
             <p className="mt-3 inline-flex items-center gap-1.5 text-body text-muted-foreground">
               <MapPin className="size-4" />

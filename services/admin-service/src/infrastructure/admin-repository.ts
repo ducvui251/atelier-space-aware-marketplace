@@ -147,7 +147,7 @@ async function getComplaintStatusCounts(): Promise<Record<string, number>> {
 
 export async function getStats() {
   const [artists, artworks, complaints, commerceStats, revenueTrend, orderStatusCounts, complaintStatusCounts] = await Promise.all([
-    requestInternalService<{ items: Array<{ verificationStatus: string }> }>("artist-artwork", "/v1/artist-artwork/artists"),
+    requestInternalService<{ items: Array<{ verificationStatus: string }> }>("artist-artwork", "/v1/artist-artwork/artists?status=all"),
     requestInternalService<{ items: Array<{ verificationStatus: string }> }>("artist-artwork", "/v1/artist-artwork/artworks?status=all"),
     query<{ count: string }>(`select count(*)::text as count from admin.complaints where status = 'open'`),
     requestInternalService<{ totalOrders: number; revenue: number }>("commerce", "/v1/commerce/stats"),

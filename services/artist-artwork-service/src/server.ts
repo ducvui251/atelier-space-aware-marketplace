@@ -24,7 +24,10 @@ const routes: Record<string, ServiceRouteHandler> = {
     const artwork = await findPersistedArtwork(url.pathname.split("/").pop() ?? "");
     return artwork ? writeServiceJson(response, 200, artwork, correlationId) : writeServiceError(response, 404, { code: "NOT_FOUND", message: "Artwork not found", correlationId, retryable: false });
   },
-  "GET /v1/artist-artwork/artists": async ({ response, correlationId }) => writeServiceJson(response, 200, { items: await listPersistedArtists() }, correlationId),
+  "GET /v1/artist-artwork/artists": async ({ url, response, correlationId }) => {
+    const includeAllStatuses = url.searchParams.get("status") === "all";
+    return writeServiceJson(response, 200, { items: await listPersistedArtists({ includeAllStatuses }) }, correlationId);
+  },
   "GET /v1/artist-artwork/artists/by-user/:userId": async ({ url, response, correlationId }) => {
     const artist = await findPersistedArtistByUserId(url.pathname.split("/").pop() ?? "");
     return artist ? writeServiceJson(response, 200, artist, correlationId) : writeServiceError(response, 404, { code: "NOT_FOUND", message: "No artist profile for this user", correlationId, retryable: false });
