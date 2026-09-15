@@ -28,6 +28,22 @@ bash scripts/wait-for-healthy.sh
 
 Gateway on `http://localhost:3000`; services on `4101`–`4108`.
 
+### Stripe testing through a Quick Tunnel
+
+When the buyer opens the Gateway through Cloudflare, start the tunnel with the
+repository launcher so Stripe returns to the same public host as the buyer:
+
+```powershell
+pnpm.cmd tunnel:quick
+```
+
+The launcher starts `cloudflared` as a hidden process, updates
+`WEB_GATEWAY_URL` in the root `.env`, verifies `/api/health` through the public
+URL, and recreates only `commerce-service`. Do not start `cloudflared` directly
+for Stripe testing, because a newly generated Quick Tunnel URL would not reach
+the running Commerce configuration. Quick Tunnel hostnames remain temporary;
+run the launcher again after a computer restart or tunnel failure.
+
 Hybrid development (host `pnpm dev` + containers for dependencies):
 
 ```bash
