@@ -36,6 +36,15 @@ export interface CheckoutLineItem {
  * simply *there* in the failure/refund webhook payload once the PaymentIntent
  * exists — no separate lookup table needed.
  */
+// Stripe enforces a 30-minute floor on expires_at (it rejects anything
+// shorter), so this can't be brought down to match the 15-minute artwork
+// reservation lease (RESERVATION_LEASE_MS in artist-artwork-service)
+// exactly. Explicitly setting Stripe's own minimum still shrinks the old
+// gap a lot: without this, Stripe defaulted the session to a 24-hour
+// expiry, so a reservation released at 15 minutes could sit unresolved for
+// up to another 23h45m before checkout.session.expired ever fired.
+const CHECKOUT_SESSION_LIFETIME_SECONDS = 30 * 60;
+
 export async function createCheckoutSession(input: {
   buyerId: string;
   orderIds: string[];
@@ -58,6 +67,7 @@ export async function createCheckoutSession(input: {
     payment_intent_data: { metadata: { orderIds: JSON.stringify(input.orderIds) } },
     success_url: input.successUrl,
     cancel_url: input.cancelUrl,
+    expires_at: Math.floor(Date.now() / 1000) + CHECKOUT_SESSION_LIFETIME_SECONDS,
   });
 }
 

@@ -8,7 +8,7 @@ import { resolveCartArtworks } from "./application/checkout-cart.ts";
 import { interpretReservationResponse, type ReservationResponseResult } from "./application/reservation-response.ts";
 import { health } from "./health.ts";
 import { addCartItem, listCart, removeCartItem } from "./infrastructure/cart-repository.ts";
-import { confirmCheckoutSession, getCheckoutSession, getIdempotencyRecord, handleChargeRefunded, handlePaymentFailed, persistPendingCheckout, recordPaymentEvent, saveCheckoutSession, saveIdempotencyRecord } from "./infrastructure/commerce-repository.ts";
+import { confirmCheckoutSession, findOpenCheckoutSessionByOrder, getCheckoutSession, getIdempotencyRecord, handleChargeRefunded, handlePaymentFailed, persistPendingCheckout, recordPaymentEvent, saveCheckoutSession, saveIdempotencyRecord } from "./infrastructure/commerce-repository.ts";
 import { getArtistEarnings, getArtistTopSellingArtworks, getCommerceStats, listOrders, listOrdersByIds } from "./infrastructure/order-repository.ts";
 import { confirmReceived, listArtistOrders, saveReview, shipOrder } from "./infrastructure/order-actions-repository.ts";
 import { createCheckoutSession, retrieveCheckoutSession, retrievePaymentIntent } from "./infrastructure/stripe-client.ts";
@@ -338,6 +338,26 @@ const routes: Record<string, ServiceRouteHandler> = {
       : new Date(to.getTime() - 90 * 24 * 60 * 60 * 1000);
     const items = await getArtistTopSellingArtworks(artistId, { from: from.toISOString(), to: to.toISOString(), limit: parsed.data.limit });
     return writeServiceJson(response, 200, { items, total: items.length }, correlationId);
+  },
+  /**
+   * A buyer who abandoned Stripe's hosted page mid-checkout had no way
+   * back to it - the order just sat "pending" with no action available on
+   * /orders until checkout.session.expired eventually cancelled it. This
+   * re-fetches the still-open Stripe session's hosted URL so they can
+   * resume paying for the exact same order/reservation within the 30-minute
+   * Stripe session window (see CHECKOUT_SESSION_LIFETIME_SECONDS).
+   */
+  "GET /v1/commerce/orders/:id/resume-checkout": async ({ url, response, correlationId }) => {
+    const orderId = url.pathname.split("/")[4] ?? "";
+    const buyerId = url.searchParams.get("buyerId");
+    if (!buyerId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "buyerId is required", correlationId, field: "buyerId", retryable: false });
+    const session = await findOpenCheckoutSessionByOrder(orderId, buyerId);
+    if (!session) return writeServiceError(response, 404, { code: "NOT_FOUND", message: "No resumable checkout for this order", correlationId, retryable: false });
+    const stripeSession = await retrieveCheckoutSession(session.stripeSessionId);
+    if (stripeSession.status !== "open" || !stripeSession.url) {
+      return writeServiceError(response, 409, { code: "CONFLICT", message: "This checkout link has expired. Please check out again.", correlationId, retryable: false });
+    }
+    return writeServiceJson(response, 200, { checkoutUrl: stripeSession.url }, correlationId);
   },
   "POST /v1/commerce/orders/:id/ship": async ({ request, url, response, correlationId }) => {
     const parsed = parseBody(ShipOrderRequestSchema, await readJson(request));

@@ -94,6 +94,23 @@ export async function getCheckoutSession(stripeSessionId: string): Promise<Check
 }
 
 /**
+ * Looks up the still-open Stripe session a buyer abandoned mid-checkout, so
+ * they can be sent back to finish paying instead of the order sitting
+ * pending with no way back in (the only other outcome was waiting for
+ * checkout.session.expired to cancel it). Scoped to `buyerId` via the
+ * session's own `buyer_id` column - same ownership-check shape as
+ * confirmReceived/saveReview in order-actions-repository.ts - so this can't
+ * be used to fetch another buyer's checkout link.
+ */
+export async function findOpenCheckoutSessionByOrder(orderId: string, buyerId: string): Promise<{ stripeSessionId: string } | null> {
+  const rows = await query<{ stripe_session_id: string }>(
+    `select stripe_session_id from commerce.checkout_sessions where order_ids ? $1 and buyer_id = $2::uuid and status = 'open'`,
+    [orderId, buyerId],
+  );
+  return rows[0] ? { stripeSessionId: rows[0].stripe_session_id } : null;
+}
+
+/**
  * Marks every order/payment in the session paid, in one transaction, only
  * if the session isn't already completed — safe to call more than once
  * (e.g. the buyer reloading the success page) without double-applying.
