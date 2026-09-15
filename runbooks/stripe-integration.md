@@ -59,7 +59,9 @@ artwork's `availability` correctly flipped to `sold`.
   `http://localhost:3000` for local dev, set to the real domain in a
   deployment)
 
-Set both in the root `.env` (`docker compose` reads it directly).
+Set both in the root `.env` (`docker compose` reads it directly). For local
+Cloudflare Quick Tunnel testing, `pnpm.cmd tunnel:quick` updates
+`WEB_GATEWAY_URL` and recreates `commerce-service` automatically.
 
 ## Known simplifications (vs. a full webhook-based production setup)
 

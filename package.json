@@ -8,6 +8,7 @@
     "dev:gateway": "pnpm --filter @atelier/web-gateway dev",
     "build": "pnpm --filter @atelier/web-gateway build",
     "start": "pnpm --filter @atelier/web-gateway start",
+    "tunnel:quick": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start-quick-tunnel.ps1",
     "lint": "pnpm --filter @atelier/web-gateway lint",
     "type-check": "pnpm -r --if-present type-check",
     "validate": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate.ps1",
