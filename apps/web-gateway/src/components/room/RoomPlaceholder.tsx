@@ -82,13 +82,13 @@ export function RoomPlaceholder({ artworks, rooms }: { artworks: Artwork[]; room
     <div className="mt-8 flex flex-col gap-10">
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         {/* Room canvas */}
-        <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-foreground/90 shadow-md md:aspect-[16/10]">
+        <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-muted shadow-md md:aspect-[16/10]">
           <Image
             src={room.imageUrl}
             alt={`${room.name} preview`}
             fill
             sizes="(max-width: 1024px) 100vw, 70vw"
-            className="object-cover opacity-85"
+            className="object-cover"
           />
 
           <div
@@ -103,7 +103,9 @@ export function RoomPlaceholder({ artworks, rooms }: { artworks: Artwork[]; room
             >
               <ArtworkImage src={artwork.imageUrl} alt={artwork.title} fill sizes="30vw" className="object-cover" />
             </div>
-            <p className="mt-2 truncate text-center text-caption text-surface/90">{artwork.title}</p>
+            <p className="mx-auto mt-2 w-fit max-w-full truncate rounded-full bg-foreground/70 px-3 py-1 text-center text-caption text-surface">
+              {artwork.title}
+            </p>
           </div>
         </div>
 
