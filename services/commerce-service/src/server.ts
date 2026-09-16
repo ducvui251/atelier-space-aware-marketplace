@@ -1,14 +1,14 @@
 import { createHash } from "node:crypto";
 import { createServiceServer, getPort, readJson, writeServiceError, writeServiceJson, type ServiceRouteHandler } from "@atelier/config/http";
 import { createLogger } from "@atelier/config/logger";
-import { ArtistEarningsQuerySchema, ArtistTopArtworksQuerySchema, CartAddRequestSchema, CheckoutConfirmRequestSchema, CheckoutRequestSchema, ConfirmReceivedRequestSchema, OrderReviewRequestSchema, ShipOrderRequestSchema, StripeWebhookRelaySchema, parseBody, type Artwork } from "@atelier/contracts";
+import { ArtistEarningsQuerySchema, ArtistTopArtworksQuerySchema, CartAddRequestSchema, CheckoutCancelRequestSchema, CheckoutConfirmRequestSchema, CheckoutRequestSchema, ConfirmReceivedRequestSchema, OrderReviewRequestSchema, ShipOrderRequestSchema, StripeWebhookRelaySchema, parseBody, type Artwork } from "@atelier/contracts";
 import { runOutboxPublisher } from "@atelier/events";
 import { ping } from "@atelier/persistence";
 import { resolveCartArtworks } from "./application/checkout-cart.ts";
 import { interpretReservationResponse, type ReservationResponseResult } from "./application/reservation-response.ts";
 import { health } from "./health.ts";
 import { addCartItem, listCart, removeCartItem } from "./infrastructure/cart-repository.ts";
-import { confirmCheckoutSession, findOpenCheckoutSessionByOrder, getCheckoutSession, getIdempotencyRecord, handleChargeRefunded, handlePaymentFailed, persistPendingCheckout, recordPaymentEvent, saveCheckoutSession, saveIdempotencyRecord } from "./infrastructure/commerce-repository.ts";
+import { confirmCheckoutSession, findOpenCheckoutSessionByOrder, findOpenCheckoutSessionForBuyer, findPendingOrderArtworkIds, getCheckoutSession, getIdempotencyRecord, handleChargeRefunded, handlePaymentFailed, persistPendingCheckout, recordPaymentEvent, saveCheckoutSession, saveIdempotencyRecord } from "./infrastructure/commerce-repository.ts";
 import { getArtistEarnings, getArtistTopSellingArtworks, getCommerceStats, listOrders, listOrdersByIds } from "./infrastructure/order-repository.ts";
 import { confirmReceived, listArtistOrders, saveReview, shipOrder } from "./infrastructure/order-actions-repository.ts";
 import { createCheckoutSession, retrieveCheckoutSession, retrievePaymentIntent } from "./infrastructure/stripe-client.ts";
@@ -163,6 +163,12 @@ const routes: Record<string, ServiceRouteHandler> = {
     }
     if (items.some((item) => item.availability !== "available")) return writeServiceError(response, 409, { code: "CONFLICT", message: "Artwork is no longer available", correlationId, retryable: false });
 
+    const alreadyPendingArtworkIds = await findPendingOrderArtworkIds(buyerId, items.map((item) => item.id));
+    if (alreadyPendingArtworkIds.length > 0) {
+      const titles = items.filter((item) => alreadyPendingArtworkIds.includes(item.id)).map((item) => item.title).join(", ");
+      return writeServiceError(response, 409, { code: "CONFLICT", message: `You already have a pending order for: ${titles}. Continue that checkout from your Orders page instead of starting a new one.`, correlationId, retryable: false });
+    }
+
     const reservations: { artworkId: string; reservationId: string }[] = [];
     for (const item of items) {
       const reservation = await reserveArtworkRemote(item.id, buyerId, correlationId);
@@ -195,7 +201,7 @@ const routes: Record<string, ServiceRouteHandler> = {
         orderIds: orders.map((order) => order.id),
         items: items.map((item) => ({ artworkId: item.id, title: item.title, amount: item.price, currency: item.currency })),
         successUrl: `${gatewayUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancelUrl: `${gatewayUrl}/checkout?cancelled=1`,
+        cancelUrl: `${gatewayUrl}/checkout?cancelled=1&session_id={CHECKOUT_SESSION_ID}`,
       });
       await saveCheckoutSession({ stripeSessionId: session.id, buyerId, orderIds: orders.map((order) => order.id), reservationIds: reservations.map((r) => r.reservationId) });
       await saveIdempotencyRecord(buyerId, idempotencyKey, requestHash, orders.map((order) => order.id));
@@ -231,6 +237,26 @@ const routes: Record<string, ServiceRouteHandler> = {
       logger.error("one or more reservation commits failed after payment", { correlationId, sessionId, orderIds: confirmed.orderIds });
     }
     return writeServiceJson(response, 200, { orders: await listOrdersByIds(confirmed.orderIds) }, correlationId);
+  },
+  /**
+   * Fired from Stripe's own cancel_url (the buyer clicked "Back" on the
+   * hosted page instead of paying), so the reservation/order clear
+   * immediately instead of sitting "reserved"/"pending" for the rest of the
+   * 15-minute lease. This only catches an explicit exit through Stripe's
+   * UI - there's no signal at all if the buyer just closes the tab, so that
+   * case still relies on the lease timing out.
+   */
+  "POST /v1/commerce/checkout/cancel": async ({ request, response, correlationId }) => {
+    const parsed = parseBody(CheckoutCancelRequestSchema, await readJson(request));
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
+    const { sessionId, buyerId } = parsed.data;
+
+    const session = await findOpenCheckoutSessionForBuyer(sessionId, buyerId);
+    if (!session) return writeServiceJson(response, 200, { cancelled: false }, correlationId);
+
+    const result = await handlePaymentFailed(session.orderIds, correlationId);
+    if (result) await releaseReservationsBestEffort(result.reservationIds, correlationId);
+    return writeServiceJson(response, 200, { cancelled: true }, correlationId);
   },
   /**
    * Phase 6, G-04. The Gateway has already verified the Stripe signature

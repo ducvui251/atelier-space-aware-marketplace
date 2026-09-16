@@ -4,6 +4,7 @@ import * as React from "react";
 import { AlertTriangle, PackageOpen } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { RequireRole } from "@/components/auth/RequireRole";
+import { RequireVerifiedArtist } from "@/components/auth/RequireVerifiedArtist";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -140,7 +141,9 @@ export default function ArtistOrdersPage() {
   return (
     <PageContainer className="py-16">
       <RequireRole role="artist">
-        <ArtistOrdersView />
+        <RequireVerifiedArtist>
+          <ArtistOrdersView />
+        </RequireVerifiedArtist>
       </RequireRole>
     </PageContainer>
   );

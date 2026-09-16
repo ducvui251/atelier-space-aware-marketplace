@@ -18,6 +18,14 @@ export async function confirmCheckoutSession(sessionId: string) {
   });
 }
 
+export async function cancelCheckoutSession(sessionId: string, buyerId: string) {
+  return requestService<{ cancelled: boolean }>("commerce", "/v1/commerce/checkout/cancel", {
+    method: "POST",
+    body: { sessionId, buyerId },
+    timeoutMs: 10_000,
+  });
+}
+
 /** Phase 6, G-04 — relays an already signature-verified Stripe event. */
 export async function relayStripeWebhook(event: StripeWebhookRelay) {
   return requestService<{ received: true; duplicate?: boolean }>("commerce", "/v1/commerce/payments/webhook", {

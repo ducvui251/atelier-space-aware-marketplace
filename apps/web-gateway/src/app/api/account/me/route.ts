@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { requestService } from "@/lib/gateway/http-client";
 import { getAuthUser, publicUser } from "@/lib/server/auth";
-import { findArtist } from "@/lib/gateway/clients/artwork.client";
+import { findArtist, updateArtistProfile } from "@/lib/gateway/clients/artwork.client";
 import { json, errorResponse } from "@/lib/server/respond";
 import { signPrincipal } from "@atelier/config/principal";
 
@@ -39,6 +39,9 @@ export async function PATCH(request: NextRequest) {
     body: { fullName, phone: body.phone },
     headers: principalHeaders(request, user.id),
   });
-  const artistProfile = profile.user.artistId ? await findArtist(profile.user.artistId) : null;
+
+  const artistProfile = profile.user.artistId
+    ? await updateArtistProfile(profile.user.artistId, { displayName: fullName, bio: body.bio, portfolioUrl: body.portfolioUrl, imageUrl: body.imageUrl })
+    : null;
   return json({ user: publicUser(profile.user), artistProfile });
 }

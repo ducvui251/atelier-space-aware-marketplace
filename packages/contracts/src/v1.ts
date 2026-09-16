@@ -81,6 +81,11 @@ export const CheckoutConfirmRequestSchema = z.object({
   sessionId: z.string().trim().min(1),
 });
 
+export const CheckoutCancelRequestSchema = z.object({
+  sessionId: z.string().trim().min(1),
+  buyerId: z.string().uuid(),
+});
+
 // --- Account ---------------------------------------------------------------
 
 export const SignupRequestSchema = z.object({
@@ -103,6 +108,13 @@ export const AccountSyncRequestSchema = z.object({
 export const AccountUpdateRequestSchema = z.object({
   fullName: z.string().trim().min(1),
   phone: z.string().trim().optional(),
+});
+
+export const ArtistProfileUpdateRequestSchema = z.object({
+  displayName: z.string().trim().min(1).optional(),
+  bio: z.string().trim().optional(),
+  portfolioUrl: z.string().trim().url().optional().or(z.literal("")),
+  imageUrl: z.string().trim().url().optional(),
 });
 
 // --- Artist & Artwork --------------------------------------------------------
@@ -507,8 +519,10 @@ export type ImageUploadResponse = z.infer<typeof ImageUploadResponseSchema>;
 export type CheckoutClientRequest = z.infer<typeof CheckoutClientRequestSchema>;
 export type CheckoutRequest = z.infer<typeof CheckoutRequestSchema>;
 export type CheckoutConfirmRequest = z.infer<typeof CheckoutConfirmRequestSchema>;
+export type CheckoutCancelRequest = z.infer<typeof CheckoutCancelRequestSchema>;
 export type AccountSyncRequest = z.infer<typeof AccountSyncRequestSchema>;
 export type AccountUpdateRequest = z.infer<typeof AccountUpdateRequestSchema>;
+export type ArtistProfileUpdateRequest = z.infer<typeof ArtistProfileUpdateRequestSchema>;
 export type SignupRequest = z.infer<typeof SignupRequestSchema>;
 export type CollectionResponse = z.infer<typeof CollectionSchema>;
 export type EnsureArtistProfileRequest = z.infer<typeof EnsureArtistProfileRequestSchema>;

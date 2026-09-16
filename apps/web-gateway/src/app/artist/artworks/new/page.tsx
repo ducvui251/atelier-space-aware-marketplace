@@ -1,14 +1,20 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Lock } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { RequireRole } from "@/components/auth/RequireRole";
 import { ArtworkForm, type ArtworkFormInput } from "@/components/artwork/ArtworkForm";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/client/hooks";
 import { apiFetch, ApiError } from "@/lib/client/api";
 import type { Artwork } from "@/types";
 
 function NewArtworkView() {
   const router = useRouter();
+  const { currentArtist } = useAuth();
 
   async function onSubmit(input: ArtworkFormInput) {
     try {
@@ -17,6 +23,23 @@ function NewArtworkView() {
     } catch (error) {
       return { error: error instanceof ApiError ? error.message : "Couldn't create the artwork." };
     }
+  }
+
+  if (!currentArtist) return null;
+
+  if (currentArtist.verificationStatus !== "verified") {
+    return (
+      <EmptyState
+        icon={Lock}
+        title="Your profile isn't verified yet"
+        description="An admin needs to verify your artist profile before you can list artwork."
+        action={
+          <Button asChild variant="outline">
+            <Link href="/artist">Back to dashboard</Link>
+          </Button>
+        }
+      />
+    );
   }
 
   return (

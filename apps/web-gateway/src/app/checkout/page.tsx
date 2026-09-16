@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -29,11 +30,26 @@ type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 
 function CheckoutView() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { items, total, refresh: refreshCart } = useCart();
   const { currentUser } = useAuth();
   const [formError, setFormError] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
   const [checkoutConflict, setCheckoutConflict] = React.useState(false);
+  const [cancelledNotice, setCancelledNotice] = React.useState(false);
+
+  React.useEffect(() => {
+    const sessionId = searchParams.get("session_id");
+    if (searchParams.get("cancelled") !== "1" || !sessionId) return;
+    apiFetch("/api/checkout/cancel", { method: "POST", body: JSON.stringify({ sessionId }) })
+      .then(() => setCancelledNotice(true))
+      .catch(() => undefined)
+      .finally(() => router.replace("/checkout"));
+    // Intentionally runs once on mount only — the query params that trigger
+    // this are a one-time landing signal from Stripe's cancel_url, not
+    // ongoing state to react to.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const {
     register,
@@ -52,16 +68,23 @@ function CheckoutView() {
 
   if (items.length === 0) {
     return (
-      <EmptyState
-        icon={ShoppingBag}
-        title="Your cart is empty"
-        description="Add an artwork to your cart before checking out."
-        action={
-          <Button asChild variant="outline">
-            <Link href="/artworks">Browse artworks</Link>
-          </Button>
-        }
-      />
+      <>
+        {cancelledNotice ? (
+          <p role="status" className="mb-6 rounded-md border border-border bg-muted/50 px-3 py-2 text-body-sm text-muted-foreground">
+            Checkout cancelled — the artwork has been released.
+          </p>
+        ) : null}
+        <EmptyState
+          icon={ShoppingBag}
+          title="Your cart is empty"
+          description="Add an artwork to your cart before checking out."
+          action={
+            <Button asChild variant="outline">
+              <Link href="/artworks">Browse artworks</Link>
+            </Button>
+          }
+        />
+      </>
     );
   }
 
@@ -100,6 +123,11 @@ function CheckoutView() {
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+        {cancelledNotice ? (
+          <p role="status" className="rounded-md border border-border bg-muted/50 px-3 py-2 text-body-sm text-muted-foreground">
+            Checkout cancelled — the artwork has been released.
+          </p>
+        ) : null}
         {formError ? (
           <div
             role="alert"
@@ -199,7 +227,9 @@ export default function CheckoutPage() {
       <h1 className="mt-2 font-display text-h1 text-foreground">Checkout</h1>
       <div className="mt-8">
         <RequireRole role={["buyer", "artist", "admin"]}>
-          <CheckoutView />
+          <Suspense fallback={null}>
+            <CheckoutView />
+          </Suspense>
         </RequireRole>
       </div>
     </PageContainer>

@@ -48,6 +48,13 @@ PROJECT_PROMPT.md
 
 # local agent/tool artifacts
 /.token-optimizer/
+/.scratch_docx/
+
+# scripts/start-quick-tunnel.ps1's cloudflared stdout/stderr
+/.runtime-logs/
+
+# scripts/backup-db.sh output
+/backups/
 
 # resume/dedupe state for scripts/pull-*-artworks.mjs — local to whatever
 # dev database each was run against, not meant to be shared via git
