@@ -74,6 +74,11 @@ export async function getArtistEarnings(
     // "completed" forever. So `refunded` here takes precedence over the
     // order-status bucket, making the five counts mutually exclusive and
     // summable to the total, as the audit's own Orders metric expects.
+    //
+    // `to` is a date-only string (defaults to "today"), so the upper bound
+    // must be end-of-day, not midnight — `< to::timestamptz` silently
+    // excluded every order placed today until the next day's default `to`
+    // rolled forward.
     `select
        coalesce(sum(o.total_amount) filter (where p.status = 'success'), 0)::text as received,
        coalesce(sum(o.total_amount) filter (where p.status is null or p.status = 'pending'), 0)::text as pending_payment,
@@ -85,7 +90,7 @@ export async function getArtistEarnings(
        count(*) filter (where p.status = 'refunded')::text as refunded_count
      from commerce.orders o
      left join commerce.payments p on p.order_id = o.id
-     where o.artwork_id = any($1::uuid[]) and o.created_at >= $2::timestamptz and o.created_at < $3::timestamptz`,
+     where o.artwork_id = any($1::uuid[]) and o.created_at >= $2::timestamptz and o.created_at < $3::date + interval '1 day'`,
     [artworkIds, options.from, options.to],
   );
 
@@ -94,7 +99,7 @@ export async function getArtistEarnings(
             coalesce(sum(o.total_amount) filter (where p.status = 'success'), 0)::text as net
      from commerce.orders o
      left join commerce.payments p on p.order_id = o.id
-     where o.artwork_id = any($1::uuid[]) and o.created_at >= $2::timestamptz and o.created_at < $3::timestamptz
+     where o.artwork_id = any($1::uuid[]) and o.created_at >= $2::timestamptz and o.created_at < $3::date + interval '1 day'
      group by bucket order by bucket`,
     [artworkIds, options.from, options.to, options.period],
   );
@@ -137,7 +142,7 @@ export async function getArtistTopSellingArtworks(
     `select artwork_id::text, count(*)::text as sales_count, sum(total_amount)::text as revenue
      from commerce.orders
      where artwork_id = any($1::uuid[]) and status = 'completed'
-       and created_at >= $2::timestamptz and created_at < $3::timestamptz
+       and created_at >= $2::timestamptz and created_at < $3::date + interval '1 day'
      group by artwork_id
      order by count(*) desc, sum(total_amount) desc
      limit $4`,

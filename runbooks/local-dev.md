@@ -28,6 +28,23 @@ bash scripts/wait-for-healthy.sh
 
 Gateway on `http://localhost:3000`; services on `4101`–`4108`.
 
+### Sample data
+
+A fresh volume only has the 3 artists + handful of artworks seeded by
+`0002_seed_catalog.sql` — enough to smoke-test, not enough to browse. Populate
+real artwork listings (with real images from the Met Open Access API) in one
+step:
+
+```bash
+bash scripts/seed-sample-data.sh        # ~150 artworks (default)
+bash scripts/seed-sample-data.sh 500    # or a custom count
+```
+
+Safe to re-run — both underlying scripts (`pull-met-artworks.mjs`,
+`backfill-artwork-styles.sh`) only touch new/untagged rows. Requires the
+stack already healthy and `ATELIER_INTERNAL_SERVICE_TOKEN` set (see
+Prerequisites above).
+
 ### Stripe testing through a Quick Tunnel
 
 When the buyer opens the Gateway through Cloudflare, start the tunnel with the

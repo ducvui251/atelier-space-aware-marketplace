@@ -76,15 +76,16 @@ const SERVICE_URL = process.env.ARTIST_ARTWORK_URL ?? "http://localhost:4103";
 const SERVICE_TOKEN = loadServiceToken();
 const TARGET_COUNT = Number(process.argv[2] ?? 20);
 
-// Real, non-test artist profiles already seeded in the dev database
-// (excludes "G05 Test Artist" / "Signup Flow Test" rows created during
-// phase testing).
+// The 3 artist profiles seeded by every fresh migration run
+// (0002_seed_catalog.sql) — the only ids guaranteed to exist on a brand new
+// clone. Do not hardcode session-specific artist ids here: a fresh database
+// won't have them, and artist_artwork.artworks.artist_id is a real foreign
+// key, so createArtwork would just fail (caught and skipped per-object,
+// but wastes a chunk of every run's attempts).
 const ARTIST_IDS = [
   "00000000-0000-4000-8000-000000000001", // Lena Moreau
   "00000000-0000-4000-8000-000000000002", // Aki Tanaka
   "00000000-0000-4000-8000-000000000003", // Maria Wood
-  "4e57c3ec-b60f-4e52-b547-f46cffb3d397", // Demo Artist
-  "ecfd7970-cb75-4ebc-aea2-310d11d53e1d", // Vu tong
 ];
 
 // Tiered pricing logic (documented in scripts/artwork-price-tiers.txt).
@@ -245,7 +246,11 @@ async function main() {
 
     const title = obj.title?.trim() || "Untitled";
     const artistDisplay = obj.artistDisplayName?.trim() || "Unknown Artist";
-    const medium = obj.medium?.trim() || "Mixed media";
+    // artist_artwork.artworks.medium is varchar(100) — the Met API's medium
+    // field is free text and some entries (mounted scrolls, multi-material
+    // pieces) run well past that, which Postgres rejects as an unhandled
+    // 500 instead of a clean validation error. Truncate client-side.
+    const medium = (obj.medium?.trim() || "Mixed media").slice(0, 100);
     const year = parseYear(obj.objectDate);
     const price = pickPrice(medium, Boolean(obj.isHighlight));
     const orientation = pickOrientation(dims.widthCm, dims.heightCm);
