@@ -9,6 +9,26 @@ interface CheckoutItem { artworkId: string; editionType: EditionType; totalAmoun
 export interface IdempotencyRecord { requestHash: string; orderIds: string[]; }
 
 /**
+ * The artwork reservation lease (15m, artist-artwork-service) is shorter
+ * than the Stripe checkout session lifetime (30m, Stripe's own floor - see
+ * CHECKOUT_SESSION_LIFETIME_SECONDS in stripe-client.ts), so a released
+ * reservation can make an artwork look "available" again while the buyer's
+ * earlier order/session for it is still open. Without this check, checkout
+ * would happily create a second order + reservation + Stripe session for
+ * the same buyer/artwork pair, leaving both pending side by side until
+ * each eventually expires on its own. Scoped to the same buyer only - a
+ * different buyer racing for the same artwork is a real, allowed contest.
+ */
+export async function findPendingOrderArtworkIds(buyerId: string, artworkIds: string[]): Promise<string[]> {
+  if (artworkIds.length === 0) return [];
+  const rows = await query<{ artwork_id: string }>(
+    `select distinct artwork_id::text from commerce.orders where buyer_id = $1::uuid and artwork_id = any($2::uuid[]) and status = 'pending'`,
+    [buyerId, artworkIds],
+  );
+  return rows.map((row) => row.artwork_id);
+}
+
+/**
  * Explicit idempotency-key persistence with request-body mismatch
  * detection (MICROSERVICE_100_PLAN.md section 9.3) — distinct from the
  * per-item ON CONFLICT below, which only guards against duplicate order
@@ -91,6 +111,20 @@ export async function getCheckoutSession(stripeSessionId: string): Promise<Check
     [stripeSessionId],
   );
   return rows[0] ? { orderIds: rows[0].order_ids, reservationIds: rows[0].reservation_ids, status: rows[0].status } : null;
+}
+
+/**
+ * Ownership-scoped lookup for the explicit-cancel path (Stripe's own
+ * cancel_url, i.e. the buyer clicked "Back" on the hosted page instead of
+ * paying) - same shape as findOpenCheckoutSessionByOrder, just keyed by
+ * session id since that's what cancel_url carries.
+ */
+export async function findOpenCheckoutSessionForBuyer(stripeSessionId: string, buyerId: string): Promise<{ orderIds: string[] } | null> {
+  const rows = await query<{ order_ids: string[] }>(
+    `select order_ids from commerce.checkout_sessions where stripe_session_id = $1 and buyer_id = $2::uuid and status = 'open'`,
+    [stripeSessionId, buyerId],
+  );
+  return rows[0] ? { orderIds: rows[0].order_ids } : null;
 }
 
 /**
