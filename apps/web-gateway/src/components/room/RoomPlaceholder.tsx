@@ -32,6 +32,44 @@ export function RoomPlaceholder({ artworks, rooms }: { artworks: Artwork[]; room
   const [scale, setScale] = React.useState(1);
   const [saving, setSaving] = React.useState(false);
   const [savedMessage, setSavedMessage] = React.useState<string | null>(null);
+  const [positionX, setPositionX] = React.useState(50);
+  const [positionY, setPositionY] = React.useState(14);
+  const [dragging, setDragging] = React.useState(false);
+  const canvasRef = React.useRef<HTMLDivElement>(null);
+
+  function positionFromPointer(clientX: number, clientY: number) {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const x = ((clientX - rect.left) / rect.width) * 100;
+    const y = ((clientY - rect.top) / rect.height) * 100;
+    return {
+      x: Math.min(92, Math.max(8, x)),
+      y: Math.min(78, Math.max(4, y)),
+    };
+  }
+
+  function handleDragStart(event: React.PointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDragging(true);
+  }
+
+  function handleDragMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (!dragging) return;
+    const next = positionFromPointer(event.clientX, event.clientY);
+    if (next) {
+      setPositionX(next.x);
+      setPositionY(next.y);
+    }
+  }
+
+  function handleDragEnd(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setDragging(false);
+  }
 
   const { data: saved, refresh: refreshSaved } = useApiResource<{ items: SavedRoomEntry[] }>(currentUser ? "/api/rooms/saved" : null);
 
@@ -62,7 +100,7 @@ export function RoomPlaceholder({ artworks, rooms }: { artworks: Artwork[]; room
       });
       await apiFetch(`/api/rooms/${encodeURIComponent(savedRoom.id)}/placements`, {
         method: "POST",
-        body: JSON.stringify({ artworkId: artwork.id, scale, positionX: 50, positionY: 14, rotation: 0 }),
+        body: JSON.stringify({ artworkId: artwork.id, scale, positionX, positionY, rotation: 0 }),
       });
       setSavedMessage("This layout has been saved.");
       refreshSaved();
@@ -82,7 +120,10 @@ export function RoomPlaceholder({ artworks, rooms }: { artworks: Artwork[]; room
     <div className="mt-8 flex flex-col gap-10">
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         {/* Room canvas */}
-        <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-muted shadow-md md:aspect-[16/10]">
+        <div
+          ref={canvasRef}
+          className="relative aspect-[4/3] overflow-hidden rounded-xl bg-muted shadow-md md:aspect-[16/10]"
+        >
           <Image
             src={room.imageUrl}
             alt={`${room.name} preview`}
@@ -92,12 +133,17 @@ export function RoomPlaceholder({ artworks, rooms }: { artworks: Artwork[]; room
           />
 
           <div
-            className="absolute left-1/2 top-[14%] -translate-x-1/2"
-            style={{ width: `${widthPct}%` }}
+            className={cn("absolute -translate-x-1/2 touch-none", dragging ? "cursor-grabbing" : "cursor-grab")}
+            style={{ width: `${widthPct}%`, left: `${positionX}%`, top: `${positionY}%` }}
+            onPointerDown={handleDragStart}
+            onPointerMove={handleDragMove}
+            onPointerUp={handleDragEnd}
+            onPointerCancel={handleDragEnd}
           >
             <div
               className={cn(
                 "relative w-full overflow-hidden rounded-sm border-[10px] border-surface/80 bg-muted shadow-lg",
+                dragging && "ring-2 ring-surface",
                 artworkAspect(artwork.orientation),
               )}
             >
@@ -107,6 +153,10 @@ export function RoomPlaceholder({ artworks, rooms }: { artworks: Artwork[]; room
               {artwork.title}
             </p>
           </div>
+
+          <p className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-foreground/60 px-3 py-1 text-caption text-surface">
+            Drag the artwork to reposition it
+          </p>
         </div>
 
         {/* Control rail */}
