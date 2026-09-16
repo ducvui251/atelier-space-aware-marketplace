@@ -6,6 +6,7 @@ import { ArrowLeft, WifiOff } from "lucide-react";
 import type { ArtistArtworkViews, ArtistAudience, ArtistEarnings } from "@atelier/contracts";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { RequireRole } from "@/components/auth/RequireRole";
+import { RequireVerifiedArtist } from "@/components/auth/RequireVerifiedArtist";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ArtworkImage } from "@/components/artwork/ArtworkImage";
@@ -220,7 +221,9 @@ export default function ArtistAnalyticsPage() {
   return (
     <PageContainer className="py-16">
       <RequireRole role="artist">
-        <ArtistAnalyticsView />
+        <RequireVerifiedArtist>
+          <ArtistAnalyticsView />
+        </RequireVerifiedArtist>
       </RequireRole>
     </PageContainer>
   );

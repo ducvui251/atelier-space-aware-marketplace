@@ -73,15 +73,55 @@ export async function listPersistedArtworks(options: { includeAllStatuses?: bool
   return (await query<ArtworkRow>(`${artworkSql} ${where}`)).map(mapArtwork);
 }
 
-export async function listPersistedArtistArtworks(artistId: string): Promise<Artwork[]> {
-  return (await query<ArtworkRow>(`${artworkSql} where a.artist_id::text = $1`, [artistId])).map(mapArtwork);
+/**
+ * page/limit are both optional with no default - omitting them returns the
+ * full list unchanged (same convention as ArtworkSearchQuerySchema), which
+ * every internal caller (orders, analytics, recommendations, the
+ * exhibition builder's artwork picker) still relies on. Only the artist's
+ * own /artist dashboard passes them, now that some artists own 900+
+ * artworks after the Met/Cleveland imports. `q` (also optional) narrows to
+ * a title substring match so an artist can find one listing among hundreds.
+ */
+export async function listPersistedArtistArtworks(artistId: string, options: { page?: number; limit?: number; q?: string } = {}): Promise<{ items: Artwork[]; total: number }> {
+  const q = options.q?.trim();
+  const params: unknown[] = [artistId];
+  let where = `a.artist_id::text = $1`;
+  if (q) {
+    params.push(`%${q}%`);
+    where += ` and a.title ilike $${params.length}`;
+  }
+
+  const countRows = await query<{ count: string }>(`select count(*)::text as count from artist_artwork.artworks a where ${where}`, params);
+  const total = Number(countRows[0]?.count ?? 0);
+  if (options.page === undefined && options.limit === undefined) {
+    const items = (await query<ArtworkRow>(`${artworkSql} where ${where} order by a.created_at desc`, params)).map(mapArtwork);
+    return { items, total };
+  }
+  const limit = options.limit ?? 24;
+  const page = options.page ?? 1;
+  const offset = (page - 1) * limit;
+  const items = (await query<ArtworkRow>(
+    `${artworkSql} where ${where} order by a.created_at desc limit $${params.length + 1} offset $${params.length + 2}`,
+    [...params, limit, offset],
+  )).map(mapArtwork);
+  return { items, total };
 }
 
+/**
+ * An artist whose own profile isn't verified yet can't list artwork -
+ * mirrors the same rule already enforced for placing artwork into an
+ * exhibition (canUseArtwork), just at the point of creation instead.
+ * Returns null (caller responds 403) rather than throwing, matching the
+ * existing not-found/conflict-style null returns elsewhere in this file.
+ */
 export async function createPersistedArtwork(input: {
   artistId: string; title: string; description?: string; medium: string; widthCm: number; heightCm: number;
   year: number; price: number; currency: string; editionType: Artwork["editionType"]; orientation: Artwork["orientation"];
   dominantColors: string[]; style: string[]; imageUrl: string;
-}, correlationId: string): Promise<Artwork> {
+}, correlationId: string): Promise<Artwork | null> {
+  const artist = await findPersistedArtist(input.artistId);
+  if (!artist || artist.verificationStatus !== "verified") return null;
+
   const id = await transaction(async (client) => {
     const inserted = await client.query<{ id: string }>(
       `insert into artist_artwork.artworks (artist_id, title, description, medium, width_cm, height_cm, creation_year, price, currency, edition_type, availability, verification_status, orientation, dominant_colors, styles)
@@ -161,6 +201,29 @@ export async function listPersistedArtists(options: { includeAllStatuses?: boole
 export async function findPersistedArtist(id: string): Promise<Artist | null> {
   const rows = await query<ArtistRow>(`select ${artistColumns} from artist_artwork.artist_profiles where id::text = $1`, [id]);
   return rows[0] ? mapArtist(rows[0]) : null;
+}
+
+/**
+ * Self-service profile edit (name/bio/portfolio/avatar) - distinct from
+ * updatePersistedArtistVerification below, which is the admin-only review
+ * action. Doesn't touch verification_status: unlike an artwork edit, a
+ * cosmetic profile change isn't a new submission that needs re-review.
+ *
+ * display_name is included here (not just bio/portfolio/image) because it
+ * was previously only ever set once, on profile creation - editing "Full
+ * name" in account settings changed account.users.full_name but never
+ * reached this row, so a renamed artist's artworks/search results kept
+ * showing their old name forever (not a sync-delay bug, the rename just
+ * never happened here at all).
+ */
+export async function updatePersistedArtistProfile(id: string, input: { displayName?: string; bio?: string; portfolioUrl?: string; imageUrl?: string }): Promise<Artist | null> {
+  const current = await findPersistedArtist(id);
+  if (!current) return null;
+  await query(
+    `update artist_artwork.artist_profiles set display_name = $2, bio = $3, portfolio_url = $4, image_url = $5, updated_at = now() where id::text = $1`,
+    [id, input.displayName ?? current.displayName, input.bio ?? current.bio ?? null, input.portfolioUrl ?? current.portfolioUrl ?? null, input.imageUrl ?? current.imageUrl ?? null],
+  );
+  return findPersistedArtist(id);
 }
 
 /**

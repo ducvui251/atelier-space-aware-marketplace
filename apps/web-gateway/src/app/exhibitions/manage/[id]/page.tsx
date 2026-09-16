@@ -1,5 +1,6 @@
 import { ExhibitionBuilder } from "@/components/exhibitions/ExhibitionBuilder";
 import { RequireRole } from "@/components/auth/RequireRole";
+import { RequireVerifiedArtist } from "@/components/auth/RequireVerifiedArtist";
 import { PageContainer } from "@/components/layout/PageContainer";
 
 export default async function ExhibitionBuilderPage({ params }: { params: Promise<{ id: string }> }) {
@@ -7,7 +8,9 @@ export default async function ExhibitionBuilderPage({ params }: { params: Promis
   return (
     <PageContainer className="py-8">
       <RequireRole role={["artist", "admin"]}>
-        <ExhibitionBuilder id={id} />
+        <RequireVerifiedArtist>
+          <ExhibitionBuilder id={id} />
+        </RequireVerifiedArtist>
       </RequireRole>
     </PageContainer>
   );

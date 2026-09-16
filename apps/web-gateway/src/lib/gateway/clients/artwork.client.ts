@@ -52,8 +52,13 @@ export async function findArtist(id: string): Promise<Artist | null> {
   try { return await requestService<Artist>("artist-artwork", `/v1/artist-artwork/artists/${encodeURIComponent(id)}`); } catch (error) { if (error instanceof ServiceClientError && error.status === 404) return null; throw error; }
 }
 
-export async function listArtistArtworks(artistId: string, options: { timeoutMs?: number; correlationId?: string } = {}) {
-  return requestService<{ items: Artwork[]; total?: number }>("artist-artwork", `/v1/artist-artwork/artist/artworks?artistId=${encodeURIComponent(artistId)}`, options);
+export async function listArtistArtworks(artistId: string, options: { page?: number; limit?: number; q?: string; timeoutMs?: number; correlationId?: string } = {}) {
+  const { page, limit, q, ...requestOptions } = options;
+  const params = new URLSearchParams({ artistId });
+  if (page !== undefined) params.set("page", String(page));
+  if (limit !== undefined) params.set("limit", String(limit));
+  if (q) params.set("q", q);
+  return requestService<{ items: Artwork[]; total: number }>("artist-artwork", `/v1/artist-artwork/artist/artworks?${params.toString()}`, requestOptions);
 }
 
 export async function createArtwork(input: Record<string, unknown>) {
@@ -62,4 +67,8 @@ export async function createArtwork(input: Record<string, unknown>) {
 
 export async function updateArtwork(id: string, input: Record<string, unknown>) {
   return requestService<Artwork>("artist-artwork", `/v1/artist-artwork/artworks/${encodeURIComponent(id)}`, { method: "PATCH", body: input });
+}
+
+export async function updateArtistProfile(id: string, input: Record<string, unknown>) {
+  return requestService<Artist>("artist-artwork", `/v1/artist-artwork/artists/${encodeURIComponent(id)}`, { method: "PATCH", body: input });
 }

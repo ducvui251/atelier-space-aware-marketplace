@@ -1,10 +1,10 @@
 import { createServiceServer, getPort, readJson, writeServiceError, writeServiceJson, type ServiceRouteHandler } from "@atelier/config/http";
-import { ArtworkArtistVerificationRequestSchema, ArtworkAvailabilityRequestSchema, ArtworkCreateRequestSchema, ArtworkUpdateRequestSchema, CreateReservationRequestSchema, EnsureArtistProfileRequestSchema, parseBody } from "@atelier/contracts";
+import { ArtistProfileUpdateRequestSchema, ArtworkArtistVerificationRequestSchema, ArtworkAvailabilityRequestSchema, ArtworkCreateRequestSchema, ArtworkUpdateRequestSchema, CreateReservationRequestSchema, EnsureArtistProfileRequestSchema, parseBody } from "@atelier/contracts";
 import { ArtistVerifiedPayloadSchema, ArtworkVerifiedPayloadSchema } from "@atelier/contracts/events";
 import { consumeEvents, runOutboxPublisher, type ConsumedEvent } from "@atelier/events";
 import { ping } from "@atelier/persistence";
 import { health } from "./health.ts";
-import { commitReservation, createPersistedArtwork, ensureArtistProfile, findPersistedArtist, findPersistedArtistByUserId, findPersistedArtwork, listPersistedArtistArtworks, listPersistedArtists, listPersistedArtworks, releaseExpiredReservations, releaseReservation, reserveArtwork, updatePersistedArtistVerification, updatePersistedArtwork, updatePersistedArtworkVerification, updatePersistedAvailability } from "./infrastructure/catalog-repository.ts";
+import { commitReservation, createPersistedArtwork, ensureArtistProfile, findPersistedArtist, findPersistedArtistByUserId, findPersistedArtwork, listPersistedArtistArtworks, listPersistedArtists, listPersistedArtworks, releaseExpiredReservations, releaseReservation, reserveArtwork, updatePersistedArtistProfile, updatePersistedArtistVerification, updatePersistedArtwork, updatePersistedArtworkVerification, updatePersistedAvailability } from "./infrastructure/catalog-repository.ts";
 
 function validationError(response: Parameters<ServiceRouteHandler>[0]["response"], correlationId: string, parsed: { code: "VALIDATION_ERROR"; message: string; field?: string }) {
   return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
@@ -18,7 +18,14 @@ const routes: Record<string, ServiceRouteHandler> = {
   "GET /v1/artist-artwork/artist/artworks": async ({ url, response, correlationId }) => {
     const artistId = url.searchParams.get("artistId");
     if (!artistId) return writeServiceError(response, 400, { code: "VALIDATION_ERROR", message: "artistId is required", correlationId, field: "artistId", retryable: false });
-    return writeServiceJson(response, 200, { items: await listPersistedArtistArtworks(artistId) }, correlationId);
+    const pageParam = url.searchParams.get("page");
+    const limitParam = url.searchParams.get("limit");
+    const { items, total } = await listPersistedArtistArtworks(artistId, {
+      page: pageParam ? Number(pageParam) : undefined,
+      limit: limitParam ? Number(limitParam) : undefined,
+      q: url.searchParams.get("q") ?? undefined,
+    });
+    return writeServiceJson(response, 200, { items, total }, correlationId);
   },
   "GET /v1/artist-artwork/artworks/:id": async ({ url, response, correlationId }) => {
     const artwork = await findPersistedArtwork(url.pathname.split("/").pop() ?? "");
@@ -41,6 +48,12 @@ const routes: Record<string, ServiceRouteHandler> = {
   },
   "GET /v1/artist-artwork/artists/:id": async ({ url, response, correlationId }) => {
     const artist = await findPersistedArtist(url.pathname.split("/").pop() ?? "");
+    return artist ? writeServiceJson(response, 200, artist, correlationId) : writeServiceError(response, 404, { code: "NOT_FOUND", message: "Artist not found", correlationId, retryable: false });
+  },
+  "PATCH /v1/artist-artwork/artists/:id": async ({ request, url, response, correlationId }) => {
+    const parsed = parseBody(ArtistProfileUpdateRequestSchema, await readJson(request));
+    if (!parsed.success) return validationError(response, correlationId, parsed);
+    const artist = await updatePersistedArtistProfile(url.pathname.split("/").pop() ?? "", parsed.data);
     return artist ? writeServiceJson(response, 200, artist, correlationId) : writeServiceError(response, 404, { code: "NOT_FOUND", message: "Artist not found", correlationId, retryable: false });
   },
   "PATCH /v1/artist-artwork/artworks/:id/verification": async ({ request, url, response, correlationId }) => {
@@ -67,7 +80,9 @@ const routes: Record<string, ServiceRouteHandler> = {
     const parsed = parseBody(ArtworkCreateRequestSchema, await readJson(request));
     if (!parsed.success) return validationError(response, correlationId, parsed);
     const artwork = await createPersistedArtwork(parsed.data, correlationId);
-    return writeServiceJson(response, 201, artwork, correlationId);
+    return artwork
+      ? writeServiceJson(response, 201, artwork, correlationId)
+      : writeServiceError(response, 403, { code: "FORBIDDEN", message: "Your artist profile must be verified before you can list artwork", correlationId, retryable: false });
   },
   "PATCH /v1/artist-artwork/artworks/:id": async ({ request, url, response, correlationId }) => {
     const parsed = parseBody(ArtworkUpdateRequestSchema, await readJson(request));

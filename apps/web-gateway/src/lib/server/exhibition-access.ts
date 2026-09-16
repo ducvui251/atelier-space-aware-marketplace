@@ -1,5 +1,6 @@
 import type { Exhibition } from "@atelier/contracts";
 import type { NextRequest } from "next/server";
+import { findArtist } from "@/lib/gateway/clients/artwork.client";
 import { findExhibitionById, type ExhibitionActor } from "@/lib/gateway/clients/exhibition.client";
 import { ServiceClientError } from "@/lib/gateway/http-client";
 import { getAuthUser, requireRole } from "@/lib/server/auth";
@@ -16,6 +17,15 @@ export async function requireExhibitionActor(request: NextRequest | Request): Pr
 
   if (user!.role === "artist" && !user!.artistId) {
     return { ok: false, response: errorResponse("An artist profile is required to build exhibitions", 403) };
+  }
+
+  // Same "verified profile only" rule as listing artwork - an artist can't
+  // build exhibitions until an admin has verified them, admins are exempt.
+  if (user!.role === "artist") {
+    const artist = await findArtist(user!.artistId!);
+    if (!artist || artist.verificationStatus !== "verified") {
+      return { ok: false, response: errorResponse("Your artist profile must be verified before you can build exhibitions", 403) };
+    }
   }
 
   return {

@@ -1,7 +1,8 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
-import { AlertCircle, ImageOff } from "lucide-react";
+import { AlertCircle, ImageOff, Lock } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Grid } from "@/components/layout/Grid";
 import { RequireRole } from "@/components/auth/RequireRole";
@@ -9,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Pagination } from "@/components/ui/pagination";
+import { SearchInput } from "@/components/discovery/SearchInput";
 import { ArtworkImage } from "@/components/artwork/ArtworkImage";
 import { artworkAspect } from "@/lib/artwork-aspect";
 import { formatPrice } from "@/lib/utils";
@@ -91,11 +94,31 @@ function ArtworkListingGridSkeleton() {
   );
 }
 
+const PAGE_SIZE = 24;
+const SEARCH_DEBOUNCE_MS = 300;
+
 function ArtistDashboard() {
   const { currentArtist } = useAuth();
-  const { data, loading, error, refresh } = useApiResource<{ items: Artwork[]; total: number }>("/api/artist/artworks");
+  const [page, setPage] = React.useState(1);
+  const [searchInput, setSearchInput] = React.useState("");
+  const [search, setSearch] = React.useState("");
+
+  React.useEffect(() => {
+    const timeout = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(1);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timeout);
+  }, [searchInput]);
+
+  const query = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
+  if (search) query.set("q", search);
+  const { data, loading, error, refresh } = useApiResource<{ items: Artwork[]; total: number }>(`/api/artist/artworks?${query.toString()}`);
   const listings = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   if (!currentArtist) return null;
+  const isVerified = currentArtist.verificationStatus === "verified";
 
   return (
     <>
@@ -108,20 +131,63 @@ function ArtistDashboard() {
           </Badge>
         </div>
         <div className="flex gap-3">
-          <Button asChild variant="outline">
-            <Link href="/exhibitions/manage">Exhibitions</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/artist/analytics">Analytics</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/artist/orders">Orders</Link>
-          </Button>
-          <Button asChild>
-            <Link href="/artist/artworks/new">+ New listing</Link>
-          </Button>
+          {isVerified ? (
+            <Button asChild variant="outline">
+              <Link href="/exhibitions/manage">Exhibitions</Link>
+            </Button>
+          ) : (
+            <Button variant="outline" disabled title="Your artist profile must be verified first">
+              <Lock className="size-3.5" /> Exhibitions
+            </Button>
+          )}
+          {isVerified ? (
+            <Button asChild variant="outline">
+              <Link href="/artist/analytics">Analytics</Link>
+            </Button>
+          ) : (
+            <Button variant="outline" disabled title="Your artist profile must be verified first">
+              <Lock className="size-3.5" /> Analytics
+            </Button>
+          )}
+          {isVerified ? (
+            <Button asChild variant="outline">
+              <Link href="/artist/orders">Orders</Link>
+            </Button>
+          ) : (
+            <Button variant="outline" disabled title="Your artist profile must be verified first">
+              <Lock className="size-3.5" /> Orders
+            </Button>
+          )}
+          {isVerified ? (
+            <Button asChild>
+              <Link href="/artist/artworks/new">+ New listing</Link>
+            </Button>
+          ) : (
+            <Button disabled title="Your artist profile must be verified first">
+              <Lock className="size-3.5" /> New listing
+            </Button>
+          )}
         </div>
       </div>
+
+      {!isVerified ? (
+        <p role="status" className="mt-6 rounded-md border border-border bg-muted/50 px-4 py-3 text-body-sm text-muted-foreground">
+          Your artist profile is {verificationLabel(currentArtist.verificationStatus).toLowerCase()}. Until an admin verifies your
+          profile, you can only update your account info — exhibitions, analytics, orders, and listing artwork stay locked.
+        </p>
+      ) : null}
+
+      {isVerified ? (
+        <div className="mt-8 max-w-xl">
+          <SearchInput
+            id="artist-artwork-search"
+            placeholder="Search your listings by title…"
+            ariaLabel="Search your listings"
+            defaultValue={searchInput}
+            onChange={setSearchInput}
+          />
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="mt-10">
@@ -136,24 +202,38 @@ function ArtistDashboard() {
         </div>
       ) : listings.length === 0 ? (
         <div className="mt-10">
-          <EmptyState
-            icon={ImageOff}
-            title="No listings yet"
-            description="Create your first listing to get started."
-            action={
-              <Button asChild>
-                <Link href="/artist/artworks/new">+ New listing</Link>
-              </Button>
-            }
-          />
+          {search ? (
+            <EmptyState
+              icon={ImageOff}
+              title="No listings match your search"
+              description={`Nothing found for "${search}". Clear the search box above and try a different title.`}
+            />
+          ) : (
+            <EmptyState
+              icon={ImageOff}
+              title="No listings yet"
+              description="Create your first listing to get started."
+              action={
+                isVerified ? (
+                  <Button asChild>
+                    <Link href="/artist/artworks/new">+ New listing</Link>
+                  </Button>
+                ) : undefined
+              }
+            />
+          )}
         </div>
       ) : (
-        <div className="mt-10">
+        <div className="mt-10 flex flex-col gap-8">
           <Grid columns={3}>
             {listings.map((artwork) => (
               <ArtworkListingCard key={artwork.id} artwork={artwork} />
             ))}
           </Grid>
+          <p className="text-center text-caption text-muted-foreground">
+            Page {page} of {totalPages} · {total} listing{total === 1 ? "" : "s"}
+          </p>
+          <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} label="Your listings pages" />
         </div>
       )}
     </>
