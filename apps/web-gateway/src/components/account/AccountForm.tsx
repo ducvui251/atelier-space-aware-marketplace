@@ -23,6 +23,11 @@ const accountSchema = z.object({
     .optional()
     .or(z.literal("")),
   imageUrl: z.string().trim().optional(),
+  originPostalCode: z.string().trim().optional(),
+  originCountry: z.string().trim().max(2).optional(),
+  originPhone: z.string().trim().optional(),
+  originEmail: z.string().trim().email("Invalid email").optional().or(z.literal("")),
+  originState: z.string().trim().optional(),
 });
 
 type AccountFormValues = z.infer<typeof accountSchema>;
@@ -48,6 +53,11 @@ export function AccountForm() {
       bio: currentArtist?.bio ?? "",
       portfolioUrl: currentArtist?.portfolioUrl ?? "",
       imageUrl: currentArtist?.imageUrl ?? "",
+      originPostalCode: currentArtist?.originPostalCode ?? "",
+      originCountry: currentArtist?.originCountry ?? "",
+      originPhone: currentArtist?.originPhone ?? "",
+      originEmail: currentArtist?.originEmail ?? "",
+      originState: currentArtist?.originState ?? "",
     },
   });
 
@@ -85,6 +95,11 @@ export function AccountForm() {
       bio: values.bio,
       portfolioUrl: values.portfolioUrl,
       imageUrl: values.imageUrl,
+      originPostalCode: values.originPostalCode,
+      originCountry: values.originCountry,
+      originPhone: values.originPhone,
+      originEmail: values.originEmail,
+      originState: values.originState,
     });
     if ("error" in result) {
       setFormError(result.error);
@@ -174,6 +189,49 @@ export function AccountForm() {
                   className={cn(errors.portfolioUrl && "border-destructive")}
                 />
               </Field>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Shipping origin postal code" error={errors.originPostalCode?.message}>
+                  <Input
+                    {...register("originPostalCode")}
+                    placeholder="e.g. 100000"
+                    className={cn(errors.originPostalCode && "border-destructive")}
+                  />
+                </Field>
+                <Field label="Shipping origin country" error={errors.originCountry?.message}>
+                  <Input
+                    {...register("originCountry")}
+                    placeholder="2-letter code, e.g. US"
+                    maxLength={2}
+                    className={cn(errors.originCountry && "border-destructive")}
+                  />
+                </Field>
+                <Field label="Shipping origin state/province (if applicable)" error={errors.originState?.message}>
+                  <Input
+                    {...register("originState")}
+                    placeholder="e.g. CA"
+                    className={cn(errors.originState && "border-destructive")}
+                  />
+                </Field>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Shipping origin phone" error={errors.originPhone?.message}>
+                  <Input
+                    {...register("originPhone")}
+                    placeholder="+1 415 555 0100"
+                    className={cn(errors.originPhone && "border-destructive")}
+                  />
+                </Field>
+                <Field label="Shipping origin email" error={errors.originEmail?.message}>
+                  <Input
+                    {...register("originEmail")}
+                    placeholder="you@example.com"
+                    className={cn(errors.originEmail && "border-destructive")}
+                  />
+                </Field>
+              </div>
+              <p className="-mt-2 text-caption text-muted-foreground">
+                Used to calculate real shipping rates and print a shipping label — required by some carriers (e.g. USPS) to purchase a label.
+              </p>
             </>
           ) : null}
 

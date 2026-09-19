@@ -7,7 +7,6 @@ import { RequireRole } from "@/components/auth/RequireRole";
 import { RequireVerifiedArtist } from "@/components/auth/RequireVerifiedArtist";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatPrice } from "@/lib/utils";
@@ -18,17 +17,15 @@ import type { Artwork, Order, Shipment } from "@/types";
 type ArtistOrder = Order & { shipment: Shipment | null };
 
 function ShipForm({ orderId, onShipped }: { orderId: string; onShipped: () => void }) {
-  const [carrier, setCarrier] = React.useState("");
-  const [tracking, setTracking] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
 
   async function submit() {
     setSubmitting(true);
     try {
-      await apiFetch(`/api/artist/orders/${encodeURIComponent(orderId)}/ship`, {
-        method: "POST",
-        body: JSON.stringify({ carrier: carrier.trim(), trackingNumber: tracking.trim() }),
-      });
+      // The server assigns the carrier and tracking number itself (a
+      // simulated waybill for now, a real carrier API later) — the artist
+      // no longer types in a tracking number by hand.
+      await apiFetch(`/api/artist/orders/${encodeURIComponent(orderId)}/ship`, { method: "POST", body: JSON.stringify({}) });
       onShipped();
     } finally {
       setSubmitting(false);
@@ -36,23 +33,9 @@ function ShipForm({ orderId, onShipped }: { orderId: string; onShipped: () => vo
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Input
-        placeholder="Carrier"
-        value={carrier}
-        onChange={(e) => setCarrier(e.target.value)}
-        className="h-9 w-40"
-      />
-      <Input
-        placeholder="Tracking number"
-        value={tracking}
-        onChange={(e) => setTracking(e.target.value)}
-        className="h-9 w-40"
-      />
-      <Button size="sm" disabled={!carrier.trim() || !tracking.trim() || submitting} onClick={submit}>
-        Mark as shipped
-      </Button>
-    </div>
+    <Button size="sm" disabled={submitting} onClick={submit}>
+      {submitting ? "Generating waybill…" : "Mark as shipped"}
+    </Button>
   );
 }
 
@@ -77,8 +60,18 @@ function ArtistOrderRow({ order, onChanged }: { order: ArtistOrder; onChanged: (
         Ship to: {order.shippingAddress.fullName}, {order.shippingAddress.address}, {order.shippingAddress.city}
       </p>
       {order.shipment ? (
-        <p className="mt-2 text-caption text-muted-foreground">
-          Shipment: {order.shipment.carrier} · {order.shipment.trackingNumber} · {order.shipment.status}
+        <p className="mt-2 flex flex-wrap items-center gap-x-3 text-caption text-muted-foreground">
+          <span>Shipment: {order.shipment.carrier} · {order.shipment.trackingNumber} · {order.shipment.status}</span>
+          {order.shipment.trackingUrl ? (
+            <a href={order.shipment.trackingUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-foreground">
+              Track
+            </a>
+          ) : null}
+          {order.shipment.labelUrl ? (
+            <a href={order.shipment.labelUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-foreground">
+              Print label
+            </a>
+          ) : null}
         </p>
       ) : null}
       {order.status === "paid" ? (

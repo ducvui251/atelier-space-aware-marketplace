@@ -120,6 +120,7 @@ services:
       EVENT_EXCHANGE: atelier.events.v1
       ATELIER_INTERNAL_SERVICE_TOKEN: ${ATELIER_INTERNAL_SERVICE_TOKEN:?required}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      SHIPPO_API_TOKEN: ${SHIPPO_API_TOKEN:-}
       WEB_GATEWAY_URL: ${WEB_GATEWAY_URL:-http://localhost:3000}
     ports: ["4104:4104"]
     restart: unless-stopped

@@ -26,24 +26,35 @@ export interface ArtworkFormInput {
   imageUrl: string;
   coaUrl?: string;
   description?: string;
+  packageWeightGrams?: number;
+  shippingMethod: Artwork["shippingMethod"];
+  flatRateAmount?: number;
 }
 
-const artworkSchema = z.object({
-  title: z.string().trim().min(1, "Required"),
-  medium: z.string().trim().min(1, "Required"),
-  widthCm: z.coerce.number().positive("Must be greater than 0"),
-  heightCm: z.coerce.number().positive("Must be greater than 0"),
-  price: z.coerce.number().positive("Must be greater than 0"),
-  currency: z.string().trim().min(1, "Required"),
-  dominantColors: z.string().trim().min(1, "Enter at least one color, separated by commas"),
-  style: z.string().trim().min(1, "Enter at least one style, separated by commas"),
-  orientation: z.enum(["portrait", "landscape", "square"]),
-  editionType: z.enum(["original", "limited-edition"]),
-  year: z.coerce.number().int().min(1900).max(new Date().getFullYear() + 1),
-  imageUrl: z.string().trim().url("Upload an image before saving"),
-  coaUrl: z.string().trim().url("Invalid URL").optional().or(z.literal("")),
-  description: z.string().trim().optional(),
-});
+const artworkSchema = z
+  .object({
+    title: z.string().trim().min(1, "Required"),
+    medium: z.string().trim().min(1, "Required"),
+    widthCm: z.coerce.number().positive("Must be greater than 0"),
+    heightCm: z.coerce.number().positive("Must be greater than 0"),
+    price: z.coerce.number().positive("Must be greater than 0"),
+    currency: z.string().trim().min(1, "Required"),
+    dominantColors: z.string().trim().min(1, "Enter at least one color, separated by commas"),
+    style: z.string().trim().min(1, "Enter at least one style, separated by commas"),
+    orientation: z.enum(["portrait", "landscape", "square"]),
+    editionType: z.enum(["original", "limited-edition"]),
+    year: z.coerce.number().int().min(1900).max(new Date().getFullYear() + 1),
+    imageUrl: z.string().trim().url("Upload an image before saving"),
+    coaUrl: z.string().trim().url("Invalid URL").optional().or(z.literal("")),
+    description: z.string().trim().optional(),
+    packageWeightGrams: z.coerce.number().positive("Must be greater than 0").optional().or(z.literal("")),
+    shippingMethod: z.enum(["calculated", "flat_rate"]),
+    flatRateAmount: z.coerce.number().nonnegative("Can't be negative").optional().or(z.literal("")),
+  })
+  .refine((data) => data.shippingMethod !== "flat_rate" || (data.flatRateAmount !== undefined && data.flatRateAmount !== ""), {
+    message: "Set a flat shipping amount, or switch to calculated",
+    path: ["flatRateAmount"],
+  });
 
 type ArtworkFormInputValues = z.input<typeof artworkSchema>;
 type ArtworkFormValues = z.output<typeof artworkSchema>;
@@ -85,14 +96,20 @@ export function ArtworkForm({ initial, submitLabel, onSubmit, onSuccess }: Artwo
           imageUrl: initial.imageUrl,
           coaUrl: initial.coaUrl ?? "",
           description: initial.description ?? "",
+          packageWeightGrams: initial.packageWeightGrams ?? "",
+          shippingMethod: initial.shippingMethod,
+          flatRateAmount: initial.flatRateAmount ?? "",
         }
       : {
           currency: "USD",
           orientation: "portrait",
           editionType: "original",
           year: new Date().getFullYear(),
+          shippingMethod: "calculated",
         },
   });
+
+  const shippingMethod = watch("shippingMethod");
 
   async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -135,6 +152,9 @@ export function ArtworkForm({ initial, submitLabel, onSubmit, onSuccess }: Artwo
       imageUrl: values.imageUrl,
       coaUrl: values.coaUrl || undefined,
       description: values.description || undefined,
+      packageWeightGrams: values.packageWeightGrams || undefined,
+      shippingMethod: values.shippingMethod,
+      flatRateAmount: values.shippingMethod === "flat_rate" ? (values.flatRateAmount || undefined) : undefined,
     };
     try {
       const result = await onSubmit(input);
@@ -217,6 +237,27 @@ export function ArtworkForm({ initial, submitLabel, onSubmit, onSuccess }: Artwo
           className={cn(errors.style && "border-destructive")}
         />
       </Field>
+
+      <p className="eyebrow mt-2">Shipping</p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Packed weight (grams)" error={errors.packageWeightGrams?.message}>
+          <Input type="number" step="1" {...register("packageWeightGrams")} placeholder="e.g. 1500" />
+        </Field>
+        <Field label="Shipping method *" error={errors.shippingMethod?.message}>
+          <select
+            {...register("shippingMethod")}
+            className="focus-ring h-11 w-full rounded-md border border-border bg-surface px-4 text-body text-foreground"
+          >
+            <option value="calculated">Calculated (based on weight &amp; destination)</option>
+            <option value="flat_rate">Flat rate (you set the amount)</option>
+          </select>
+        </Field>
+        {shippingMethod === "flat_rate" ? (
+          <Field label="Flat shipping amount *" error={errors.flatRateAmount?.message}>
+            <Input type="number" step="1" {...register("flatRateAmount")} />
+          </Field>
+        ) : null}
+      </div>
 
       <Field label="Artwork image *" error={errors.imageUrl?.message ?? uploadError ?? undefined}>
         <div className="flex flex-col gap-2">

@@ -12,7 +12,7 @@ export interface AppContextValue {
   currentArtist: Artist | null;
   login(email: string, password: string): Promise<ActionResult>;
   logout(): Promise<void>;
-  updateProfile(input: { fullName: string; phone?: string; bio?: string; portfolioUrl?: string; imageUrl?: string }): Promise<ActionResult>;
+  updateProfile(input: { fullName: string; phone?: string; bio?: string; portfolioUrl?: string; imageUrl?: string; originPostalCode?: string; originCountry?: string; originPhone?: string; originEmail?: string; originState?: string }): Promise<ActionResult>;
   refreshUser(): Promise<void>;
 
   cartItems: Artwork[];
@@ -144,7 +144,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateProfile = React.useCallback(
-    async (input: { fullName: string; phone?: string; bio?: string; portfolioUrl?: string; imageUrl?: string }): Promise<ActionResult> => {
+    async (input: { fullName: string; phone?: string; bio?: string; portfolioUrl?: string; imageUrl?: string; originPostalCode?: string; originCountry?: string; originPhone?: string; originEmail?: string; originState?: string }): Promise<ActionResult> => {
       try {
         const result = await apiFetch<MeResponse>("/api/account/me", { method: "PATCH", body: JSON.stringify(input) });
         setCurrentUser(result.user);

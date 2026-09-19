@@ -17,11 +17,17 @@ import { ArtworkImage } from "@/components/artwork/ArtworkImage";
 import { cn, formatPrice } from "@/lib/utils";
 import { useAuth, useCart } from "@/lib/client/hooks";
 import { apiFetch, ApiError } from "@/lib/client/api";
+import type { ShippingQuote } from "@/types";
+
+const QUOTE_DEBOUNCE_MS = 500;
 
 const checkoutSchema = z.object({
   fullName: z.string().trim().min(1, "Required"),
   address: z.string().trim().min(1, "Required"),
   city: z.string().trim().min(1, "Required"),
+  postalCode: z.string().trim().min(1, "Required"),
+  country: z.string().trim().length(2, "Use a 2-letter code, e.g. US"),
+  state: z.string().trim().optional(),
   phone: z.string().trim().min(1, "Required"),
   method: z.enum(["card", "wallet"]),
 });
@@ -37,6 +43,8 @@ function CheckoutView() {
   const [submitting, setSubmitting] = React.useState(false);
   const [checkoutConflict, setCheckoutConflict] = React.useState(false);
   const [cancelledNotice, setCancelledNotice] = React.useState(false);
+  const [shippingQuote, setShippingQuote] = React.useState<ShippingQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = React.useState(false);
 
   React.useEffect(() => {
     const sessionId = searchParams.get("session_id");
@@ -54,6 +62,7 @@ function CheckoutView() {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
@@ -62,9 +71,37 @@ function CheckoutView() {
       phone: currentUser?.phone ?? "",
       address: "",
       city: "",
+      postalCode: "",
+      country: "",
+      state: "",
       method: "card",
     },
   });
+
+  const postalCode = watch("postalCode");
+  const country = watch("country");
+  const itemIds = React.useMemo(() => items.map((item) => item.id).join(","), [items]);
+
+  React.useEffect(() => {
+    if (!postalCode?.trim() || country?.trim().length !== 2 || !itemIds) {
+      setShippingQuote(null);
+      return;
+    }
+    const timeout = setTimeout(() => {
+      setQuoteLoading(true);
+      apiFetch<ShippingQuote>("/api/shipping/quote", {
+        method: "POST",
+        body: JSON.stringify({ artworkIds: itemIds.split(","), buyerPostalCode: postalCode.trim(), buyerCountry: country.trim() }),
+      })
+        .then(setShippingQuote)
+        .catch(() => setShippingQuote(null))
+        .finally(() => setQuoteLoading(false));
+    }, QUOTE_DEBOUNCE_MS);
+    return () => clearTimeout(timeout);
+  }, [postalCode, country, itemIds]);
+
+  const shippingTotal = shippingQuote?.totalAmount ?? 0;
+  const orderTotal = total + shippingTotal;
 
   if (items.length === 0) {
     return (
@@ -100,6 +137,9 @@ function CheckoutView() {
             fullName: values.fullName,
             address: values.address,
             city: values.city,
+            postalCode: values.postalCode,
+            country: values.country,
+            state: values.state,
             phone: values.phone,
           },
           method: values.method,
@@ -152,6 +192,15 @@ function CheckoutView() {
         <Field label="City" error={errors.city?.message}>
           <Input {...register("city")} className={cn(errors.city && "border-destructive")} />
         </Field>
+        <Field label="Postal code" error={errors.postalCode?.message}>
+          <Input {...register("postalCode")} className={cn(errors.postalCode && "border-destructive")} />
+        </Field>
+        <Field label="Country (2-letter code, e.g. US)" error={errors.country?.message}>
+          <Input {...register("country")} maxLength={2} placeholder="US" className={cn(errors.country && "border-destructive")} />
+        </Field>
+        <Field label="State/province (if applicable)" error={errors.state?.message}>
+          <Input {...register("state")} placeholder="e.g. CA" className={cn(errors.state && "border-destructive")} />
+        </Field>
         <Field label="Phone number" error={errors.phone?.message}>
           <Input {...register("phone")} className={cn(errors.phone && "border-destructive")} />
         </Field>
@@ -168,7 +217,7 @@ function CheckoutView() {
         </Field>
 
         <Button type="submit" size="lg" className="mt-4 w-fit" disabled={submitting}>
-          {submitting ? "Processing…" : `Place order — ${formatPrice(total, items[0]?.currency ?? "USD")}`}
+          {submitting ? "Processing…" : `Place order — ${formatPrice(orderTotal, items[0]?.currency ?? "USD")}`}
         </Button>
       </form>
 
@@ -189,9 +238,27 @@ function CheckoutView() {
             </div>
           ))}
         </div>
-        <div className="mt-4 flex items-center justify-between border-t border-border pt-4 text-body font-medium text-foreground">
+        <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4 text-body-sm text-muted-foreground">
+          <div className="flex items-center justify-between">
+            <span>Subtotal</span>
+            <span>{formatPrice(total, items[0]?.currency ?? "USD")}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span>Shipping</span>
+            <span>
+              {postalCode?.trim()
+                ? quoteLoading
+                  ? "Calculating…"
+                  : shippingQuote
+                    ? formatPrice(shippingTotal, shippingQuote.currency)
+                    : "—"
+                : "Enter postal code"}
+            </span>
+          </div>
+        </div>
+        <div className="mt-2 flex items-center justify-between border-t border-border pt-4 text-body font-medium text-foreground">
           <span>Total</span>
-          <span>{formatPrice(total, items[0]?.currency ?? "USD")}</span>
+          <span>{formatPrice(orderTotal, items[0]?.currency ?? "USD")}</span>
         </div>
       </aside>
     </div>

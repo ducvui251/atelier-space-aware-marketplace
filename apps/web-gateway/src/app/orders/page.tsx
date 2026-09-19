@@ -14,7 +14,9 @@ import { Button } from "@/components/ui/button";
 import { cn, formatPrice } from "@/lib/utils";
 import { useApiResource } from "@/lib/client/hooks";
 import { apiFetch } from "@/lib/client/api";
-import type { Artwork, Order } from "@/types";
+import type { Artwork, Order, Shipment } from "@/types";
+
+type BuyerOrder = Order & { shipment: Shipment | null };
 
 function ReviewForm({ orderId }: { orderId: string }) {
   const [rating, setRating] = React.useState(5);
@@ -114,7 +116,7 @@ function ComplaintForm({ orderId }: { orderId: string }) {
   );
 }
 
-function OrderRow({ order, onChanged }: { order: Order; onChanged: () => void }) {
+function OrderRow({ order, onChanged }: { order: BuyerOrder; onChanged: () => void }) {
   const { data: artwork } = useApiResource<Artwork>(`/api/artworks/${encodeURIComponent(order.artworkId)}`);
   const [confirming, setConfirming] = React.useState(false);
   const [resuming, setResuming] = React.useState(false);
@@ -157,6 +159,23 @@ function OrderRow({ order, onChanged }: { order: Order; onChanged: () => void })
         </Badge>
       </div>
 
+      {order.shipment ? (
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-border bg-muted/40 px-3 py-2 text-caption text-muted-foreground">
+          <span>
+            <span className="font-medium text-foreground">{order.shipment.carrier}</span>
+            {order.shipment.trackingNumber ? ` · ${order.shipment.trackingNumber}` : ""}
+          </span>
+          <Badge variant="outline" className="capitalize">
+            {order.shipment.status.replace("_", " ")}
+          </Badge>
+          {order.shipment.trackingUrl ? (
+            <a href={order.shipment.trackingUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-foreground">
+              Track shipment
+            </a>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="mt-4 flex flex-wrap items-center gap-3">
         {order.status === "pending" ? (
           <Button size="sm" disabled={resuming} onClick={continueCheckout}>
@@ -182,7 +201,7 @@ function OrderRow({ order, onChanged }: { order: Order; onChanged: () => void })
 }
 
 function OrdersView() {
-  const { data, loading, error, refresh } = useApiResource<{ items: Order[]; total: number }>("/api/orders");
+  const { data, loading, error, refresh } = useApiResource<{ items: BuyerOrder[]; total: number }>("/api/orders");
   const searchParams = useSearchParams();
   const justPlaced = searchParams.get("success") === "1";
   const orders = data?.items ?? [];

@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => null);
   const parsed = CheckoutClientRequestSchema.safeParse(body);
-  if (!parsed.success) return errorResponse("shippingAddress.{fullName,address,city,phone} are required", 400);
+  if (!parsed.success) return errorResponse("shippingAddress.{fullName,address,city,postalCode,phone} are required", 400);
   const { shippingAddress, method } = parsed.data;
 
   try {

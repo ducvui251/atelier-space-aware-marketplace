@@ -69,6 +69,17 @@ export const CheckoutClientRequestSchema = z.object({
     address: z.string().trim().min(1),
     city: z.string().trim().min(1),
     phone: z.string().trim().min(1),
+    // The buyer-side location identifiers calculated shipping needs (see
+    // shippingMethodEnum) -- paired with the artist's originPostalCode /
+    // originCountry. country is ISO 3166-1 alpha-2 (e.g. "US", "VN") --
+    // required for a real carrier-rate API call (Shippo), not just the
+    // placeholder formula.
+    postalCode: z.string().trim().min(1),
+    country: z.string().trim().length(2, "Use a 2-letter country code, e.g. US").toUpperCase(),
+    // Optional (most countries don't use one), but confirmed live that
+    // Shippo refuses to purchase a real US label without it -- see
+    // originState above.
+    state: z.string().trim().optional(),
   }),
   method: z.enum(["card", "wallet"]).default("card"),
 });
@@ -84,6 +95,17 @@ export const CheckoutConfirmRequestSchema = z.object({
 export const CheckoutCancelRequestSchema = z.object({
   sessionId: z.string().trim().min(1),
   buyerId: z.string().uuid(),
+});
+
+// Buyer-facing preview of the exact fee checkout will charge — both read
+// from the same calculateShippingRate() (see commerce-service/src/domain/
+// shipping-rate.ts) so the quote never drifts from what actually gets billed.
+export const ShippingQuoteRequestSchema = z.object({
+  artworkIds: z.array(z.string().uuid()).min(1),
+  buyerPostalCode: z.string().trim().min(1),
+  // Required for a real Shippo rate lookup; the placeholder formula ignores
+  // it and only uses buyerPostalCode.
+  buyerCountry: z.string().trim().length(2, "Use a 2-letter country code, e.g. US").toUpperCase(),
 });
 
 // --- Account ---------------------------------------------------------------
@@ -115,6 +137,22 @@ export const ArtistProfileUpdateRequestSchema = z.object({
   bio: z.string().trim().optional(),
   portfolioUrl: z.string().trim().url().optional().or(z.literal("")),
   imageUrl: z.string().trim().url().optional(),
+  // Where the artist ships from — the location identifiers calculated
+  // shipping needs (see shippingMethodEnum above). country is ISO
+  // 3166-1 alpha-2 (e.g. "US", "VN", "FR") -- required for a real
+  // carrier-rate API call (Shippo), optional for the placeholder formula.
+  originPostalCode: z.string().trim().optional(),
+  originCountry: z.string().trim().length(2, "Use a 2-letter country code, e.g. US").toUpperCase().optional(),
+  // Required by at least USPS to purchase a real label (not just quote a
+  // rate) via Shippo — without these, label purchase silently falls back
+  // to the simulated waybill every time.
+  originPhone: z.string().trim().optional(),
+  originEmail: z.string().trim().email("Invalid email").optional().or(z.literal("")),
+  // Confirmed live: Shippo will quote a rate without this but refuses to
+  // purchase a label ("complete address information" required) for at
+  // least US addresses. Optional since most countries have no concept of
+  // state/province the way US/CA/AU do.
+  originState: z.string().trim().optional(),
 });
 
 // --- Artist & Artwork --------------------------------------------------------
@@ -127,6 +165,11 @@ const orientationEnum = z.enum(["portrait", "landscape", "square"]);
 const editionTypeEnum = z.enum(["original", "limited-edition"]);
 const availabilityEnum = z.enum(["available", "reserved", "sold"]);
 const verificationDecisionEnum = z.enum(["verified", "rejected"]);
+// Etsy-style per-listing choice: "flat_rate" is a fixed amount the artist
+// sets themselves; "calculated" looks up a real carrier rate from
+// packageWeightGrams + both parties' postal codes (rate lookup itself is a
+// later phase — this is just the data model/UX choice).
+const shippingMethodEnum = z.enum(["calculated", "flat_rate"]);
 
 export const ArtworkCreateRequestSchema = z.object({
   artistId: z.string().uuid(),
@@ -143,6 +186,9 @@ export const ArtworkCreateRequestSchema = z.object({
   orientation: orientationEnum.default("portrait"),
   dominantColors: z.array(z.string()).default([]),
   style: z.array(z.string()).default([]),
+  packageWeightGrams: z.coerce.number().positive().optional(),
+  shippingMethod: shippingMethodEnum.default("calculated"),
+  flatRateAmount: z.coerce.number().nonnegative().optional(),
 });
 
 export const ArtworkUpdateRequestSchema = z.object({
@@ -158,6 +204,9 @@ export const ArtworkUpdateRequestSchema = z.object({
   dominantColors: z.array(z.string()).optional(),
   style: z.array(z.string()).optional(),
   imageUrl: z.string().trim().url().optional(),
+  packageWeightGrams: z.coerce.number().positive().optional(),
+  shippingMethod: shippingMethodEnum.optional(),
+  flatRateAmount: z.coerce.number().nonnegative().optional(),
 });
 
 export const ArtworkAvailabilityRequestSchema = z.object({
@@ -182,10 +231,12 @@ export const CartAddRequestSchema = z.object({
   artworkId: z.string().uuid(),
 });
 
+// carrier/trackingNumber are no longer supplied by the artist (Shipping
+// Phase 3) -- the server generates a waybill itself (see
+// commerce-service/src/domain/waybill.ts) so a shipment can't display a
+// mistyped or fabricated tracking number.
 export const ShipOrderRequestSchema = z.object({
   artistId: z.string().uuid(),
-  carrier: z.string().trim().min(1),
-  trackingNumber: z.string().trim().min(1),
 });
 
 export const ConfirmReceivedRequestSchema = z.object({
@@ -520,6 +571,7 @@ export type CheckoutClientRequest = z.infer<typeof CheckoutClientRequestSchema>;
 export type CheckoutRequest = z.infer<typeof CheckoutRequestSchema>;
 export type CheckoutConfirmRequest = z.infer<typeof CheckoutConfirmRequestSchema>;
 export type CheckoutCancelRequest = z.infer<typeof CheckoutCancelRequestSchema>;
+export type ShippingQuoteRequest = z.infer<typeof ShippingQuoteRequestSchema>;
 export type AccountSyncRequest = z.infer<typeof AccountSyncRequestSchema>;
 export type AccountUpdateRequest = z.infer<typeof AccountUpdateRequestSchema>;
 export type ArtistProfileUpdateRequest = z.infer<typeof ArtistProfileUpdateRequestSchema>;
