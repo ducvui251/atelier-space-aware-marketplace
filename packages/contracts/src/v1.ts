@@ -69,9 +69,17 @@ export const CheckoutClientRequestSchema = z.object({
     address: z.string().trim().min(1),
     city: z.string().trim().min(1),
     phone: z.string().trim().min(1),
-    // The buyer-side location identifier calculated shipping needs (see
-    // shippingMethodEnum) -- paired with the artist's originPostalCode.
+    // The buyer-side location identifiers calculated shipping needs (see
+    // shippingMethodEnum) -- paired with the artist's originPostalCode /
+    // originCountry. country is ISO 3166-1 alpha-2 (e.g. "US", "VN") --
+    // required for a real carrier-rate API call (Shippo), not just the
+    // placeholder formula.
     postalCode: z.string().trim().min(1),
+    country: z.string().trim().length(2, "Use a 2-letter country code, e.g. US").toUpperCase(),
+    // Optional (most countries don't use one), but confirmed live that
+    // Shippo refuses to purchase a real US label without it -- see
+    // originState above.
+    state: z.string().trim().optional(),
   }),
   method: z.enum(["card", "wallet"]).default("card"),
 });
@@ -95,6 +103,9 @@ export const CheckoutCancelRequestSchema = z.object({
 export const ShippingQuoteRequestSchema = z.object({
   artworkIds: z.array(z.string().uuid()).min(1),
   buyerPostalCode: z.string().trim().min(1),
+  // Required for a real Shippo rate lookup; the placeholder formula ignores
+  // it and only uses buyerPostalCode.
+  buyerCountry: z.string().trim().length(2, "Use a 2-letter country code, e.g. US").toUpperCase(),
 });
 
 // --- Account ---------------------------------------------------------------
@@ -126,9 +137,22 @@ export const ArtistProfileUpdateRequestSchema = z.object({
   bio: z.string().trim().optional(),
   portfolioUrl: z.string().trim().url().optional().or(z.literal("")),
   imageUrl: z.string().trim().url().optional(),
-  // Where the artist ships from — the carrier-agnostic location identifier
-  // calculated shipping needs (see shippingMethodEnum above).
+  // Where the artist ships from — the location identifiers calculated
+  // shipping needs (see shippingMethodEnum above). country is ISO
+  // 3166-1 alpha-2 (e.g. "US", "VN", "FR") -- required for a real
+  // carrier-rate API call (Shippo), optional for the placeholder formula.
   originPostalCode: z.string().trim().optional(),
+  originCountry: z.string().trim().length(2, "Use a 2-letter country code, e.g. US").toUpperCase().optional(),
+  // Required by at least USPS to purchase a real label (not just quote a
+  // rate) via Shippo — without these, label purchase silently falls back
+  // to the simulated waybill every time.
+  originPhone: z.string().trim().optional(),
+  originEmail: z.string().trim().email("Invalid email").optional().or(z.literal("")),
+  // Confirmed live: Shippo will quote a rate without this but refuses to
+  // purchase a label ("complete address information" required) for at
+  // least US addresses. Optional since most countries have no concept of
+  // state/province the way US/CA/AU do.
+  originState: z.string().trim().optional(),
 });
 
 // --- Artist & Artwork --------------------------------------------------------

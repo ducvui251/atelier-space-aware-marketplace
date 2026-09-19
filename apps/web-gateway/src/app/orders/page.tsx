@@ -168,6 +168,11 @@ function OrderRow({ order, onChanged }: { order: BuyerOrder; onChanged: () => vo
           <Badge variant="outline" className="capitalize">
             {order.shipment.status.replace("_", " ")}
           </Badge>
+          {order.shipment.trackingUrl ? (
+            <a href={order.shipment.trackingUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-foreground">
+              Track shipment
+            </a>
+          ) : null}
         </div>
       ) : null}
 

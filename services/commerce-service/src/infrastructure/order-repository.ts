@@ -15,10 +15,10 @@ function mapOrder(row: OrderRow): Order {
  */
 export async function listOrders(buyerId: string): Promise<(Order & { shipment: Shipment | null })[]> {
   const rows = await query<
-    OrderRow & { shipment_id: string | null; carrier: string | null; tracking_number: string | null; shipment_status: Shipment["status"] | null }
+    OrderRow & { shipment_id: string | null; carrier: string | null; tracking_number: string | null; tracking_url: string | null; label_url: string | null; shipment_status: Shipment["status"] | null }
   >(
     `select o.id::text, o.buyer_id::text, o.artwork_id::text, o.edition_type, o.total_amount::text, o.currency, o.status, o.created_at::text, o.shipping_address,
-            s.id::text as shipment_id, s.carrier, s.tracking_number, s.status as shipment_status
+            s.id::text as shipment_id, s.carrier, s.tracking_number, s.tracking_url, s.label_url, s.status as shipment_status
      from commerce.orders o
      left join commerce.shipments s on s.order_id = o.id
      where o.buyer_id = $1::uuid order by o.created_at desc`, [buyerId],
@@ -26,7 +26,7 @@ export async function listOrders(buyerId: string): Promise<(Order & { shipment: 
   return rows.map((row) => ({
     ...mapOrder(row),
     shipment: row.shipment_id
-      ? { id: row.shipment_id, orderId: row.id, carrier: row.carrier ?? undefined, trackingNumber: row.tracking_number ?? undefined, status: row.shipment_status! }
+      ? { id: row.shipment_id, orderId: row.id, carrier: row.carrier ?? undefined, trackingNumber: row.tracking_number ?? undefined, trackingUrl: row.tracking_url ?? undefined, labelUrl: row.label_url ?? undefined, status: row.shipment_status! }
       : null,
   }));
 }

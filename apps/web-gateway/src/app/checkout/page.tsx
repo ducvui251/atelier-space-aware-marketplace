@@ -26,6 +26,8 @@ const checkoutSchema = z.object({
   address: z.string().trim().min(1, "Required"),
   city: z.string().trim().min(1, "Required"),
   postalCode: z.string().trim().min(1, "Required"),
+  country: z.string().trim().length(2, "Use a 2-letter code, e.g. US"),
+  state: z.string().trim().optional(),
   phone: z.string().trim().min(1, "Required"),
   method: z.enum(["card", "wallet"]),
 });
@@ -70,15 +72,18 @@ function CheckoutView() {
       address: "",
       city: "",
       postalCode: "",
+      country: "",
+      state: "",
       method: "card",
     },
   });
 
   const postalCode = watch("postalCode");
+  const country = watch("country");
   const itemIds = React.useMemo(() => items.map((item) => item.id).join(","), [items]);
 
   React.useEffect(() => {
-    if (!postalCode?.trim() || !itemIds) {
+    if (!postalCode?.trim() || country?.trim().length !== 2 || !itemIds) {
       setShippingQuote(null);
       return;
     }
@@ -86,14 +91,14 @@ function CheckoutView() {
       setQuoteLoading(true);
       apiFetch<ShippingQuote>("/api/shipping/quote", {
         method: "POST",
-        body: JSON.stringify({ artworkIds: itemIds.split(","), buyerPostalCode: postalCode.trim() }),
+        body: JSON.stringify({ artworkIds: itemIds.split(","), buyerPostalCode: postalCode.trim(), buyerCountry: country.trim() }),
       })
         .then(setShippingQuote)
         .catch(() => setShippingQuote(null))
         .finally(() => setQuoteLoading(false));
     }, QUOTE_DEBOUNCE_MS);
     return () => clearTimeout(timeout);
-  }, [postalCode, itemIds]);
+  }, [postalCode, country, itemIds]);
 
   const shippingTotal = shippingQuote?.totalAmount ?? 0;
   const orderTotal = total + shippingTotal;
@@ -133,6 +138,8 @@ function CheckoutView() {
             address: values.address,
             city: values.city,
             postalCode: values.postalCode,
+            country: values.country,
+            state: values.state,
             phone: values.phone,
           },
           method: values.method,
@@ -187,6 +194,12 @@ function CheckoutView() {
         </Field>
         <Field label="Postal code" error={errors.postalCode?.message}>
           <Input {...register("postalCode")} className={cn(errors.postalCode && "border-destructive")} />
+        </Field>
+        <Field label="Country (2-letter code, e.g. US)" error={errors.country?.message}>
+          <Input {...register("country")} maxLength={2} placeholder="US" className={cn(errors.country && "border-destructive")} />
+        </Field>
+        <Field label="State/province (if applicable)" error={errors.state?.message}>
+          <Input {...register("state")} placeholder="e.g. CA" className={cn(errors.state && "border-destructive")} />
         </Field>
         <Field label="Phone number" error={errors.phone?.message}>
           <Input {...register("phone")} className={cn(errors.phone && "border-destructive")} />

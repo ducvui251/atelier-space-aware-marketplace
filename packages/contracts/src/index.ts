@@ -46,6 +46,10 @@ export interface Artist {
   reviewedBy?: string;
   reviewedAt?: string;
   originPostalCode?: string;
+  originCountry?: string;
+  originPhone?: string;
+  originEmail?: string;
+  originState?: string;
 }
 
 export interface Collection { id: string; title: string; description: string; imageUrl: string; artworkCount: number; }
@@ -133,13 +137,13 @@ export type OrderStatus = "pending" | "confirmed" | "paid" | "shipped" | "comple
 export interface Order {
   id: string; buyerId: string; artworkId: string; editionType: EditionType;
   totalAmount: number; currency: string; status: OrderStatus; createdAt: string;
-  shippingAddress: { fullName: string; address: string; city: string; phone: string; postalCode?: string };
+  shippingAddress: { fullName: string; address: string; city: string; phone: string; postalCode?: string; country?: string; state?: string };
 }
 export type PaymentMethod = "card" | "wallet";
 export type PaymentStatus = "pending" | "success" | "failed" | "refunded";
 export interface Payment { id: string; orderId: string; amount: number; method: PaymentMethod; status: PaymentStatus; }
 export type ShipmentStatus = "packing" | "in_transit" | "delivered" | "incident";
-export interface Shipment { id: string; orderId: string; carrier?: string; trackingNumber?: string; status: ShipmentStatus; }
+export interface Shipment { id: string; orderId: string; carrier?: string; trackingNumber?: string; status: ShipmentStatus; trackingUrl?: string; labelUrl?: string; }
 export interface Review { id: string; orderId: string; buyerId: string; rating: number; comment?: string; }
 export interface Follow { id: string; buyerId: string; artistId: string; }
 export interface SavedArtwork { id: string; buyerId: string; artworkId: string; }

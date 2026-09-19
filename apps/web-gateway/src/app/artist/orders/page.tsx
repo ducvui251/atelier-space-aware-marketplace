@@ -60,8 +60,18 @@ function ArtistOrderRow({ order, onChanged }: { order: ArtistOrder; onChanged: (
         Ship to: {order.shippingAddress.fullName}, {order.shippingAddress.address}, {order.shippingAddress.city}
       </p>
       {order.shipment ? (
-        <p className="mt-2 text-caption text-muted-foreground">
-          Shipment: {order.shipment.carrier} · {order.shipment.trackingNumber} · {order.shipment.status}
+        <p className="mt-2 flex flex-wrap items-center gap-x-3 text-caption text-muted-foreground">
+          <span>Shipment: {order.shipment.carrier} · {order.shipment.trackingNumber} · {order.shipment.status}</span>
+          {order.shipment.trackingUrl ? (
+            <a href={order.shipment.trackingUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-foreground">
+              Track
+            </a>
+          ) : null}
+          {order.shipment.labelUrl ? (
+            <a href={order.shipment.labelUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-foreground">
+              Print label
+            </a>
+          ) : null}
         </p>
       ) : null}
       {order.status === "paid" ? (

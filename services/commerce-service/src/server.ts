@@ -12,9 +12,8 @@ import { confirmCheckoutSession, findOpenCheckoutSessionByOrder, findOpenCheckou
 import { getArtistEarnings, getArtistTopSellingArtworks, getCommerceStats, listOrders, listOrdersByIds } from "./infrastructure/order-repository.ts";
 import { confirmReceived, listArtistOrders, saveReview, shipOrder } from "./infrastructure/order-actions-repository.ts";
 import { createCheckoutSession, retrieveCheckoutSession, retrievePaymentIntent } from "./infrastructure/stripe-client.ts";
-import { getArtistOriginPostalCode } from "./infrastructure/shipping-repository.ts";
-import { calculateShippingRate, isSameRegion } from "./domain/shipping-rate.ts";
-import { generateWaybill } from "./domain/waybill.ts";
+import { getArtistOrigin } from "./infrastructure/shipping-repository.ts";
+import { resolveShippingRate } from "./domain/shipping-rate.ts";
 
 function artistArtworkHeaders(): Record<string, string> {
   return process.env.ATELIER_INTERNAL_SERVICE_TOKEN ? { "x-service-token": process.env.ATELIER_INTERNAL_SERVICE_TOKEN } : {};
@@ -41,21 +40,37 @@ async function sourceArtworks(correlationId: string): Promise<Artwork[]> {
   }
 }
 
+interface ShippingDestinationInput {
+  name: string;
+  street1: string;
+  city: string;
+  postalCode: string;
+  country: string;
+  phone?: string;
+  state?: string;
+}
+
 /**
  * Shared by checkout (what actually gets charged) and the shipping/quote
  * route (what the buyer previews beforehand) so the two numbers can never
- * drift apart — both call calculateShippingRate() with the same inputs.
- * One origin lookup per distinct artist, not per artwork.
+ * drift apart — both call resolveShippingRate() with the same inputs (which
+ * itself tries a real Shippo rate before falling back to the placeholder
+ * formula). One origin lookup per distinct artist, not per artwork.
  */
-async function quoteShippingFees(items: Artwork[], buyerPostalCode: string): Promise<Map<string, number>> {
-  const originByArtist = new Map<string, string | null>();
+async function quoteShippingFees(items: Artwork[], destination: ShippingDestinationInput): Promise<Map<string, number>> {
+  const originByArtist = new Map<string, Awaited<ReturnType<typeof getArtistOrigin>>>();
   const fees = new Map<string, number>();
   for (const item of items) {
     if (!originByArtist.has(item.artistId)) {
-      originByArtist.set(item.artistId, await getArtistOriginPostalCode(item.artistId));
+      originByArtist.set(item.artistId, await getArtistOrigin(item.artistId));
     }
-    const sameRegion = isSameRegion(originByArtist.get(item.artistId) ?? null, buyerPostalCode);
-    fees.set(item.id, calculateShippingRate(item, sameRegion).amount);
+    const origin = originByArtist.get(item.artistId)!;
+    const rate = await resolveShippingRate(
+      item,
+      { name: origin.displayName ?? "Artist", postalCode: origin.postalCode, country: origin.country, phone: origin.phone, email: origin.email, state: origin.state },
+      destination,
+    );
+    fees.set(item.id, rate.amount);
   }
   return fees;
 }
@@ -216,7 +231,15 @@ const routes: Record<string, ServiceRouteHandler> = {
     }
 
     try {
-      const shippingFees = await quoteShippingFees(items, parsed.data.shippingAddress.postalCode);
+      const shippingFees = await quoteShippingFees(items, {
+        name: parsed.data.shippingAddress.fullName,
+        street1: parsed.data.shippingAddress.address,
+        city: parsed.data.shippingAddress.city,
+        postalCode: parsed.data.shippingAddress.postalCode,
+        country: parsed.data.shippingAddress.country,
+        phone: parsed.data.shippingAddress.phone,
+        state: parsed.data.shippingAddress.state,
+      });
       const totalAmountFor = (item: Artwork) => item.price + (shippingFees.get(item.id) ?? 0);
       const orders = await persistPendingCheckout({ buyerId, items: items.map((item) => ({ artworkId: item.id, editionType: item.editionType, totalAmount: totalAmountFor(item), currency: item.currency, title: item.title })), shippingAddress: parsed.data.shippingAddress, method: parsed.data.method, idempotencyKey }, correlationId);
       const gatewayUrl = (process.env.WEB_GATEWAY_URL ?? "http://localhost:3000").replace(/\/$/, "");
@@ -285,7 +308,7 @@ const routes: Record<string, ServiceRouteHandler> = {
   "POST /v1/commerce/shipping/quote": async ({ request, response, correlationId }) => {
     const parsed = parseBody(ShippingQuoteRequestSchema, await readJson(request));
     if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
-    const { artworkIds, buyerPostalCode } = parsed.data;
+    const { artworkIds, buyerPostalCode, buyerCountry } = parsed.data;
 
     let source: Artwork[];
     try {
@@ -300,7 +323,9 @@ const routes: Record<string, ServiceRouteHandler> = {
       return writeServiceError(response, 404, { code: "NOT_FOUND", message: "One or more artworks were not found", correlationId, retryable: false });
     }
 
-    const fees = await quoteShippingFees(items, buyerPostalCode);
+    // No full address collected at preview time — postal code + country is
+    // enough to drive a real rate lookup (see resolveShippingRate).
+    const fees = await quoteShippingFees(items, { name: "Buyer", street1: "N/A", city: buyerPostalCode, postalCode: buyerPostalCode, country: buyerCountry });
     const quoteItems = items.map((item) => ({ artworkId: item.id, amount: fees.get(item.id) ?? 0, currency: item.currency, method: item.shippingMethod }));
     const totalAmount = Math.round(quoteItems.reduce((sum, entry) => sum + entry.amount, 0) * 100) / 100;
     return writeServiceJson(response, 200, { items: quoteItems, totalAmount, currency: items[0]?.currency ?? "USD" }, correlationId);
@@ -436,8 +461,7 @@ const routes: Record<string, ServiceRouteHandler> = {
     const parsed = parseBody(ShipOrderRequestSchema, await readJson(request));
     if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
     const orderId = url.pathname.split("/")[4] ?? "";
-    const waybill = generateWaybill(orderId);
-    const shipment = await shipOrder(orderId, parsed.data.artistId, waybill, correlationId);
+    const shipment = await shipOrder(orderId, parsed.data.artistId, correlationId);
     return shipment ? writeServiceJson(response, 200, shipment, correlationId) : writeServiceError(response, 403, { code: "FORBIDDEN", message: "This order does not belong to the artist", correlationId, retryable: false });
   },
   "POST /v1/commerce/orders/:id/confirm-received": async ({ request, url, response, correlationId }) => {

@@ -11,10 +11,11 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const artworkIds = Array.isArray(body?.artworkIds) ? body.artworkIds.filter((id: unknown) => typeof id === "string") : [];
   const buyerPostalCode = typeof body?.buyerPostalCode === "string" ? body.buyerPostalCode.trim() : "";
-  if (artworkIds.length === 0 || !buyerPostalCode) return errorResponse("artworkIds and buyerPostalCode are required", 400);
+  const buyerCountry = typeof body?.buyerCountry === "string" ? body.buyerCountry.trim() : "";
+  if (artworkIds.length === 0 || !buyerPostalCode || buyerCountry.length !== 2) return errorResponse("artworkIds, buyerPostalCode, and a 2-letter buyerCountry are required", 400);
 
   try {
-    return json(await getShippingQuote(artworkIds, buyerPostalCode));
+    return json(await getShippingQuote(artworkIds, buyerPostalCode, buyerCountry));
   } catch (error) {
     if (error instanceof ServiceClientError && error.status < 500) return errorResponse(error.message, error.status);
     return errorResponse("Couldn't calculate shipping. Please try again.", 503);

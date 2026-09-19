@@ -26,11 +26,11 @@ export async function cancelCheckoutSession(sessionId: string, buyerId: string) 
   });
 }
 
-export async function getShippingQuote(artworkIds: string[], buyerPostalCode: string) {
+export async function getShippingQuote(artworkIds: string[], buyerPostalCode: string, buyerCountry: string) {
   return requestService<ShippingQuote>("commerce", "/v1/commerce/shipping/quote", {
     method: "POST",
-    body: { artworkIds, buyerPostalCode },
-    timeoutMs: 5_000,
+    body: { artworkIds, buyerPostalCode, buyerCountry },
+    timeoutMs: 8_000,
   });
 }
 

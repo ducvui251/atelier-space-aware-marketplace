@@ -18,7 +18,7 @@ type ArtistRow = {
   id: string; user_id: string | null; display_name: string; location: string | null; nationality: string | null;
   bio: string | null; verification_status: Artist["verificationStatus"]; image_url: string | null; portfolio_url: string | null;
   verification_note: string | null; reviewed_by: string | null; reviewed_at: string | null;
-  origin_postal_code: string | null;
+  origin_postal_code: string | null; origin_country: string | null; origin_phone: string | null; origin_email: string | null; origin_state: string | null;
 };
 
 const artworkSql = `
@@ -63,6 +63,10 @@ function mapArtist(row: ArtistRow): Artist {
     ...(row.reviewed_by ? { reviewedBy: row.reviewed_by } : {}),
     ...(row.reviewed_at ? { reviewedAt: row.reviewed_at } : {}),
     ...(row.origin_postal_code ? { originPostalCode: row.origin_postal_code } : {}),
+    ...(row.origin_country ? { originCountry: row.origin_country } : {}),
+    ...(row.origin_phone ? { originPhone: row.origin_phone } : {}),
+    ...(row.origin_email ? { originEmail: row.origin_email } : {}),
+    ...(row.origin_state ? { originState: row.origin_state } : {}),
   };
 }
 
@@ -188,7 +192,7 @@ export async function findPersistedArtwork(id: string): Promise<Artwork | null> 
  * every subsequent login), so a repeat call for an already-provisioned
  * account must be a safe no-op rather than erroring or duplicating a row.
  */
-const artistColumns = `id::text, user_id::text, display_name, location, nationality, bio, verification_status, image_url, portfolio_url, verification_note, reviewed_by::text, reviewed_at::text, origin_postal_code`;
+const artistColumns = `id::text, user_id::text, display_name, location, nationality, bio, verification_status, image_url, portfolio_url, verification_note, reviewed_by::text, reviewed_at::text, origin_postal_code, origin_country, origin_phone, origin_email, origin_state`;
 
 export async function ensureArtistProfile(userId: string, displayName: string): Promise<Artist> {
   const rows = await query<ArtistRow>(
@@ -224,12 +228,12 @@ export async function findPersistedArtist(id: string): Promise<Artist | null> {
  * showing their old name forever (not a sync-delay bug, the rename just
  * never happened here at all).
  */
-export async function updatePersistedArtistProfile(id: string, input: { displayName?: string; bio?: string; portfolioUrl?: string; imageUrl?: string; originPostalCode?: string }): Promise<Artist | null> {
+export async function updatePersistedArtistProfile(id: string, input: { displayName?: string; bio?: string; portfolioUrl?: string; imageUrl?: string; originPostalCode?: string; originCountry?: string; originPhone?: string; originEmail?: string; originState?: string }): Promise<Artist | null> {
   const current = await findPersistedArtist(id);
   if (!current) return null;
   await query(
-    `update artist_artwork.artist_profiles set display_name = $2, bio = $3, portfolio_url = $4, image_url = $5, origin_postal_code = $6, updated_at = now() where id::text = $1`,
-    [id, input.displayName ?? current.displayName, input.bio ?? current.bio ?? null, input.portfolioUrl ?? current.portfolioUrl ?? null, input.imageUrl ?? current.imageUrl ?? null, input.originPostalCode ?? current.originPostalCode ?? null],
+    `update artist_artwork.artist_profiles set display_name = $2, bio = $3, portfolio_url = $4, image_url = $5, origin_postal_code = $6, origin_country = $7, origin_phone = $8, origin_email = $9, origin_state = $10, updated_at = now() where id::text = $1`,
+    [id, input.displayName ?? current.displayName, input.bio ?? current.bio ?? null, input.portfolioUrl ?? current.portfolioUrl ?? null, input.imageUrl ?? current.imageUrl ?? null, input.originPostalCode ?? current.originPostalCode ?? null, input.originCountry ?? current.originCountry ?? null, input.originPhone ?? current.originPhone ?? null, input.originEmail ?? current.originEmail ?? null, input.originState ?? current.originState ?? null],
   );
   return findPersistedArtist(id);
 }
