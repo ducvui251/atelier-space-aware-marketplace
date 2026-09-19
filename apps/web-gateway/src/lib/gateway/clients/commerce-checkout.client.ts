@@ -1,4 +1,4 @@
-import type { CheckoutClientRequest, Order, StripeWebhookRelay } from "@atelier/contracts";
+import type { CheckoutClientRequest, Order, ShippingQuote, StripeWebhookRelay } from "@atelier/contracts";
 import { requestService } from "../http-client";
 
 export async function checkout(authUserId: string, input: CheckoutClientRequest, idempotencyKey: string) {
@@ -23,6 +23,14 @@ export async function cancelCheckoutSession(sessionId: string, buyerId: string) 
     method: "POST",
     body: { sessionId, buyerId },
     timeoutMs: 10_000,
+  });
+}
+
+export async function getShippingQuote(artworkIds: string[], buyerPostalCode: string) {
+  return requestService<ShippingQuote>("commerce", "/v1/commerce/shipping/quote", {
+    method: "POST",
+    body: { artworkIds, buyerPostalCode },
+    timeoutMs: 5_000,
   });
 }
 

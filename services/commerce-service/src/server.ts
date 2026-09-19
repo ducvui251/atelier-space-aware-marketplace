@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createServiceServer, getPort, readJson, writeServiceError, writeServiceJson, type ServiceRouteHandler } from "@atelier/config/http";
 import { createLogger } from "@atelier/config/logger";
-import { ArtistEarningsQuerySchema, ArtistTopArtworksQuerySchema, CartAddRequestSchema, CheckoutCancelRequestSchema, CheckoutConfirmRequestSchema, CheckoutRequestSchema, ConfirmReceivedRequestSchema, OrderReviewRequestSchema, ShipOrderRequestSchema, StripeWebhookRelaySchema, parseBody, type Artwork } from "@atelier/contracts";
+import { ArtistEarningsQuerySchema, ArtistTopArtworksQuerySchema, CartAddRequestSchema, CheckoutCancelRequestSchema, CheckoutConfirmRequestSchema, CheckoutRequestSchema, ConfirmReceivedRequestSchema, OrderReviewRequestSchema, ShipOrderRequestSchema, ShippingQuoteRequestSchema, StripeWebhookRelaySchema, parseBody, type Artwork } from "@atelier/contracts";
 import { runOutboxPublisher } from "@atelier/events";
 import { ping } from "@atelier/persistence";
 import { resolveCartArtworks } from "./application/checkout-cart.ts";
@@ -12,6 +12,8 @@ import { confirmCheckoutSession, findOpenCheckoutSessionByOrder, findOpenCheckou
 import { getArtistEarnings, getArtistTopSellingArtworks, getCommerceStats, listOrders, listOrdersByIds } from "./infrastructure/order-repository.ts";
 import { confirmReceived, listArtistOrders, saveReview, shipOrder } from "./infrastructure/order-actions-repository.ts";
 import { createCheckoutSession, retrieveCheckoutSession, retrievePaymentIntent } from "./infrastructure/stripe-client.ts";
+import { getArtistOriginPostalCode } from "./infrastructure/shipping-repository.ts";
+import { calculateShippingRate, isSameRegion } from "./domain/shipping-rate.ts";
 
 function artistArtworkHeaders(): Record<string, string> {
   return process.env.ATELIER_INTERNAL_SERVICE_TOKEN ? { "x-service-token": process.env.ATELIER_INTERNAL_SERVICE_TOKEN } : {};
@@ -36,6 +38,25 @@ async function sourceArtworks(correlationId: string): Promise<Artwork[]> {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/**
+ * Shared by checkout (what actually gets charged) and the shipping/quote
+ * route (what the buyer previews beforehand) so the two numbers can never
+ * drift apart — both call calculateShippingRate() with the same inputs.
+ * One origin lookup per distinct artist, not per artwork.
+ */
+async function quoteShippingFees(items: Artwork[], buyerPostalCode: string): Promise<Map<string, number>> {
+  const originByArtist = new Map<string, string | null>();
+  const fees = new Map<string, number>();
+  for (const item of items) {
+    if (!originByArtist.has(item.artistId)) {
+      originByArtist.set(item.artistId, await getArtistOriginPostalCode(item.artistId));
+    }
+    const sameRegion = isSameRegion(originByArtist.get(item.artistId) ?? null, buyerPostalCode);
+    fees.set(item.id, calculateShippingRate(item, sameRegion).amount);
+  }
+  return fees;
 }
 
 /**
@@ -194,12 +215,14 @@ const routes: Record<string, ServiceRouteHandler> = {
     }
 
     try {
-      const orders = await persistPendingCheckout({ buyerId, items: items.map((item) => ({ artworkId: item.id, editionType: item.editionType, totalAmount: item.price, currency: item.currency, title: item.title })), shippingAddress: parsed.data.shippingAddress, method: parsed.data.method, idempotencyKey }, correlationId);
+      const shippingFees = await quoteShippingFees(items, parsed.data.shippingAddress.postalCode);
+      const totalAmountFor = (item: Artwork) => item.price + (shippingFees.get(item.id) ?? 0);
+      const orders = await persistPendingCheckout({ buyerId, items: items.map((item) => ({ artworkId: item.id, editionType: item.editionType, totalAmount: totalAmountFor(item), currency: item.currency, title: item.title })), shippingAddress: parsed.data.shippingAddress, method: parsed.data.method, idempotencyKey }, correlationId);
       const gatewayUrl = (process.env.WEB_GATEWAY_URL ?? "http://localhost:3000").replace(/\/$/, "");
       const session = await createCheckoutSession({
         buyerId,
         orderIds: orders.map((order) => order.id),
-        items: items.map((item) => ({ artworkId: item.id, title: item.title, amount: item.price, currency: item.currency })),
+        items: items.map((item) => ({ artworkId: item.id, title: item.title, amount: totalAmountFor(item), currency: item.currency })),
         successUrl: `${gatewayUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
         cancelUrl: `${gatewayUrl}/checkout?cancelled=1&session_id={CHECKOUT_SESSION_ID}`,
       });
@@ -257,6 +280,29 @@ const routes: Record<string, ServiceRouteHandler> = {
     const result = await handlePaymentFailed(session.orderIds, correlationId);
     if (result) await releaseReservationsBestEffort(result.reservationIds, correlationId);
     return writeServiceJson(response, 200, { cancelled: true }, correlationId);
+  },
+  "POST /v1/commerce/shipping/quote": async ({ request, response, correlationId }) => {
+    const parsed = parseBody(ShippingQuoteRequestSchema, await readJson(request));
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
+    const { artworkIds, buyerPostalCode } = parsed.data;
+
+    let source: Artwork[];
+    try {
+      source = await sourceArtworks(correlationId);
+    } catch (error) {
+      logger.error("artwork lookup failed during shipping quote", { correlationId, error });
+      return writeServiceError(response, 503, { code: "DEPENDENCY_UNAVAILABLE", message: "Could not look up artwork details. Please try again.", correlationId, retryable: true });
+    }
+    const byId = new Map(source.map((artwork) => [artwork.id, artwork]));
+    const items = artworkIds.map((id) => byId.get(id)).filter((item): item is Artwork => Boolean(item));
+    if (items.length !== artworkIds.length) {
+      return writeServiceError(response, 404, { code: "NOT_FOUND", message: "One or more artworks were not found", correlationId, retryable: false });
+    }
+
+    const fees = await quoteShippingFees(items, buyerPostalCode);
+    const quoteItems = items.map((item) => ({ artworkId: item.id, amount: fees.get(item.id) ?? 0, currency: item.currency, method: item.shippingMethod }));
+    const totalAmount = Math.round(quoteItems.reduce((sum, entry) => sum + entry.amount, 0) * 100) / 100;
+    return writeServiceJson(response, 200, { items: quoteItems, totalAmount, currency: items[0]?.currency ?? "USD" }, correlationId);
   },
   /**
    * Phase 6, G-04. The Gateway has already verified the Stripe signature

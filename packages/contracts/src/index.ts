@@ -213,6 +213,18 @@ export interface ArtistEarnings {
   trend: { period: string; net: number }[];
 }
 
+export interface ShippingQuoteItem {
+  artworkId: string;
+  amount: number;
+  currency: string;
+  method: ShippingMethod;
+}
+export interface ShippingQuote {
+  items: ShippingQuoteItem[];
+  totalAmount: number;
+  currency: string;
+}
+
 export const SERVICE_NAMES = [
   "account", "catalog-discovery", "artist-artwork", "commerce",
   "recommendation", "verification", "room-preview", "admin",

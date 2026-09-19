@@ -89,6 +89,14 @@ export const CheckoutCancelRequestSchema = z.object({
   buyerId: z.string().uuid(),
 });
 
+// Buyer-facing preview of the exact fee checkout will charge — both read
+// from the same calculateShippingRate() (see commerce-service/src/domain/
+// shipping-rate.ts) so the quote never drifts from what actually gets billed.
+export const ShippingQuoteRequestSchema = z.object({
+  artworkIds: z.array(z.string().uuid()).min(1),
+  buyerPostalCode: z.string().trim().min(1),
+});
+
 // --- Account ---------------------------------------------------------------
 
 export const SignupRequestSchema = z.object({
@@ -537,6 +545,7 @@ export type CheckoutClientRequest = z.infer<typeof CheckoutClientRequestSchema>;
 export type CheckoutRequest = z.infer<typeof CheckoutRequestSchema>;
 export type CheckoutConfirmRequest = z.infer<typeof CheckoutConfirmRequestSchema>;
 export type CheckoutCancelRequest = z.infer<typeof CheckoutCancelRequestSchema>;
+export type ShippingQuoteRequest = z.infer<typeof ShippingQuoteRequestSchema>;
 export type AccountSyncRequest = z.infer<typeof AccountSyncRequestSchema>;
 export type AccountUpdateRequest = z.infer<typeof AccountUpdateRequestSchema>;
 export type ArtistProfileUpdateRequest = z.infer<typeof ArtistProfileUpdateRequestSchema>;

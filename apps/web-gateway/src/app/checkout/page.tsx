@@ -17,6 +17,9 @@ import { ArtworkImage } from "@/components/artwork/ArtworkImage";
 import { cn, formatPrice } from "@/lib/utils";
 import { useAuth, useCart } from "@/lib/client/hooks";
 import { apiFetch, ApiError } from "@/lib/client/api";
+import type { ShippingQuote } from "@/types";
+
+const QUOTE_DEBOUNCE_MS = 500;
 
 const checkoutSchema = z.object({
   fullName: z.string().trim().min(1, "Required"),
@@ -38,6 +41,8 @@ function CheckoutView() {
   const [submitting, setSubmitting] = React.useState(false);
   const [checkoutConflict, setCheckoutConflict] = React.useState(false);
   const [cancelledNotice, setCancelledNotice] = React.useState(false);
+  const [shippingQuote, setShippingQuote] = React.useState<ShippingQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = React.useState(false);
 
   React.useEffect(() => {
     const sessionId = searchParams.get("session_id");
@@ -55,6 +60,7 @@ function CheckoutView() {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
@@ -67,6 +73,30 @@ function CheckoutView() {
       method: "card",
     },
   });
+
+  const postalCode = watch("postalCode");
+  const itemIds = React.useMemo(() => items.map((item) => item.id).join(","), [items]);
+
+  React.useEffect(() => {
+    if (!postalCode?.trim() || !itemIds) {
+      setShippingQuote(null);
+      return;
+    }
+    const timeout = setTimeout(() => {
+      setQuoteLoading(true);
+      apiFetch<ShippingQuote>("/api/shipping/quote", {
+        method: "POST",
+        body: JSON.stringify({ artworkIds: itemIds.split(","), buyerPostalCode: postalCode.trim() }),
+      })
+        .then(setShippingQuote)
+        .catch(() => setShippingQuote(null))
+        .finally(() => setQuoteLoading(false));
+    }, QUOTE_DEBOUNCE_MS);
+    return () => clearTimeout(timeout);
+  }, [postalCode, itemIds]);
+
+  const shippingTotal = shippingQuote?.totalAmount ?? 0;
+  const orderTotal = total + shippingTotal;
 
   if (items.length === 0) {
     return (
@@ -174,7 +204,7 @@ function CheckoutView() {
         </Field>
 
         <Button type="submit" size="lg" className="mt-4 w-fit" disabled={submitting}>
-          {submitting ? "Processing…" : `Place order — ${formatPrice(total, items[0]?.currency ?? "USD")}`}
+          {submitting ? "Processing…" : `Place order — ${formatPrice(orderTotal, items[0]?.currency ?? "USD")}`}
         </Button>
       </form>
 
@@ -195,9 +225,27 @@ function CheckoutView() {
             </div>
           ))}
         </div>
-        <div className="mt-4 flex items-center justify-between border-t border-border pt-4 text-body font-medium text-foreground">
+        <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4 text-body-sm text-muted-foreground">
+          <div className="flex items-center justify-between">
+            <span>Subtotal</span>
+            <span>{formatPrice(total, items[0]?.currency ?? "USD")}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span>Shipping</span>
+            <span>
+              {postalCode?.trim()
+                ? quoteLoading
+                  ? "Calculating…"
+                  : shippingQuote
+                    ? formatPrice(shippingTotal, shippingQuote.currency)
+                    : "—"
+                : "Enter postal code"}
+            </span>
+          </div>
+        </div>
+        <div className="mt-2 flex items-center justify-between border-t border-border pt-4 text-body font-medium text-foreground">
           <span>Total</span>
-          <span>{formatPrice(total, items[0]?.currency ?? "USD")}</span>
+          <span>{formatPrice(orderTotal, items[0]?.currency ?? "USD")}</span>
         </div>
       </aside>
     </div>
