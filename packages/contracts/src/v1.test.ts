@@ -399,9 +399,10 @@ describe("ArtworkArtistVerificationRequestSchema", () => {
 });
 
 describe("ShipOrderRequestSchema / ConfirmReceivedRequestSchema / OrderReviewRequestSchema", () => {
-  it("requires artistId, carrier, and trackingNumber to ship", () => {
-    expect(ShipOrderRequestSchema.safeParse({ artistId: uuid1, carrier: "DHL", trackingNumber: "T1" }).success).toBe(true);
-    expect(ShipOrderRequestSchema.safeParse({ artistId: uuid1, carrier: "", trackingNumber: "T1" }).success).toBe(false);
+  it("requires artistId to ship; the server assigns the waybill", () => {
+    expect(ShipOrderRequestSchema.safeParse({ artistId: uuid1 }).success).toBe(true);
+    expect(ShipOrderRequestSchema.safeParse({}).success).toBe(false);
+    expect(ShipOrderRequestSchema.safeParse({ artistId: "not-a-uuid" }).success).toBe(false);
   });
 
   it("requires a valid buyerId to confirm receipt", () => {

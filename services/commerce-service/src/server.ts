@@ -14,6 +14,7 @@ import { confirmReceived, listArtistOrders, saveReview, shipOrder } from "./infr
 import { createCheckoutSession, retrieveCheckoutSession, retrievePaymentIntent } from "./infrastructure/stripe-client.ts";
 import { getArtistOriginPostalCode } from "./infrastructure/shipping-repository.ts";
 import { calculateShippingRate, isSameRegion } from "./domain/shipping-rate.ts";
+import { generateWaybill } from "./domain/waybill.ts";
 
 function artistArtworkHeaders(): Record<string, string> {
   return process.env.ATELIER_INTERNAL_SERVICE_TOKEN ? { "x-service-token": process.env.ATELIER_INTERNAL_SERVICE_TOKEN } : {};
@@ -434,7 +435,9 @@ const routes: Record<string, ServiceRouteHandler> = {
   "POST /v1/commerce/orders/:id/ship": async ({ request, url, response, correlationId }) => {
     const parsed = parseBody(ShipOrderRequestSchema, await readJson(request));
     if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
-    const shipment = await shipOrder(url.pathname.split("/")[4] ?? "", parsed.data.artistId, { carrier: parsed.data.carrier, trackingNumber: parsed.data.trackingNumber }, correlationId);
+    const orderId = url.pathname.split("/")[4] ?? "";
+    const waybill = generateWaybill(orderId);
+    const shipment = await shipOrder(orderId, parsed.data.artistId, waybill, correlationId);
     return shipment ? writeServiceJson(response, 200, shipment, correlationId) : writeServiceError(response, 403, { code: "FORBIDDEN", message: "This order does not belong to the artist", correlationId, retryable: false });
   },
   "POST /v1/commerce/orders/:id/confirm-received": async ({ request, url, response, correlationId }) => {

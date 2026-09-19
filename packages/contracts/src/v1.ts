@@ -207,10 +207,12 @@ export const CartAddRequestSchema = z.object({
   artworkId: z.string().uuid(),
 });
 
+// carrier/trackingNumber are no longer supplied by the artist (Shipping
+// Phase 3) -- the server generates a waybill itself (see
+// commerce-service/src/domain/waybill.ts) so a shipment can't display a
+// mistyped or fabricated tracking number.
 export const ShipOrderRequestSchema = z.object({
   artistId: z.string().uuid(),
-  carrier: z.string().trim().min(1),
-  trackingNumber: z.string().trim().min(1),
 });
 
 export const ConfirmReceivedRequestSchema = z.object({
