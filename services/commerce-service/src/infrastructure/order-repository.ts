@@ -1,4 +1,4 @@
-import type { ArtistEarnings, Order } from "@atelier/contracts";
+import type { ArtistEarnings, Order, Shipment } from "@atelier/contracts";
 import { query } from "@atelier/persistence";
 import { requestInternalService } from "@atelier/config/service-client";
 
@@ -8,13 +8,27 @@ function mapOrder(row: OrderRow): Order {
   return { id: row.id, buyerId: row.buyer_id, artworkId: row.artwork_id, editionType: row.edition_type, totalAmount: Number(row.total_amount), currency: row.currency, status: row.status, createdAt: row.created_at, shippingAddress: row.shipping_address };
 }
 
-export async function listOrders(buyerId: string): Promise<Order[]> {
-  const rows = await query<OrderRow>(
-    `select id::text, buyer_id::text, artwork_id::text, edition_type,
-            total_amount::text, currency, status, created_at::text, shipping_address
-     from commerce.orders where buyer_id = $1::uuid order by created_at desc`, [buyerId],
+/**
+ * Includes the shipment (carrier/tracking/status), same left-join shape as
+ * listArtistOrders — the buyer is the other side of the same shipment and
+ * had no way to see their own tracking number before this.
+ */
+export async function listOrders(buyerId: string): Promise<(Order & { shipment: Shipment | null })[]> {
+  const rows = await query<
+    OrderRow & { shipment_id: string | null; carrier: string | null; tracking_number: string | null; shipment_status: Shipment["status"] | null }
+  >(
+    `select o.id::text, o.buyer_id::text, o.artwork_id::text, o.edition_type, o.total_amount::text, o.currency, o.status, o.created_at::text, o.shipping_address,
+            s.id::text as shipment_id, s.carrier, s.tracking_number, s.status as shipment_status
+     from commerce.orders o
+     left join commerce.shipments s on s.order_id = o.id
+     where o.buyer_id = $1::uuid order by o.created_at desc`, [buyerId],
   );
-  return rows.map(mapOrder);
+  return rows.map((row) => ({
+    ...mapOrder(row),
+    shipment: row.shipment_id
+      ? { id: row.shipment_id, orderId: row.id, carrier: row.carrier ?? undefined, trackingNumber: row.tracking_number ?? undefined, status: row.shipment_status! }
+      : null,
+  }));
 }
 
 export async function listOrdersByIds(ids: string[]): Promise<Order[]> {

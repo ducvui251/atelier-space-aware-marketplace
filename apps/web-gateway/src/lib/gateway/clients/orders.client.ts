@@ -1,8 +1,8 @@
-import type { Order } from "@atelier/contracts";
+import type { Order, Shipment } from "@atelier/contracts";
 import { requestService } from "../http-client";
 
 export async function listOrders(authUserId: string) {
-  return requestService<{ items: Order[]; total: number }>("commerce", `/v1/commerce/orders?buyerId=${encodeURIComponent(authUserId)}`);
+  return requestService<{ items: (Order & { shipment: Shipment | null })[]; total: number }>("commerce", `/v1/commerce/orders?buyerId=${encodeURIComponent(authUserId)}`);
 }
 export async function listArtistOrders(artistId: string) { return requestService<{ items: unknown[]; total: number }>("commerce", `/v1/commerce/artist-orders?artistId=${encodeURIComponent(artistId)}`); }
 export async function shipOrder(orderId: string, artistId: string, input: Record<string, unknown>) { return requestService<Record<string, unknown>>("commerce", `/v1/commerce/orders/${encodeURIComponent(orderId)}/ship`, { method: "POST", body: { ...input, artistId } }); }
