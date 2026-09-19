@@ -23,6 +23,7 @@ const accountSchema = z.object({
     .optional()
     .or(z.literal("")),
   imageUrl: z.string().trim().optional(),
+  originPostalCode: z.string().trim().optional(),
 });
 
 type AccountFormValues = z.infer<typeof accountSchema>;
@@ -48,6 +49,7 @@ export function AccountForm() {
       bio: currentArtist?.bio ?? "",
       portfolioUrl: currentArtist?.portfolioUrl ?? "",
       imageUrl: currentArtist?.imageUrl ?? "",
+      originPostalCode: currentArtist?.originPostalCode ?? "",
     },
   });
 
@@ -85,6 +87,7 @@ export function AccountForm() {
       bio: values.bio,
       portfolioUrl: values.portfolioUrl,
       imageUrl: values.imageUrl,
+      originPostalCode: values.originPostalCode,
     });
     if ("error" in result) {
       setFormError(result.error);
@@ -173,6 +176,14 @@ export function AccountForm() {
                   placeholder="https://…"
                   className={cn(errors.portfolioUrl && "border-destructive")}
                 />
+              </Field>
+              <Field label="Shipping origin postal code" error={errors.originPostalCode?.message}>
+                <Input
+                  {...register("originPostalCode")}
+                  placeholder="e.g. 100000"
+                  className={cn(errors.originPostalCode && "border-destructive")}
+                />
+                <p className="text-caption text-muted-foreground">Used to calculate shipping cost from your location.</p>
               </Field>
             </>
           ) : null}

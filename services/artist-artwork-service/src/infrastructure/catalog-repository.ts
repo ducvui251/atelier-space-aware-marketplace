@@ -11,12 +11,14 @@ type ArtworkRow = {
   verification_status: Artwork["verificationStatus"]; image_url: string | null; orientation: Artwork["orientation"];
   creation_year: number | null; description: string | null;
   verification_note: string | null; reviewed_by: string | null; reviewed_at: string | null;
+  package_weight_grams: string | null; shipping_method: Artwork["shippingMethod"]; flat_rate_amount: string | null;
 };
 
 type ArtistRow = {
   id: string; user_id: string | null; display_name: string; location: string | null; nationality: string | null;
   bio: string | null; verification_status: Artist["verificationStatus"]; image_url: string | null; portfolio_url: string | null;
   verification_note: string | null; reviewed_by: string | null; reviewed_at: string | null;
+  origin_postal_code: string | null;
 };
 
 const artworkSql = `
@@ -24,7 +26,8 @@ const artworkSql = `
          a.price::text, a.currency, a.width_cm::text, a.height_cm::text, a.medium,
          a.styles, a.dominant_colors, a.edition_type, a.availability, a.verification_status,
          ai.image_url, a.orientation, a.creation_year, a.description,
-         a.verification_note, a.reviewed_by::text, a.reviewed_at::text
+         a.verification_note, a.reviewed_by::text, a.reviewed_at::text,
+         a.package_weight_grams::text, a.shipping_method, a.flat_rate_amount::text
   from artist_artwork.artworks a
   join artist_artwork.artist_profiles ap on ap.id = a.artist_id
   left join lateral (
@@ -41,10 +44,13 @@ function mapArtwork(row: ArtworkRow): Artwork {
     medium: row.medium ?? "", style: asStrings(row.styles), dominantColors: asStrings(row.dominant_colors),
     editionType: row.edition_type, availability: row.availability, verificationStatus: row.verification_status,
     imageUrl: row.image_url ?? "", orientation: row.orientation, year: row.creation_year ?? 0,
+    shippingMethod: row.shipping_method,
     ...(row.description ? { description: row.description } : {}),
     ...(row.verification_note ? { verificationNote: row.verification_note } : {}),
     ...(row.reviewed_by ? { reviewedBy: row.reviewed_by } : {}),
     ...(row.reviewed_at ? { reviewedAt: row.reviewed_at } : {}),
+    ...(row.package_weight_grams ? { packageWeightGrams: Number(row.package_weight_grams) } : {}),
+    ...(row.flat_rate_amount ? { flatRateAmount: Number(row.flat_rate_amount) } : {}),
   };
 }
 
@@ -56,6 +62,7 @@ function mapArtist(row: ArtistRow): Artist {
     ...(row.verification_note ? { verificationNote: row.verification_note } : {}),
     ...(row.reviewed_by ? { reviewedBy: row.reviewed_by } : {}),
     ...(row.reviewed_at ? { reviewedAt: row.reviewed_at } : {}),
+    ...(row.origin_postal_code ? { originPostalCode: row.origin_postal_code } : {}),
   };
 }
 
@@ -118,15 +125,16 @@ export async function createPersistedArtwork(input: {
   artistId: string; title: string; description?: string; medium: string; widthCm: number; heightCm: number;
   year: number; price: number; currency: string; editionType: Artwork["editionType"]; orientation: Artwork["orientation"];
   dominantColors: string[]; style: string[]; imageUrl: string;
+  packageWeightGrams?: number; shippingMethod?: Artwork["shippingMethod"]; flatRateAmount?: number;
 }, correlationId: string): Promise<Artwork | null> {
   const artist = await findPersistedArtist(input.artistId);
   if (!artist || artist.verificationStatus !== "verified") return null;
 
   const id = await transaction(async (client) => {
     const inserted = await client.query<{ id: string }>(
-      `insert into artist_artwork.artworks (artist_id, title, description, medium, width_cm, height_cm, creation_year, price, currency, edition_type, availability, verification_status, orientation, dominant_colors, styles)
-       values ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'available', 'pending', $11, $12::jsonb, $13::jsonb) returning id::text`,
-      [input.artistId, input.title, input.description ?? null, input.medium, input.widthCm, input.heightCm, input.year, input.price, input.currency, input.editionType, input.orientation, JSON.stringify(input.dominantColors), JSON.stringify(input.style)],
+      `insert into artist_artwork.artworks (artist_id, title, description, medium, width_cm, height_cm, creation_year, price, currency, edition_type, availability, verification_status, orientation, dominant_colors, styles, package_weight_grams, shipping_method, flat_rate_amount)
+       values ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'available', 'pending', $11, $12::jsonb, $13::jsonb, $14, $15, $16) returning id::text`,
+      [input.artistId, input.title, input.description ?? null, input.medium, input.widthCm, input.heightCm, input.year, input.price, input.currency, input.editionType, input.orientation, JSON.stringify(input.dominantColors), JSON.stringify(input.style), input.packageWeightGrams ?? null, input.shippingMethod ?? "calculated", input.flatRateAmount ?? null],
     );
     const artworkId = inserted.rows[0].id;
     await client.query(`insert into artist_artwork.artwork_images (artwork_id, image_url, is_primary) values ($1::uuid, $2, true)`, [artworkId, input.imageUrl]);
@@ -143,7 +151,7 @@ export async function createPersistedArtwork(input: {
   return artwork;
 }
 
-export async function updatePersistedArtwork(id: string, input: Partial<Pick<Artwork, "title" | "description" | "medium" | "price" | "widthCm" | "heightCm" | "year" | "currency" | "orientation" | "dominantColors" | "style" | "imageUrl">>): Promise<Artwork | null> {
+export async function updatePersistedArtwork(id: string, input: Partial<Pick<Artwork, "title" | "description" | "medium" | "price" | "widthCm" | "heightCm" | "year" | "currency" | "orientation" | "dominantColors" | "style" | "imageUrl" | "packageWeightGrams" | "shippingMethod" | "flatRateAmount">>): Promise<Artwork | null> {
   const current = await findPersistedArtwork(id);
   if (!current) return null;
   await transaction(async (client) => {
@@ -154,8 +162,8 @@ export async function updatePersistedArtwork(id: string, input: Partial<Pick<Art
     // Verification's own audit trail (verification.artwork_verifications),
     // this only clears the projection's copy.
     await client.query(
-      `update artist_artwork.artworks set title = $2, description = $3, medium = $4, price = $5, width_cm = $6, height_cm = $7, creation_year = $8, currency = $9, orientation = $10, dominant_colors = $11::jsonb, styles = $12::jsonb, verification_status = 'pending', verification_note = null, reviewed_by = null, reviewed_at = null, updated_at = now() where id::text = $1`,
-      [id, input.title ?? current.title, input.description ?? current.description ?? null, input.medium ?? current.medium, input.price ?? current.price, input.widthCm ?? current.widthCm, input.heightCm ?? current.heightCm, input.year ?? current.year, input.currency ?? current.currency, input.orientation ?? current.orientation, JSON.stringify(input.dominantColors ?? current.dominantColors), JSON.stringify(input.style ?? current.style)],
+      `update artist_artwork.artworks set title = $2, description = $3, medium = $4, price = $5, width_cm = $6, height_cm = $7, creation_year = $8, currency = $9, orientation = $10, dominant_colors = $11::jsonb, styles = $12::jsonb, package_weight_grams = $13, shipping_method = $14, flat_rate_amount = $15, verification_status = 'pending', verification_note = null, reviewed_by = null, reviewed_at = null, updated_at = now() where id::text = $1`,
+      [id, input.title ?? current.title, input.description ?? current.description ?? null, input.medium ?? current.medium, input.price ?? current.price, input.widthCm ?? current.widthCm, input.heightCm ?? current.heightCm, input.year ?? current.year, input.currency ?? current.currency, input.orientation ?? current.orientation, JSON.stringify(input.dominantColors ?? current.dominantColors), JSON.stringify(input.style ?? current.style), input.packageWeightGrams ?? current.packageWeightGrams ?? null, input.shippingMethod ?? current.shippingMethod, input.flatRateAmount ?? current.flatRateAmount ?? null],
     );
     // The primary image row always exists (createPersistedArtwork inserts
     // exactly one, and nothing else deletes it), so this is a plain update
@@ -180,7 +188,7 @@ export async function findPersistedArtwork(id: string): Promise<Artwork | null> 
  * every subsequent login), so a repeat call for an already-provisioned
  * account must be a safe no-op rather than erroring or duplicating a row.
  */
-const artistColumns = `id::text, user_id::text, display_name, location, nationality, bio, verification_status, image_url, portfolio_url, verification_note, reviewed_by::text, reviewed_at::text`;
+const artistColumns = `id::text, user_id::text, display_name, location, nationality, bio, verification_status, image_url, portfolio_url, verification_note, reviewed_by::text, reviewed_at::text, origin_postal_code`;
 
 export async function ensureArtistProfile(userId: string, displayName: string): Promise<Artist> {
   const rows = await query<ArtistRow>(
@@ -216,12 +224,12 @@ export async function findPersistedArtist(id: string): Promise<Artist | null> {
  * showing their old name forever (not a sync-delay bug, the rename just
  * never happened here at all).
  */
-export async function updatePersistedArtistProfile(id: string, input: { displayName?: string; bio?: string; portfolioUrl?: string; imageUrl?: string }): Promise<Artist | null> {
+export async function updatePersistedArtistProfile(id: string, input: { displayName?: string; bio?: string; portfolioUrl?: string; imageUrl?: string; originPostalCode?: string }): Promise<Artist | null> {
   const current = await findPersistedArtist(id);
   if (!current) return null;
   await query(
-    `update artist_artwork.artist_profiles set display_name = $2, bio = $3, portfolio_url = $4, image_url = $5, updated_at = now() where id::text = $1`,
-    [id, input.displayName ?? current.displayName, input.bio ?? current.bio ?? null, input.portfolioUrl ?? current.portfolioUrl ?? null, input.imageUrl ?? current.imageUrl ?? null],
+    `update artist_artwork.artist_profiles set display_name = $2, bio = $3, portfolio_url = $4, image_url = $5, origin_postal_code = $6, updated_at = now() where id::text = $1`,
+    [id, input.displayName ?? current.displayName, input.bio ?? current.bio ?? null, input.portfolioUrl ?? current.portfolioUrl ?? null, input.imageUrl ?? current.imageUrl ?? null, input.originPostalCode ?? current.originPostalCode ?? null],
   );
   return findPersistedArtist(id);
 }

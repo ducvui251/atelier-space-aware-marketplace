@@ -69,6 +69,9 @@ export const CheckoutClientRequestSchema = z.object({
     address: z.string().trim().min(1),
     city: z.string().trim().min(1),
     phone: z.string().trim().min(1),
+    // The buyer-side location identifier calculated shipping needs (see
+    // shippingMethodEnum) -- paired with the artist's originPostalCode.
+    postalCode: z.string().trim().min(1),
   }),
   method: z.enum(["card", "wallet"]).default("card"),
 });
@@ -115,6 +118,9 @@ export const ArtistProfileUpdateRequestSchema = z.object({
   bio: z.string().trim().optional(),
   portfolioUrl: z.string().trim().url().optional().or(z.literal("")),
   imageUrl: z.string().trim().url().optional(),
+  // Where the artist ships from — the carrier-agnostic location identifier
+  // calculated shipping needs (see shippingMethodEnum above).
+  originPostalCode: z.string().trim().optional(),
 });
 
 // --- Artist & Artwork --------------------------------------------------------
@@ -127,6 +133,11 @@ const orientationEnum = z.enum(["portrait", "landscape", "square"]);
 const editionTypeEnum = z.enum(["original", "limited-edition"]);
 const availabilityEnum = z.enum(["available", "reserved", "sold"]);
 const verificationDecisionEnum = z.enum(["verified", "rejected"]);
+// Etsy-style per-listing choice: "flat_rate" is a fixed amount the artist
+// sets themselves; "calculated" looks up a real carrier rate from
+// packageWeightGrams + both parties' postal codes (rate lookup itself is a
+// later phase — this is just the data model/UX choice).
+const shippingMethodEnum = z.enum(["calculated", "flat_rate"]);
 
 export const ArtworkCreateRequestSchema = z.object({
   artistId: z.string().uuid(),
@@ -143,6 +154,9 @@ export const ArtworkCreateRequestSchema = z.object({
   orientation: orientationEnum.default("portrait"),
   dominantColors: z.array(z.string()).default([]),
   style: z.array(z.string()).default([]),
+  packageWeightGrams: z.coerce.number().positive().optional(),
+  shippingMethod: shippingMethodEnum.default("calculated"),
+  flatRateAmount: z.coerce.number().nonnegative().optional(),
 });
 
 export const ArtworkUpdateRequestSchema = z.object({
@@ -158,6 +172,9 @@ export const ArtworkUpdateRequestSchema = z.object({
   dominantColors: z.array(z.string()).optional(),
   style: z.array(z.string()).optional(),
   imageUrl: z.string().trim().url().optional(),
+  packageWeightGrams: z.coerce.number().positive().optional(),
+  shippingMethod: shippingMethodEnum.optional(),
+  flatRateAmount: z.coerce.number().nonnegative().optional(),
 });
 
 export const ArtworkAvailabilityRequestSchema = z.object({

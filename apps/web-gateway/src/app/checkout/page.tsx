@@ -22,6 +22,7 @@ const checkoutSchema = z.object({
   fullName: z.string().trim().min(1, "Required"),
   address: z.string().trim().min(1, "Required"),
   city: z.string().trim().min(1, "Required"),
+  postalCode: z.string().trim().min(1, "Required"),
   phone: z.string().trim().min(1, "Required"),
   method: z.enum(["card", "wallet"]),
 });
@@ -62,6 +63,7 @@ function CheckoutView() {
       phone: currentUser?.phone ?? "",
       address: "",
       city: "",
+      postalCode: "",
       method: "card",
     },
   });
@@ -100,6 +102,7 @@ function CheckoutView() {
             fullName: values.fullName,
             address: values.address,
             city: values.city,
+            postalCode: values.postalCode,
             phone: values.phone,
           },
           method: values.method,
@@ -151,6 +154,9 @@ function CheckoutView() {
         </Field>
         <Field label="City" error={errors.city?.message}>
           <Input {...register("city")} className={cn(errors.city && "border-destructive")} />
+        </Field>
+        <Field label="Postal code" error={errors.postalCode?.message}>
+          <Input {...register("postalCode")} className={cn(errors.postalCode && "border-destructive")} />
         </Field>
         <Field label="Phone number" error={errors.phone?.message}>
           <Input {...register("phone")} className={cn(errors.phone && "border-destructive")} />

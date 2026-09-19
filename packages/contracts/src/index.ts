@@ -2,6 +2,7 @@ export type ArtworkOrientation = "portrait" | "landscape" | "square";
 export type EditionType = "original" | "limited-edition";
 export type VerificationStatus = "pending" | "verified" | "rejected";
 export type Availability = "available" | "reserved" | "sold";
+export type ShippingMethod = "calculated" | "flat_rate";
 
 export interface Artwork {
   id: string;
@@ -26,6 +27,9 @@ export interface Artwork {
   verificationNote?: string;
   reviewedAt?: string;
   reviewedBy?: string;
+  packageWeightGrams?: number;
+  shippingMethod: ShippingMethod;
+  flatRateAmount?: number;
 }
 
 export interface Artist {
@@ -41,6 +45,7 @@ export interface Artist {
   verificationNote?: string;
   reviewedBy?: string;
   reviewedAt?: string;
+  originPostalCode?: string;
 }
 
 export interface Collection { id: string; title: string; description: string; imageUrl: string; artworkCount: number; }
@@ -128,7 +133,7 @@ export type OrderStatus = "pending" | "confirmed" | "paid" | "shipped" | "comple
 export interface Order {
   id: string; buyerId: string; artworkId: string; editionType: EditionType;
   totalAmount: number; currency: string; status: OrderStatus; createdAt: string;
-  shippingAddress: { fullName: string; address: string; city: string; phone: string };
+  shippingAddress: { fullName: string; address: string; city: string; phone: string; postalCode?: string };
 }
 export type PaymentMethod = "card" | "wallet";
 export type PaymentStatus = "pending" | "success" | "failed" | "refunded";

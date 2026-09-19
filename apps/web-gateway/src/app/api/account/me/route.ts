@@ -41,7 +41,7 @@ export async function PATCH(request: NextRequest) {
   });
 
   const artistProfile = profile.user.artistId
-    ? await updateArtistProfile(profile.user.artistId, { displayName: fullName, bio: body.bio, portfolioUrl: body.portfolioUrl, imageUrl: body.imageUrl })
+    ? await updateArtistProfile(profile.user.artistId, { displayName: fullName, bio: body.bio, portfolioUrl: body.portfolioUrl, imageUrl: body.imageUrl, originPostalCode: body.originPostalCode })
     : null;
   return json({ user: publicUser(profile.user), artistProfile });
 }
