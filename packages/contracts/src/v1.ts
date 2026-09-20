@@ -350,6 +350,51 @@ export type ExhibitionRoomTemplateId = z.infer<typeof ExhibitionRoomTemplateIdSc
 const exhibitionRoomDimensionSchema = z.coerce.number().finite().min(6).max(10);
 const exhibitionWallColorSchema = z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, "wallColor must be a 6-digit hex color, e.g. #f5f3ee");
 
+/** One wall segment in an Artsteps-style custom floor plan. */
+const sceneWallSchema = z.object({
+  id: z.string().min(1),
+  start: z.tuple([z.number(), z.number()]),
+  end: z.tuple([z.number(), z.number()]),
+  height: z.number().positive().default(3.2),
+  thickness: z.number().positive().default(0.15),
+});
+
+const exhibitionSceneLevelSchema = z.object({
+  id: z.string().trim().min(1).max(64),
+  name: z.string().trim().min(1).max(80),
+  elevation: z.number().finite().min(-100).max(100),
+  floor: z.object({
+    width: z.number().finite().positive().max(100),
+    depth: z.number().finite().positive().max(100),
+  }).strict(),
+}).strict();
+
+const exhibitionSceneWallSchema = z.object({
+  id: z.string().trim().min(1).max(64),
+  levelId: z.string().trim().min(1).max(64),
+  start: z.tuple([z.number().finite(), z.number().finite()]),
+  end: z.tuple([z.number().finite(), z.number().finite()]),
+  height: z.number().finite().positive().max(20),
+  thickness: z.number().finite().positive().max(2),
+}).strict();
+
+export const ExhibitionSceneDocumentSchema = z.object({
+  version: z.literal(1),
+  activeLevelId: z.string().trim().min(1).max(64),
+  levels: z.array(exhibitionSceneLevelSchema).min(1).max(20),
+  walls: z.array(exhibitionSceneWallSchema).max(500),
+}).strict().superRefine((scene, context) => {
+  const levelIds = new Set(scene.levels.map((level) => level.id));
+  if (!levelIds.has(scene.activeLevelId)) {
+    context.addIssue({ code: "custom", path: ["activeLevelId"], message: "activeLevelId must reference a level" });
+  }
+  scene.walls.forEach((wall, index) => {
+    if (!levelIds.has(wall.levelId)) {
+      context.addIssue({ code: "custom", path: ["walls", index, "levelId"], message: "wall levelId must reference a level" });
+    }
+  });
+});
+
 export const CreateExhibitionRequestSchema = z.object({
   creatorType: exhibitionCreatorTypeSchema,
   creatorId: z.string().uuid(),
@@ -360,6 +405,8 @@ export const CreateExhibitionRequestSchema = z.object({
   roomWidth: exhibitionRoomDimensionSchema.optional(),
   roomDepth: exhibitionRoomDimensionSchema.optional(),
   wallColor: exhibitionWallColorSchema.optional(),
+  wallSegments: z.array(sceneWallSchema).optional(),
+  scene: ExhibitionSceneDocumentSchema.optional(),
   featured: z.boolean().optional(),
 });
 
@@ -373,6 +420,8 @@ export const UpdateExhibitionRequestSchema = z.object({
   roomWidth: exhibitionRoomDimensionSchema.optional(),
   roomDepth: exhibitionRoomDimensionSchema.optional(),
   wallColor: exhibitionWallColorSchema.optional(),
+  wallSegments: z.array(sceneWallSchema).optional(),
+  scene: ExhibitionSceneDocumentSchema.optional(),
   status: exhibitionStatusSchema.optional(),
   featured: z.boolean().optional(),
 });
@@ -420,6 +469,8 @@ export const CreateExhibitionBuilderRequestSchema = z.object({
   roomWidth: exhibitionRoomDimensionSchema.optional(),
   roomDepth: exhibitionRoomDimensionSchema.optional(),
   wallColor: exhibitionWallColorSchema.optional(),
+  wallSegments: z.array(sceneWallSchema).optional(),
+  scene: ExhibitionSceneDocumentSchema.optional(),
 }).strict();
 
 export const UpdateExhibitionBuilderRequestSchema = z.object({
@@ -429,6 +480,8 @@ export const UpdateExhibitionBuilderRequestSchema = z.object({
   roomWidth: exhibitionRoomDimensionSchema.optional(),
   roomDepth: exhibitionRoomDimensionSchema.optional(),
   wallColor: exhibitionWallColorSchema.optional(),
+  wallSegments: z.array(sceneWallSchema).optional(),
+  scene: ExhibitionSceneDocumentSchema.optional(),
   status: exhibitionStatusSchema.optional(),
   featured: z.boolean().optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, "At least one exhibition field is required");

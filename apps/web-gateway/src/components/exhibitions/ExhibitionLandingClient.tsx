@@ -28,6 +28,7 @@ export function ExhibitionLandingClient({ exhibition, creatorName, placedArtwork
           roomWidth={exhibition.roomWidth}
           roomDepth={exhibition.roomDepth}
           wallColor={exhibition.wallColor}
+          wallSegments={exhibition.wallSegments}
           placedArtworks={placedArtworks}
           onExit={() => setEntered(false)}
         />

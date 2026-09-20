@@ -10,6 +10,7 @@ import { useAppState, useSaved } from "@/lib/client/hooks";
 import { ArtworkImage } from "./ArtworkImage";
 import { PriceDisplay } from "./PriceDisplay";
 import { SaveButton } from "./SaveButton";
+import { displayableImageUrl } from "@/lib/image-hosts";
 
 interface ArtworkCardProps {
   artwork: Artwork;
@@ -48,7 +49,7 @@ export function ArtworkCard({ artwork, priority, className }: ArtworkCardProps) 
         )}
       >
         <ArtworkImage
-          src={live.imageUrl}
+          src={displayableImageUrl(live.imageUrl)}
           alt={live.title}
           fill
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"

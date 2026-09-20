@@ -61,6 +61,44 @@ export interface Placement {
 export type ExhibitionCreatorType = "artist" | "admin";
 export type ExhibitionStatus = "draft" | "published" | "archived";
 
+/**
+ * A single wall segment in an Artsteps-style custom floor plan.
+ * Stored as JSONB in room_preview.exhibitions.wall_segments.
+ * When wallSegments is present on an Exhibition, the renderer uses these
+ * instead of the fixed 4-wall box derived from roomWidth/roomDepth.
+ */
+export interface SceneWall {
+  id: string;
+  /** Start point in metres (origin-centred; +X right, +Z forward). */
+  start: [number, number];
+  /** End point in metres. */
+  end: [number, number];
+  height: number;
+  thickness: number;
+}
+
+export interface ExhibitionSceneLevel {
+  id: string;
+  name: string;
+  elevation: number;
+  floor: {
+    width: number;
+    depth: number;
+  };
+}
+
+export interface ExhibitionSceneWall extends SceneWall {
+  levelId: string;
+}
+
+/** Versioned scene document used by the Exhibition Editor V2. */
+export interface ExhibitionSceneDocument {
+  version: 1;
+  activeLevelId: string;
+  levels: ExhibitionSceneLevel[];
+  walls: ExhibitionSceneWall[];
+}
+
 export interface ExhibitionRoomTemplate {
   id: string;
   name: string;
@@ -83,6 +121,10 @@ export interface Exhibition {
   roomDepth?: number;
   /** Overrides the template's wall color when set; floor/ceiling/trim stay from the template. */
   wallColor?: string;
+  /** Custom Artsteps-style wall segments. When present, overrides the fixed 4-wall box. */
+  wallSegments?: SceneWall[];
+  /** Versioned scene document used by the V2 exhibition editor. */
+  scene?: ExhibitionSceneDocument;
   status: ExhibitionStatus;
   featured: boolean;
   /** Read-model enrichment computed by room-preview-service, not stored. */

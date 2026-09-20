@@ -15,3 +15,8 @@ test-results
 .env
 .env.*
 !.env.example
+
+# Large artwork dataset images — excluded to keep build context small.
+# Copied into the running gateway container after each rebuild via:
+#   docker cp apps/web-gateway/public/img/met-import <container>:/app/apps/web-gateway/public/img/met-import
+# apps/web-gateway/public/img/met-import/

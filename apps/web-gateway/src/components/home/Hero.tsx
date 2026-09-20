@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { listArtworks } from "@/lib/gateway/clients/artwork.client";
 
 export async function Hero() {
-  const heroArtwork = (await listArtworks())[1];
+  const artworks = await listArtworks().catch(() => []);
+  const heroArtwork = artworks[1];
 
   return (
     <section className="container-page pt-8 md:pt-14">
@@ -32,22 +33,28 @@ export async function Hero() {
           </div>
         </div>
 
-        <div className="relative">
-          <div className="relative aspect-[4/5] w-full overflow-hidden rounded-xl bg-muted sm:aspect-[5/6]">
-            <Image
-              src={heroArtwork.imageUrl}
-              alt={heroArtwork.title}
-              fill
-              priority
-              sizes="(max-width: 1024px) 100vw, 45vw"
-              className="object-cover"
-            />
+        {heroArtwork?.imageUrl ? (
+          <div className="relative">
+            <div className="relative aspect-[4/5] w-full overflow-hidden rounded-xl bg-muted sm:aspect-[5/6]">
+              <Image
+                src={heroArtwork.imageUrl}
+                alt={heroArtwork.title}
+                fill
+                priority
+                sizes="(max-width: 1024px) 100vw, 45vw"
+                className="object-cover"
+              />
+            </div>
+            <div className="absolute -left-4 bottom-6 hidden rounded-lg border border-border bg-surface px-4 py-3 shadow-sm sm:block">
+              <p className="text-caption text-muted-foreground">{heroArtwork.artist}</p>
+              <p className="font-display text-h3 text-foreground">{heroArtwork.title}</p>
+            </div>
           </div>
-          <div className="absolute -left-4 bottom-6 hidden rounded-lg border border-border bg-surface px-4 py-3 shadow-sm sm:block">
-            <p className="text-caption text-muted-foreground">{heroArtwork.artist}</p>
-            <p className="font-display text-h3 text-foreground">{heroArtwork.title}</p>
+        ) : (
+          <div className="relative aspect-[4/5] w-full overflow-hidden rounded-xl bg-muted sm:aspect-[5/6] flex items-center justify-center">
+            <p className="text-caption text-muted-foreground">No artwork available yet</p>
           </div>
-        </div>
+        )}
       </div>
     </section>
   );

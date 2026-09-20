@@ -42,6 +42,7 @@ import {
   ToggleSavedRequestSchema,
   UpdateExhibitionPlacementRequestSchema,
   UpdateExhibitionRequestSchema,
+  ExhibitionSceneDocumentSchema,
   parseBody,
 } from "./v1.ts";
 
@@ -536,5 +537,22 @@ describe("CreateComplaintRequestSchema / ResolveComplaintRequestSchema", () => {
   it("only accepts resolved/rejected as a resolution status", () => {
     expect(ResolveComplaintRequestSchema.safeParse({ status: "resolved" }).success).toBe(true);
     expect(ResolveComplaintRequestSchema.safeParse({ status: "open" }).success).toBe(false);
+  });
+});
+
+describe("ExhibitionSceneDocumentSchema", () => {
+  const scene = {
+    version: 1 as const,
+    activeLevelId: "ground-level",
+    levels: [{ id: "ground-level", name: "Ground level", elevation: 0, floor: { width: 20, depth: 20 } }],
+    walls: [{ id: "wall-1", levelId: "ground-level", start: [-2, -1], end: [2, -1], height: 4, thickness: 0.15 }],
+  };
+
+  it("accepts a valid V2 scene document", () => {
+    expect(ExhibitionSceneDocumentSchema.safeParse(scene).success).toBe(true);
+  });
+
+  it("rejects walls that reference an unknown level", () => {
+    expect(ExhibitionSceneDocumentSchema.safeParse({ ...scene, walls: [{ ...scene.walls[0], levelId: "missing" }] }).success).toBe(false);
   });
 });
