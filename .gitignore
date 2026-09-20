@@ -37,7 +37,6 @@ next-env.d.ts
 # project docs (not part of app source)
 *.md
 !MICROSERVICE_100_PLAN.md
-!EXHIBITION_EDITOR_V2_PLAN.md
 AGENTS.md
 PROJECT_PROMPT.md
 /docs/*
