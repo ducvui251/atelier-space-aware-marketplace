@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { X } from "lucide-react";
-import type { Artwork } from "@atelier/contracts";
+import type { Artwork, SceneWall } from "@atelier/contracts";
 import { SpatialCanvas } from "./SpatialCanvas";
 import { ExhibitionLiveScene, type PlacedArtwork } from "./exhibition/ExhibitionLiveScene";
 import { ArtworkDetailSheet } from "./exhibition/ArtworkDetailSheet";
@@ -14,11 +14,12 @@ interface ExhibitionViewerProps {
   roomWidth?: number;
   roomDepth?: number;
   wallColor?: string;
+  wallSegments?: SceneWall[];
   placedArtworks: PlacedArtwork[];
   onExit: () => void;
 }
 
-export function ExhibitionViewer({ title, roomTemplateId, roomWidth, roomDepth, wallColor, placedArtworks, onExit }: ExhibitionViewerProps) {
+export function ExhibitionViewer({ title, roomTemplateId, roomWidth, roomDepth, wallColor, wallSegments, placedArtworks, onExit }: ExhibitionViewerProps) {
   const [locked, setLocked] = useState(false);
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
 
@@ -30,6 +31,7 @@ export function ExhibitionViewer({ title, roomTemplateId, roomWidth, roomDepth, 
           roomWidth={roomWidth}
           roomDepth={roomDepth}
           wallColor={wallColor}
+          wallSegments={wallSegments}
           placedArtworks={placedArtworks}
           onLockChange={setLocked}
           onArtworkSelect={setSelectedArtwork}

@@ -8,7 +8,15 @@ COPY packages ./packages
 COPY services ./services
 COPY apps ./apps
 
-RUN pnpm install --frozen-lockfile
+# pnpm does not symlink optionalDependencies by default; sharp's native binding
+# (@img/sharp-linux-x64) lives in the pnpm store but is not linked under
+# sharp/node_modules/@img/. Hoist it manually so Next.js image optimiser works.
+RUN echo 'public-hoist-pattern[]=@img/*' > .npmrc && \
+    pnpm install --frozen-lockfile
+
+# next build requires sharp for image optimisation. The hoist above makes it
+# findable, but the postinstall binary-copy step still needs to run.
+RUN pnpm --filter @atelier/web-gateway exec node -e "require('sharp/install')" 2>/dev/null || true
 
 # Next.js inlines NEXT_PUBLIC_* variables into the build output at build
 # time, even in server-side code — setting them at runtime (docker-compose

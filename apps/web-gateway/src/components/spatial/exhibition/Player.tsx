@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { ROOM_DEPTH, ROOM_WIDTH } from "../RoomEnvironment";
+import type { SceneWall } from "@atelier/contracts";
 
 const MOVE_SPEED = 3.2;
 const PLAYER_RADIUS = 0.35;
@@ -31,20 +32,52 @@ interface PlayerProps {
   /** Room footprint for the collision bounds — must match the RoomEnvironment rendered alongside this Player. */
   roomWidth?: number;
   roomDepth?: number;
+  /**
+   * Custom Artsteps-style wall segments for raycast collision.
+   * When provided, overrides simple rectangular clamping with line-segment collision.
+   */
+  wallSegments?: SceneWall[];
 }
 
 /**
- * WASD + mouse-look player. Collision uses the simple room-bounding-box
- * backup from the exhibition plan (clamping X/Z to the room interior) rather
- * than a full physics engine, since the room is a single rectangular volume
- * with no interior obstacles yet. Look direction comes from the R3F default
- * camera, which PointerLockControls rotates elsewhere in the scene.
+ * Tests whether the line segment [from, to] intersects the wall segment
+ * [wa, wb] on the XZ plane. Returns true if they cross within the step
+ * distance, which means movement is blocked.
  */
-export function Player({ paused = false, roomWidth = ROOM_WIDTH, roomDepth = ROOM_DEPTH }: PlayerProps) {
+function segmentIntersectsWall(
+  from: THREE.Vector3,
+  to: THREE.Vector3,
+  wa: THREE.Vector3,
+  wb: THREE.Vector3,
+): boolean {
+  // Segment from→to
+  const fxt = to.x - from.x;
+  const fzt = to.z - from.z;
+  // Segment wa→wb
+  const wxt = wb.x - wa.x;
+  const wzt = wb.z - wa.z;
+  const denom = fxt * wzt - fzt * wxt;
+  if (Math.abs(denom) < 1e-8) return false; // parallel
+  const dx = wa.x - from.x;
+  const dz = wa.z - from.z;
+  const t = (dx * wzt - dz * wxt) / denom;
+  const u = (dx * fzt - dz * fxt) / denom;
+  return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+}
+
+/**
+ * WASD + mouse-look player with optional raycast-based wall collision.
+ * When `wallSegments` is provided, movement is clamped against each wall
+ * segment using line-segment distance checks. Falls back to rectangular
+ * bounding-box clamping when no segments are given.
+ */
+export function Player({ paused = false, roomWidth = ROOM_WIDTH, roomDepth = ROOM_DEPTH, wallSegments }: PlayerProps) {
   const { camera } = useThree();
   const position = useRef(new THREE.Vector3(...SPAWN_POSITION));
   const boundsX = roomWidth / 2 - PLAYER_RADIUS;
   const boundsZ = roomDepth / 2 - PLAYER_RADIUS;
+  // Cache wall segment endpoints in Three.js vectors to avoid reallocation.
+  const wallCache = useRef<{ a: THREE.Vector3; b: THREE.Vector3 }[]>([]);
 
   useEffect(() => {
     camera.position.copy(position.current);
@@ -68,9 +101,24 @@ export function Player({ paused = false, roomWidth = ROOM_WIDTH, roomDepth = ROO
     };
   }, []);
 
+  // Rebuild wall cache when segments change.
+  useEffect(() => {
+    if (!wallSegments || wallSegments.length === 0) {
+      wallCache.current = [];
+      return;
+    }
+    wallCache.current = wallSegments.map((w) => ({
+      a: new THREE.Vector3(w.start[0], 0, w.start[1]),
+      b: new THREE.Vector3(w.end[0], 0, w.end[1]),
+    }));
+  }, [wallSegments]);
+
   const forward = useMemo(() => new THREE.Vector3(), []);
   const right = useMemo(() => new THREE.Vector3(), []);
   const moveDir = useMemo(() => new THREE.Vector3(), []);
+  const candidatePos = useMemo(() => new THREE.Vector3(), []);
+  const wallA = useMemo(() => new THREE.Vector3(), []);
+  const wallB = useMemo(() => new THREE.Vector3(), []);
 
   useFrame((_, delta) => {
     if (paused) return;
@@ -86,15 +134,59 @@ export function Player({ paused = false, roomWidth = ROOM_WIDTH, roomDepth = ROO
     if (pressedKeys.has("right")) moveDir.add(right);
     if (pressedKeys.has("left")) moveDir.sub(right);
 
-    if (moveDir.lengthSq() > 0) {
-      moveDir.normalize().multiplyScalar(MOVE_SPEED * delta);
-      position.current.x += moveDir.x;
-      position.current.z += moveDir.z;
-      position.current.x = THREE.MathUtils.clamp(position.current.x, -boundsX, boundsX);
-      position.current.z = THREE.MathUtils.clamp(position.current.z, -boundsZ, boundsZ);
-      camera.position.x = position.current.x;
-      camera.position.z = position.current.z;
+    if (moveDir.lengthSq() === 0) return;
+
+    moveDir.normalize().multiplyScalar(MOVE_SPEED * delta);
+    candidatePos.copy(position.current).add(moveDir);
+
+    if (wallSegments && wallSegments.length > 0) {
+      // Raycast-style collision: test whether the movement step crosses
+      // any wall segment on the XZ plane.  Check X and Z axes independently
+      // so diagonal movement still slides along walls.
+      const moveX = Math.abs(moveDir.x) > 0.001;
+      const moveZ = Math.abs(moveDir.z) > 0.001;
+
+      if (moveX) {
+        let blocked = false;
+        for (const seg of wallCache.current) {
+          wallA.copy(seg.a);
+          wallB.copy(seg.b);
+          if (segmentIntersectsWall(position.current, candidatePos, wallA, wallB)) {
+            blocked = true;
+            break;
+          }
+        }
+        if (!blocked) {
+          candidatePos.x = position.current.x + moveDir.x;
+        }
+      }
+
+      if (moveZ) {
+        const zCandidate = new THREE.Vector3(candidatePos.x, 0, position.current.z + moveDir.z);
+        let blocked = false;
+        for (const seg of wallCache.current) {
+          wallA.copy(seg.a);
+          wallB.copy(seg.b);
+          if (segmentIntersectsWall(position.current, zCandidate, wallA, wallB)) {
+            blocked = true;
+            break;
+          }
+        }
+        if (!blocked) {
+          candidatePos.z = position.current.z + moveDir.z;
+        }
+      }
+
+      position.current.x = THREE.MathUtils.clamp(candidatePos.x, -boundsX, boundsX);
+      position.current.z = THREE.MathUtils.clamp(candidatePos.z, -boundsZ, boundsZ);
+    } else {
+      // Fallback: simple rectangular bounds (original behavior)
+      position.current.x = THREE.MathUtils.clamp(candidatePos.x, -boundsX, boundsX);
+      position.current.z = THREE.MathUtils.clamp(candidatePos.z, -boundsZ, boundsZ);
     }
+
+    camera.position.x = position.current.x;
+    camera.position.z = position.current.z;
   });
 
   return null;
