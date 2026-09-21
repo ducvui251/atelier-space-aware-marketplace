@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Artwork, ExhibitionPlacement } from "@atelier/contracts";
+import type { Artwork, ExhibitionPlacement, SceneWall } from "@atelier/contracts";
 import { PointerLockControls } from "@react-three/drei";
 import { Lighting } from "../Lighting";
 import { RoomEnvironment } from "../RoomEnvironment";
@@ -21,6 +21,7 @@ interface ExhibitionLiveSceneProps {
   roomWidth?: number;
   roomDepth?: number;
   wallColor?: string;
+  wallSegments?: SceneWall[];
   placedArtworks: PlacedArtwork[];
   onLockChange?: (locked: boolean) => void;
   onArtworkSelect?: (artwork: Artwork) => void;
@@ -38,6 +39,7 @@ export function ExhibitionLiveScene({
   roomWidth,
   roomDepth,
   wallColor,
+  wallSegments,
   placedArtworks,
   onLockChange,
   onArtworkSelect,
@@ -58,9 +60,9 @@ export function ExhibitionLiveScene({
         onUnlock={() => handleLockChange(false)}
       />
 
-      <Player paused={paused} roomWidth={roomWidth} roomDepth={roomDepth} />
+      <Player paused={paused} roomWidth={roomWidth} roomDepth={roomDepth} wallSegments={wallSegments} />
 
-      <RoomEnvironment templateId={roomTemplateId} width={roomWidth} depth={roomDepth} wallColor={wallColor} />
+      <RoomEnvironment templateId={roomTemplateId} width={roomWidth} depth={roomDepth} wallColor={wallColor} wallSegments={wallSegments} />
 
       {placedArtworks.map(({ placement, artwork }) => (
         <ArtworkMesh

@@ -28,7 +28,7 @@ export async function getNetworkFollows(buyerId: string) {
 }
 
 export async function getNetworkSaved(buyerId: string) {
-  return requestService<{ items: unknown[]; total: number }>("recommendation", `/v1/recommendation/saved?buyerId=${encodeURIComponent(buyerId)}`);
+  return requestService<{ items: unknown[]; total: number }>("recommendation", `/v1/recommendation/saved?buyerId=${encodeURIComponent(buyerId)}`, { timeoutMs: 5000 });
 }
 
 export async function toggleNetworkSaved(buyerId: string, artworkId: string) {

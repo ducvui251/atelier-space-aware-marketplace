@@ -16,7 +16,7 @@ export function SpatialCanvas({ children, cameraPosition = [0, 1.6, 4] }: Spatia
       // shadow (visible in both the builder and the public viewer).
       // Diagnosing the shadow-camera frustum wasn't worth it for a gallery
       // scene where wall/floor lighting alone already reads as flat and
-      // clean — same call as ExhibitionBuilderViewport.
+      // clean — enough for the editor and public viewer.
       dpr={[1, 1.5]}
       camera={{ position: cameraPosition, fov: 60, near: 0.1, far: 100 }}
     >

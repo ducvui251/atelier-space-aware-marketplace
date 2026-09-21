@@ -36,15 +36,9 @@ next-env.d.ts
 
 # project docs (not part of app source)
 *.md
-!MICROSERVICE_100_PLAN.md
 AGENTS.md
 PROJECT_PROMPT.md
 /docs/*
-!docs/adr/
-!docs/adr/*.md
-!docs/mutation-semantics.md
-!runbooks/
-!runbooks/*.md
 
 # local agent/tool artifacts
 /.token-optimizer/
@@ -67,3 +61,6 @@ PROJECT_PROMPT.md
 *.docx
 *.txt
 /*.pptx
+
+# imported artwork dataset images (large binary blob, not source code)
+apps/web-gateway/public/img/met-import/

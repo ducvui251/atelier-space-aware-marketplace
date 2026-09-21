@@ -1,10 +1,13 @@
 "use client";
 
 import { EXHIBITION_BUILDER_ROOM_TEMPLATE_ID } from "@atelier/contracts";
+import type { SceneWall } from "@atelier/contracts";
+import { EXHIBITION_BOX_DEPTH, EXHIBITION_BOX_HEIGHT, EXHIBITION_BOX_WIDTH } from "./exhibition-box";
+import { WallMesh } from "./WallMesh";
 
-export const ROOM_WIDTH = 10;
-export const ROOM_DEPTH = 10;
-export const ROOM_HEIGHT = 3.2;
+export const ROOM_WIDTH = EXHIBITION_BOX_WIDTH;
+export const ROOM_DEPTH = EXHIBITION_BOX_DEPTH;
+export const ROOM_HEIGHT = EXHIBITION_BOX_HEIGHT;
 
 interface RoomAppearance {
   floor: string;
@@ -27,13 +30,25 @@ interface RoomEnvironmentProps {
   depth?: number;
   /** Overrides the template's wall color when set; floor/ceiling/trim/track stay from the template. */
   wallColor?: string;
+  /**
+   * Custom Artsteps-style wall segments. When non-empty, renders these instead
+   * of the fixed 4-wall box. Floor and ceiling still render.
+   */
+  wallSegments?: SceneWall[];
 }
 
-export function RoomEnvironment({ templateId = EXHIBITION_BUILDER_ROOM_TEMPLATE_ID, width, depth, wallColor }: RoomEnvironmentProps) {
+export function RoomEnvironment({
+  templateId = EXHIBITION_BUILDER_ROOM_TEMPLATE_ID,
+  width,
+  depth,
+  wallColor,
+  wallSegments,
+}: RoomEnvironmentProps) {
   const appearance = ROOM_APPEARANCES[templateId] ?? ROOM_APPEARANCES[EXHIBITION_BUILDER_ROOM_TEMPLATE_ID];
   const roomWidth = width ?? ROOM_WIDTH;
   const roomDepth = depth ?? ROOM_DEPTH;
   const wall = wallColor ?? appearance.wall;
+  const hasCustomWalls = Array.isArray(wallSegments) && wallSegments.length > 0;
 
   return (
     <group>
@@ -47,68 +62,76 @@ export function RoomEnvironment({ templateId = EXHIBITION_BUILDER_ROOM_TEMPLATE_
         <meshStandardMaterial color={appearance.ceiling} />
       </mesh>
 
-      <mesh position={[0, ROOM_HEIGHT / 2, -roomDepth / 2]} receiveShadow>
-        <planeGeometry args={[roomWidth, ROOM_HEIGHT]} />
-        <meshStandardMaterial color={wall} />
-      </mesh>
+      {hasCustomWalls ? (
+        wallSegments.map((w) => (
+          <WallMesh key={w.id} wall={w} wallColor={wall} />
+        ))
+      ) : (
+        <>
+          <mesh position={[0, ROOM_HEIGHT / 2, -roomDepth / 2]} receiveShadow>
+            <planeGeometry args={[roomWidth, ROOM_HEIGHT]} />
+            <meshStandardMaterial color={wall} />
+          </mesh>
 
-      <mesh
-        position={[0, ROOM_HEIGHT / 2, roomDepth / 2]}
-        rotation={[0, Math.PI, 0]}
-      >
-        <planeGeometry args={[roomWidth, ROOM_HEIGHT]} />
-        <meshStandardMaterial color={wall} />
-      </mesh>
+          <mesh
+            position={[0, ROOM_HEIGHT / 2, roomDepth / 2]}
+            rotation={[0, Math.PI, 0]}
+          >
+            <planeGeometry args={[roomWidth, ROOM_HEIGHT]} />
+            <meshStandardMaterial color={wall} />
+          </mesh>
 
-      <mesh
-        position={[-roomWidth / 2, ROOM_HEIGHT / 2, 0]}
-        rotation={[0, Math.PI / 2, 0]}
-      >
-        <planeGeometry args={[roomDepth, ROOM_HEIGHT]} />
-        <meshStandardMaterial color={wall} />
-      </mesh>
+          <mesh
+            position={[-roomWidth / 2, ROOM_HEIGHT / 2, 0]}
+            rotation={[0, Math.PI / 2, 0]}
+          >
+            <planeGeometry args={[roomDepth, ROOM_HEIGHT]} />
+            <meshStandardMaterial color={wall} />
+          </mesh>
 
-      <mesh
-        position={[roomWidth / 2, ROOM_HEIGHT / 2, 0]}
-        rotation={[0, -Math.PI / 2, 0]}
-      >
-        <planeGeometry args={[roomDepth, ROOM_HEIGHT]} />
-        <meshStandardMaterial color={wall} />
-      </mesh>
+          <mesh
+            position={[roomWidth / 2, ROOM_HEIGHT / 2, 0]}
+            rotation={[0, -Math.PI / 2, 0]}
+          >
+            <planeGeometry args={[roomDepth, ROOM_HEIGHT]} />
+            <meshStandardMaterial color={wall} />
+          </mesh>
 
-      {appearance.trim ? (
-        <group>
-          <mesh position={[0, 0.07, -roomDepth / 2 + 0.04]}>
-            <boxGeometry args={[roomWidth, 0.14, 0.08]} />
-            <meshStandardMaterial color={appearance.trim} />
-          </mesh>
-          <mesh position={[0, 0.07, roomDepth / 2 - 0.04]}>
-            <boxGeometry args={[roomWidth, 0.14, 0.08]} />
-            <meshStandardMaterial color={appearance.trim} />
-          </mesh>
-          <mesh position={[-roomWidth / 2 + 0.04, 0.07, 0]} rotation={[0, Math.PI / 2, 0]}>
-            <boxGeometry args={[roomDepth, 0.14, 0.08]} />
-            <meshStandardMaterial color={appearance.trim} />
-          </mesh>
-          <mesh position={[roomWidth / 2 - 0.04, 0.07, 0]} rotation={[0, Math.PI / 2, 0]}>
-            <boxGeometry args={[roomDepth, 0.14, 0.08]} />
-            <meshStandardMaterial color={appearance.trim} />
-          </mesh>
-        </group>
-      ) : null}
+          {appearance.trim ? (
+            <group>
+              <mesh position={[0, 0.07, -roomDepth / 2 + 0.04]}>
+                <boxGeometry args={[roomWidth, 0.14, 0.08]} />
+                <meshStandardMaterial color={appearance.trim} />
+              </mesh>
+              <mesh position={[0, 0.07, roomDepth / 2 - 0.04]}>
+                <boxGeometry args={[roomWidth, 0.14, 0.08]} />
+                <meshStandardMaterial color={appearance.trim} />
+              </mesh>
+              <mesh position={[-roomWidth / 2 + 0.04, 0.07, 0]} rotation={[0, Math.PI / 2, 0]}>
+                <boxGeometry args={[roomDepth, 0.14, 0.08]} />
+                <meshStandardMaterial color={appearance.trim} />
+              </mesh>
+              <mesh position={[roomWidth / 2 - 0.04, 0.07, 0]} rotation={[0, Math.PI / 2, 0]}>
+                <boxGeometry args={[roomDepth, 0.14, 0.08]} />
+                <meshStandardMaterial color={appearance.trim} />
+              </mesh>
+            </group>
+          ) : null}
 
-      {appearance.track ? (
-        <group>
-          <mesh position={[-2.5, ROOM_HEIGHT - 0.12, 0]}>
-            <boxGeometry args={[0.06, 0.06, 7]} />
-            <meshStandardMaterial color={appearance.track} />
-          </mesh>
-          <mesh position={[2.5, ROOM_HEIGHT - 0.12, 0]}>
-            <boxGeometry args={[0.06, 0.06, 7]} />
-            <meshStandardMaterial color={appearance.track} />
-          </mesh>
-        </group>
-      ) : null}
+          {appearance.track ? (
+            <group>
+              <mesh position={[-2.5, ROOM_HEIGHT - 0.12, 0]}>
+                <boxGeometry args={[0.06, 0.06, 7]} />
+                <meshStandardMaterial color={appearance.track} />
+              </mesh>
+              <mesh position={[2.5, ROOM_HEIGHT - 0.12, 0]}>
+                <boxGeometry args={[0.06, 0.06, 7]} />
+                <meshStandardMaterial color={appearance.track} />
+              </mesh>
+            </group>
+          ) : null}
+        </>
+      )}
     </group>
   );
 }

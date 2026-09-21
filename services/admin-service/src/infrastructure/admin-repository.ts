@@ -146,7 +146,7 @@ async function getComplaintStatusCounts(): Promise<Record<string, number>> {
 }
 
 export async function getStats() {
-  const [artists, artworks, complaints, commerceStats, revenueTrend, orderStatusCounts, complaintStatusCounts] = await Promise.all([
+  const results = await Promise.allSettled([
     requestInternalService<{ items: Array<{ verificationStatus: string }> }>("artist-artwork", "/v1/artist-artwork/artists?status=all"),
     requestInternalService<{ items: Array<{ verificationStatus: string }> }>("artist-artwork", "/v1/artist-artwork/artworks?status=all"),
     query<{ count: string }>(`select count(*)::text as count from admin.complaints where status = 'open'`),
@@ -155,6 +155,14 @@ export async function getStats() {
     getOrderStatusCounts(),
     getComplaintStatusCounts(),
   ]);
+  const [artistsResult, artworksResult, complaintsResult, commerceResult, revenueTrendResult, orderStatusResult, complaintStatusResult] = results;
+  const artists = artistsResult.status === "fulfilled" ? artistsResult.value : { items: [] };
+  const artworks = artworksResult.status === "fulfilled" ? artworksResult.value : { items: [] };
+  const complaints = complaintsResult.status === "fulfilled" ? complaintsResult.value : [];
+  const commerceStats = commerceResult.status === "fulfilled" ? commerceResult.value : { totalOrders: 0, revenue: 0 };
+  const revenueTrend = revenueTrendResult.status === "fulfilled" ? revenueTrendResult.value : null;
+  const orderStatusCounts = orderStatusResult.status === "fulfilled" ? orderStatusResult.value : { pending: 0, paid: 0, shipped: 0, failed: 0 };
+  const complaintStatusCounts = complaintStatusResult.status === "fulfilled" ? complaintStatusResult.value : { open: 0, resolved: 0, rejected: 0 };
   return {
     pendingArtists: artists.items.filter((item) => item.verificationStatus === "pending").length,
     pendingArtworks: artworks.items.filter((item) => item.verificationStatus === "pending").length,

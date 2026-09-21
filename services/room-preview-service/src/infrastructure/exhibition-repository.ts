@@ -1,4 +1,5 @@
-import type { Exhibition, ExhibitionCreatorType, ExhibitionPlacement } from "@atelier/contracts";
+import { ExhibitionSceneDocumentSchema } from "@atelier/contracts";
+import type { Exhibition, ExhibitionCreatorType, ExhibitionPlacement, ExhibitionSceneDocument, SceneWall } from "@atelier/contracts";
 import { query } from "@atelier/persistence";
 import { requestInternalService } from "@atelier/config/service-client";
 
@@ -18,6 +19,8 @@ type ExhibitionRow = {
   room_width: string | null;
   room_depth: string | null;
   wall_color: string | null;
+  wall_segments: string | null;
+  scene_document: string | null;
   status: string;
   featured: boolean;
   artwork_count: number;
@@ -47,10 +50,32 @@ type PlacementRow = {
 // Every exhibition query aliases the table as `e` so these two correlated
 // subqueries (read-model enrichment, not stored columns) resolve the same
 // way in SELECT, INSERT ... RETURNING, and UPDATE ... RETURNING.
-const EXHIBITION_COLUMNS = `e.id::text, e.title, e.slug, e.description, e.creator_type, e.creator_id::text, e.room_template_id, e.room_width::text, e.room_depth::text, e.wall_color, e.status, e.featured, e.created_at::text, e.updated_at::text,
+const EXHIBITION_COLUMNS = `e.id::text, e.title, e.slug, e.description, e.creator_type, e.creator_id::text, e.room_template_id, e.room_width::text, e.room_depth::text, e.wall_color, e.wall_segments::text, e.scene_document::text, e.status, e.featured, e.created_at::text, e.updated_at::text,
   (select count(*) from room_preview.exhibition_placements p where p.exhibition_id = e.id)::int as artwork_count,
   (select p.artwork_id::text from room_preview.exhibition_placements p where p.exhibition_id = e.id order by p.placement_order nulls last, p.created_at limit 1) as preview_artwork_id`;
 const PLACEMENT_COLUMNS = `id::text, exhibition_id::text, artwork_id::text, position_x::text, position_y::text, position_z::text, rotation_x::text, rotation_y::text, rotation_z::text, scale::text, wall_id, frame_style, placement_order, created_at::text, updated_at::text`;
+
+function parseWallSegments(raw: string | null): SceneWall[] | undefined {
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw) as unknown[];
+    if (!Array.isArray(parsed)) return undefined;
+    return parsed.map((seg) => {
+      const s = seg as Record<string, unknown>;
+      const start = s.start as unknown[];
+      const end = s.end as unknown[];
+      return {
+        id: String(s.id ?? `w-${Math.random().toString(36).slice(2, 8)}`),
+        start: [Number(start?.[0] ?? 0), Number(start?.[1] ?? 0)] as [number, number],
+        end: [Number(end?.[0] ?? 0), Number(end?.[1] ?? 0)] as [number, number],
+        height: Number(s.height ?? 3.2),
+        thickness: Number(s.thickness ?? 0.15),
+      };
+    }).filter((w) => Number.isFinite(w.start[0]) && Number.isFinite(w.start[1]) && Number.isFinite(w.end[0]) && Number.isFinite(w.end[1]));
+  } catch {
+    return undefined;
+  }
+}
 
 function mapExhibition(row: ExhibitionRow): Exhibition {
   return {
@@ -64,6 +89,8 @@ function mapExhibition(row: ExhibitionRow): Exhibition {
     ...(row.room_width !== null ? { roomWidth: Number(row.room_width) } : {}),
     ...(row.room_depth !== null ? { roomDepth: Number(row.room_depth) } : {}),
     ...(row.wall_color ? { wallColor: row.wall_color } : {}),
+    ...(row.wall_segments ? { wallSegments: parseWallSegments(row.wall_segments) } : {}),
+    ...(row.scene_document ? { scene: parseSceneDocument(row.scene_document) } : {}),
     status: row.status as Exhibition["status"],
     featured: row.featured,
     artworkCount: row.artwork_count,
@@ -71,6 +98,16 @@ function mapExhibition(row: ExhibitionRow): Exhibition {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function parseSceneDocument(raw: string | null): ExhibitionSceneDocument | undefined {
+  if (!raw) return undefined;
+  try {
+    const parsed = ExhibitionSceneDocumentSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function mapPlacement(row: PlacementRow): ExhibitionPlacement {
@@ -145,14 +182,16 @@ export async function createExhibition(input: {
   roomWidth?: number;
   roomDepth?: number;
   wallColor?: string;
+  wallSegments?: SceneWall[];
+  scene?: ExhibitionSceneDocument;
   featured?: boolean;
 }): Promise<Exhibition | null> {
   const existing = await query<{ id: string }>(`select id::text from room_preview.exhibitions where slug = $1`, [input.slug]);
   if (existing[0]) return null;
 
   const rows = await query<ExhibitionRow>(
-    `insert into room_preview.exhibitions as e (title, slug, description, creator_type, creator_id, room_template_id, room_width, room_depth, wall_color, featured)
-     values ($1, $2, $3, $4, $5::uuid, $6, $7, $8, $9, $10)
+    `insert into room_preview.exhibitions as e (title, slug, description, creator_type, creator_id, room_template_id, room_width, room_depth, wall_color, wall_segments, scene_document, featured)
+     values ($1, $2, $3, $4, $5::uuid, $6, $7, $8, $9, $10, $11, $12)
      returning ${EXHIBITION_COLUMNS}`,
     [
       input.title,
@@ -164,6 +203,8 @@ export async function createExhibition(input: {
       input.roomWidth ?? null,
       input.roomDepth ?? null,
       input.wallColor ?? null,
+      input.wallSegments ? JSON.stringify(input.wallSegments) : null,
+      input.scene ? JSON.stringify(input.scene) : null,
       input.featured ?? false,
     ],
   );
@@ -181,6 +222,8 @@ export async function updateExhibition(
     roomWidth?: number;
     roomDepth?: number;
     wallColor?: string;
+    wallSegments?: SceneWall[];
+    scene?: ExhibitionSceneDocument;
     status?: Exhibition["status"];
     featured?: boolean;
   },
@@ -203,6 +246,8 @@ export async function updateExhibition(
   if (patch.roomWidth !== undefined) addSet("room_width", patch.roomWidth);
   if (patch.roomDepth !== undefined) addSet("room_depth", patch.roomDepth);
   if (patch.wallColor !== undefined) addSet("wall_color", patch.wallColor);
+  if (patch.wallSegments !== undefined) addSet("wall_segments", JSON.stringify(patch.wallSegments));
+  if (patch.scene !== undefined) addSet("scene_document", JSON.stringify(patch.scene));
   if (patch.status !== undefined) addSet("status", patch.status);
   if (patch.featured !== undefined) addSet("featured", patch.featured);
   if (setClauses.length === 0) return findExhibitionById(id);
