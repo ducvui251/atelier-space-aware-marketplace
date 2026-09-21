@@ -145,7 +145,7 @@ jobs:
     # runner) and restarts the live stack behind the Cloudflare Tunnel, so
     # it must never fire on an ordinary push/PR. Trigger it from the
     # Actions tab ("Run workflow") only when you deliberately want to
-    # redeploy. See runbooks/deployment.md.
+    # redeploy.
     if: github.event_name == 'workflow_dispatch'
     runs-on: self-hosted
     needs: [validate, compose-smoke]

@@ -4,6 +4,7 @@ import { getAuthUser, publicUser } from "@/lib/server/auth";
 import { findArtist, updateArtistProfile } from "@/lib/gateway/clients/artwork.client";
 import { json, errorResponse } from "@/lib/server/respond";
 import { signPrincipal } from "@atelier/config/principal";
+import { createClient } from "@/lib/supabase/server";
 
 // authUserId travels as a signed x-principal header, not a query param
 // (G-19) — account-service verifies the signature instead of trusting a
@@ -39,6 +40,14 @@ export async function PATCH(request: NextRequest) {
     body: { fullName, phone: body.phone },
     headers: principalHeaders(request, user.id),
   });
+
+  // account.users.full_name was just updated above, but getAuthUser() re-syncs
+  // it from Supabase's own user_metadata.full_name on every subsequent
+  // request (see /v1/account/users/sync's upsert) — left untouched here, that
+  // stale signup-time value would silently overwrite this edit back on the
+  // user's very next page load. Keeping both in step avoids that.
+  const supabase = await createClient();
+  await supabase.auth.updateUser({ data: { full_name: fullName } });
 
   const artistProfile = profile.user.artistId
     ? await updateArtistProfile(profile.user.artistId, { displayName: fullName, bio: body.bio, portfolioUrl: body.portfolioUrl, imageUrl: body.imageUrl, originPostalCode: body.originPostalCode, originCountry: body.originCountry, originPhone: body.originPhone, originEmail: body.originEmail, originState: body.originState })

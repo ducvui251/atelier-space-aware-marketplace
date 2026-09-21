@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { cn, formatPrice } from "@/lib/utils";
 import { useApiResource } from "@/lib/client/hooks";
 import { apiFetch } from "@/lib/client/api";
+import { TrackingPanel } from "@/components/orders/TrackingPanel";
 import type { Artwork, Order, Shipment } from "@/types";
 
 type BuyerOrder = Order & { shipment: Shipment | null };
@@ -173,6 +174,11 @@ function OrderRow({ order, onChanged }: { order: BuyerOrder; onChanged: () => vo
               Track shipment
             </a>
           ) : null}
+        </div>
+      ) : null}
+      {order.shipment?.trackingNumber ? (
+        <div className="mt-2">
+          <TrackingPanel fetchUrl={`/api/orders/${encodeURIComponent(order.id)}/tracking`} hasTrackingLink={Boolean(order.shipment?.trackingUrl)} />
         </div>
       ) : null}
 
