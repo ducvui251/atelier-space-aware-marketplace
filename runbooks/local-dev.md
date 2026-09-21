@@ -15,7 +15,7 @@ Audience: developers getting the stack running on a workstation.
    - `.env` — used by `docker compose` (build args + runtime env).
 2. Fill in `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` in both.
 3. Set `ATELIER_INTERNAL_SERVICE_TOKEN` to any long random string in `.env`. It is **required**: Compose fails closed without it. Use the same value in `.env.local` when running services on the host.
-4. Leave `STRIPE_SECRET_KEY` as a test key or empty for pure-catalog work (see `runbooks/stripe-integration.md`).
+4. Leave `STRIPE_SECRET_KEY` as a test key or empty for pure-catalog work — get a test key from the Stripe dashboard's Developers > API keys page.
 
 ## Running the stack
 
@@ -44,6 +44,15 @@ Safe to re-run — both underlying scripts (`pull-met-artworks.mjs`,
 `backfill-artwork-styles.sh`) only touch new/untagged rows. Requires the
 stack already healthy and `ATELIER_INTERNAL_SERVICE_TOKEN` set (see
 Prerequisites above).
+
+### Shipping (Shippo)
+
+`SHIPPO_API_TOKEN` is optional. Without it, checkout still charges a
+placeholder-formula shipping fee and "Mark as shipped" generates a simulated
+carrier waybill — nothing breaks. Set a `shippo_test_...` token (free account
+at [goshippo.com](https://goshippo.com)) to get real carrier rate quotes and
+real (test-mode) shipping labels/tracking numbers instead. Restart
+`commerce-service` after changing it.
 
 ### Stripe testing through a Quick Tunnel
 
@@ -76,9 +85,9 @@ Host runs use `*_SERVICE_URL` defaults of `http://localhost:<port>`; Compose run
 ## Database
 
 - PostgreSQL is exposed on `localhost:5432` (user `atelier`, dev password `atelier_local_dev` — local dev only, never production).
-- Migrations run automatically only on a fresh volume; for an existing volume apply new files manually (see `runbooks/deployment.md` → Migration handling).
+- Migrations run automatically only on a fresh volume; for an existing volume, apply new files under `supabase/migrations/` manually with `psql` (or `docker exec -i datn-postgres-1 psql -U atelier -d atelier < supabase/migrations/00xx_name.sql`) in filename order.
 - Each service connects with its own least-privilege role (`account_service`, `catalog_discovery_service`, …) restricted to its own schema.
-- Backup/restore: `runbooks/backup-restore.md`.
+- Backup/restore: `bash scripts/backup-db.sh` / `bash scripts/restore-db.sh`.
 
 ## Validation before pushing
 

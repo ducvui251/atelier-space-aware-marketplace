@@ -22,7 +22,11 @@ a working microservices system, not a mock/demo shell.
 - **Auth & storage**: Supabase (Auth + Storage only — no Supabase DB, Postgres above is
   self-hosted via Docker)
 - **Payments**: Stripe Checkout (real test-mode integration, webhook-verified)
-- **3D**: React Three Fiber for the walkable exhibition builder/viewer
+- **3D**: React Three Fiber for the exhibition editor (custom floor plans, a live 3D
+  artwork-placement gallery) and the walkable published-exhibition viewer
+- **Shipping**: real Shippo API integration (rate quotes + label purchase/tracking) with
+  an automatic placeholder-formula/simulated-waybill fallback when no token is set — see
+  "Shipping (Shippo)" in `runbooks/local-dev.md`
 - **Contracts**: a shared Zod schema + route registry package (`packages/contracts/`) that
   both sides of every internal API are generated/checked against
 - **Orchestration**: Docker Compose (`docker-compose.yml`) runs the full stack locally;
@@ -98,13 +102,20 @@ Prefer running the Gateway or a service directly on the host instead of in a con
   event-outbox, and DB-client infrastructure used by every service
 - `supabase/migrations/` — every Postgres migration, applied in order on a fresh volume
 - `scripts/` — one-off and recurring ops scripts (seeding, backups, tunnels, CI gates)
-- `runbooks/` — the operational docs: local dev, deployment, backup/restore, incident
-  response, Stripe integration, image uploads, and more
-- `docs/adr/` — architecture decision records; `docs/mutation-semantics.md` — cross-cutting write-path rules
+- `runbooks/` — operational docs; currently just local dev setup (`local-dev.md`)
+
+## Known gaps
+
+- **Exhibition Editor V2** (`/exhibitions/manage/[id]`): "1. Define Space" (draw/resize
+  walls), "3. Add Content" (place artwork with wall/frame/position controls), and
+  "5. Publish & Share" (slug, description, publish/unpublish) are fully working.
+  "2. Shape Style" (wall color/room style) and "4. Create Paths" (camera waypoints) don't
+  exist yet.
+- **Shipping**: without `SHIPPO_API_TOKEN` set, rate quotes use a placeholder formula and
+  "Mark as shipped" generates a simulated carrier waybill instead of a real one — see
+  "Shipping (Shippo)" in `runbooks/local-dev.md`.
 
 ## Where to go next
 
-- Setting up locally, hit an error, or want Stripe test payments working →
-  [runbooks/local-dev.md](runbooks/local-dev.md)
-- Understand how services are split and why → [docs/adr/0001-mvp-microservice-topology.md](docs/adr/0001-mvp-microservice-topology.md)
-- Deploying, migrations on an existing volume, or an incident → [runbooks/](runbooks/)
+- Setting up locally, hit an error, want Stripe test payments or real Shippo shipping
+  working → [runbooks/local-dev.md](runbooks/local-dev.md)
