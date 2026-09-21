@@ -43,21 +43,35 @@ export interface ShippoLabel {
   labelUrl?: string;
 }
 
+export interface ShippoTrackingEvent {
+  status: string;
+  statusDetails: string;
+  statusDate: string;
+  location?: { city?: string; state?: string; country?: string };
+}
+
+export interface ShippoTracking {
+  status: string;
+  statusDetails: string;
+  eta?: string;
+  history: ShippoTrackingEvent[];
+}
+
 function isConfigured(): boolean {
   return Boolean(process.env.SHIPPO_API_TOKEN);
 }
 
-async function shippoFetch(path: string, body: unknown): Promise<unknown> {
+async function shippoRequest(method: "GET" | "POST", path: string, body?: unknown): Promise<unknown> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
     const res = await fetch(`${SHIPPO_BASE_URL}${path}`, {
-      method: "POST",
+      method,
       headers: {
         "content-type": "application/json",
         authorization: `ShippoToken ${process.env.SHIPPO_API_TOKEN}`,
       },
-      body: JSON.stringify(body),
+      body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });
     if (!res.ok) return null;
@@ -67,6 +81,10 @@ async function shippoFetch(path: string, body: unknown): Promise<unknown> {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function shippoFetch(path: string, body: unknown): Promise<unknown> {
+  return shippoRequest("POST", path, body);
 }
 
 /**
@@ -103,5 +121,36 @@ export async function purchaseLabel(rate: ShippoRate): Promise<ShippoLabel | nul
     trackingNumber: body.tracking_number,
     trackingUrl: body.tracking_url_provider || undefined,
     labelUrl: body.label_url || undefined,
+  };
+}
+
+/**
+ * Live status straight from Shippo's own tracking database (as opposed to
+ * `trackingUrl`, which just links out to the carrier's public tracking
+ * page). Only resolves for shipments Shippo actually recognizes — under a
+ * test token that means Shippo's canned SHIPPO_* sample tracking numbers,
+ * not the fake-but-realistic numbers a test-mode label purchase returns;
+ * under a live token it works for any real shipment on that carrier. Either
+ * way, an unrecognized carrier/number degrades to null like every other
+ * Shippo call here, rather than surfacing an error to the caller.
+ */
+export async function getTrackingStatus(carrier: string, trackingNumber: string): Promise<ShippoTracking | null> {
+  if (!isConfigured()) return null;
+  const body = await shippoRequest("GET", `/tracks/${encodeURIComponent(carrier)}/${encodeURIComponent(trackingNumber)}`) as {
+    tracking_status?: { status: string; status_details: string };
+    eta?: string;
+    tracking_history?: Array<{ status: string; status_details: string; status_date: string; location?: { city?: string; state?: string; country?: string } | null }>;
+  } | null;
+  if (!body || !body.tracking_status) return null;
+  return {
+    status: body.tracking_status.status,
+    statusDetails: body.tracking_status.status_details,
+    eta: body.eta,
+    history: (body.tracking_history ?? []).map((event) => ({
+      status: event.status,
+      statusDetails: event.status_details,
+      statusDate: event.status_date,
+      location: event.location ?? undefined,
+    })),
   };
 }

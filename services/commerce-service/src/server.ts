@@ -10,7 +10,7 @@ import { health } from "./health.ts";
 import { addCartItem, listCart, removeCartItem } from "./infrastructure/cart-repository.ts";
 import { confirmCheckoutSession, findOpenCheckoutSessionByOrder, findOpenCheckoutSessionForBuyer, findPendingOrderArtworkIds, getCheckoutSession, getIdempotencyRecord, handleChargeRefunded, handlePaymentFailed, persistPendingCheckout, recordPaymentEvent, saveCheckoutSession, saveIdempotencyRecord } from "./infrastructure/commerce-repository.ts";
 import { getArtistEarnings, getArtistTopSellingArtworks, getCommerceStats, listOrders, listOrdersByIds } from "./infrastructure/order-repository.ts";
-import { confirmReceived, listArtistOrders, saveReview, shipOrder } from "./infrastructure/order-actions-repository.ts";
+import { confirmReceived, getOrderTrackingStatus, listArtistOrders, saveReview, shipOrder } from "./infrastructure/order-actions-repository.ts";
 import { createCheckoutSession, retrieveCheckoutSession, retrievePaymentIntent } from "./infrastructure/stripe-client.ts";
 import { getArtistOrigin } from "./infrastructure/shipping-repository.ts";
 import { resolveShippingRate } from "./domain/shipping-rate.ts";
@@ -463,6 +463,15 @@ const routes: Record<string, ServiceRouteHandler> = {
     const orderId = url.pathname.split("/")[4] ?? "";
     const shipment = await shipOrder(orderId, parsed.data.artistId, correlationId);
     return shipment ? writeServiceJson(response, 200, shipment, correlationId) : writeServiceError(response, 403, { code: "FORBIDDEN", message: "This order does not belong to the artist", correlationId, retryable: false });
+  },
+  "GET /v1/commerce/orders/:id/tracking": async ({ url, response, correlationId }) => {
+    const orderId = url.pathname.split("/")[4] ?? "";
+    const buyerId = url.searchParams.get("buyerId") ?? undefined;
+    const artistId = url.searchParams.get("artistId") ?? undefined;
+    const tracking = await getOrderTrackingStatus(orderId, { buyerId, artistId });
+    return tracking
+      ? writeServiceJson(response, 200, tracking, correlationId)
+      : writeServiceError(response, 404, { code: "NOT_FOUND", message: "Tracking status unavailable", correlationId, retryable: true });
   },
   "POST /v1/commerce/orders/:id/confirm-received": async ({ request, url, response, correlationId }) => {
     const parsed = parseBody(ConfirmReceivedRequestSchema, await readJson(request));

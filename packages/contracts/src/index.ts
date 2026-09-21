@@ -186,6 +186,8 @@ export type PaymentStatus = "pending" | "success" | "failed" | "refunded";
 export interface Payment { id: string; orderId: string; amount: number; method: PaymentMethod; status: PaymentStatus; }
 export type ShipmentStatus = "packing" | "in_transit" | "delivered" | "incident";
 export interface Shipment { id: string; orderId: string; carrier?: string; trackingNumber?: string; status: ShipmentStatus; trackingUrl?: string; labelUrl?: string; }
+export interface ShipmentTrackingEvent { status: string; statusDetails: string; statusDate: string; location?: { city?: string; state?: string; country?: string }; }
+export interface ShipmentTracking { status: string; statusDetails: string; eta?: string; history: ShipmentTrackingEvent[]; }
 export interface Review { id: string; orderId: string; buyerId: string; rating: number; comment?: string; }
 export interface Follow { id: string; buyerId: string; artistId: string; }
 export interface SavedArtwork { id: string; buyerId: string; artworkId: string; }

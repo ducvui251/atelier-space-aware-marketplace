@@ -1,4 +1,4 @@
-import type { Order, Shipment } from "@atelier/contracts";
+import type { Order, Shipment, ShipmentTracking } from "@atelier/contracts";
 import { requestService } from "../http-client";
 
 export async function listOrders(authUserId: string) {
@@ -9,3 +9,5 @@ export async function shipOrder(orderId: string, artistId: string, input: Record
 export async function confirmReceived(orderId: string, buyerId: string) { return requestService<Record<string, unknown>>("commerce", `/v1/commerce/orders/${encodeURIComponent(orderId)}/confirm-received`, { method: "POST", body: { buyerId } }); }
 export async function saveReview(orderId: string, buyerId: string, input: Record<string, unknown>) { return requestService<Record<string, unknown>>("commerce", `/v1/commerce/orders/${encodeURIComponent(orderId)}/reviews`, { method: "POST", body: { ...input, buyerId } }); }
 export async function resumeCheckout(orderId: string, buyerId: string) { return requestService<{ checkoutUrl: string }>("commerce", `/v1/commerce/orders/${encodeURIComponent(orderId)}/resume-checkout?buyerId=${encodeURIComponent(buyerId)}`); }
+export async function getOrderTrackingAsBuyer(orderId: string, buyerId: string) { return requestService<ShipmentTracking>("commerce", `/v1/commerce/orders/${encodeURIComponent(orderId)}/tracking?buyerId=${encodeURIComponent(buyerId)}`); }
+export async function getOrderTrackingAsArtist(orderId: string, artistId: string) { return requestService<ShipmentTracking>("commerce", `/v1/commerce/orders/${encodeURIComponent(orderId)}/tracking?artistId=${encodeURIComponent(artistId)}`); }

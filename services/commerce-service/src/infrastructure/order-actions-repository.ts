@@ -1,9 +1,10 @@
-import type { Artwork, Order, Review, Shipment } from "@atelier/contracts";
+import type { Artwork, Order, Review, Shipment, ShipmentTracking } from "@atelier/contracts";
 import { query, transaction } from "@atelier/persistence";
 import { requestInternalService } from "@atelier/config/service-client";
 import { writeOutboxEvent } from "@atelier/events";
 import { getArtistOrigin } from "./shipping-repository.ts";
 import { resolveWaybill } from "../domain/waybill.ts";
+import { getTrackingStatus } from "./shippo-client.ts";
 
 const SCHEMA = "commerce";
 
@@ -91,6 +92,46 @@ export async function shipOrder(orderId: string, artistId: string, correlationId
     });
     return { id: shipment.rows[0].id, orderId, carrier: waybill.carrier, trackingNumber: waybill.trackingNumber, trackingUrl: waybill.trackingUrl, labelUrl: waybill.labelUrl, status: "in_transit" as const };
   });
+}
+
+/**
+ * The carrier column stores a human label like "USPS Ground Advantage"
+ * (see purchaseLabel in shippo-client.ts) — Shippo's tracking endpoint wants
+ * just the lowercase carrier slug ("usps"), which is always its first word.
+ */
+function carrierSlug(carrier: string): string {
+  return carrier.split(" ")[0]?.toLowerCase() ?? carrier.toLowerCase();
+}
+
+/**
+ * Ownership is checked here rather than trusted from the caller: a buyer
+ * may only look up their own order, an artist only one for their own
+ * artwork (same cross-service check shipOrder already does).
+ */
+export async function getOrderTrackingStatus(orderId: string, requester: { buyerId?: string; artistId?: string }): Promise<ShipmentTracking | null> {
+  const rows = await query<{ buyer_id: string; artwork_id: string; carrier: string | null; tracking_number: string | null }>(
+    `select o.buyer_id::text, o.artwork_id::text, s.carrier, s.tracking_number
+     from commerce.orders o
+     left join commerce.shipments s on s.order_id = o.id
+     where o.id::text = $1`,
+    [orderId],
+  );
+  const row = rows[0];
+  if (!row || !row.carrier || !row.tracking_number) return null;
+
+  if (requester.buyerId) {
+    if (row.buyer_id !== requester.buyerId) return null;
+  } else if (requester.artistId) {
+    const artwork = await requestInternalService<Artwork>(
+      "artist-artwork",
+      `/v1/artist-artwork/artworks/${encodeURIComponent(row.artwork_id)}`,
+    ).catch(() => null);
+    if (!artwork || artwork.artistId !== requester.artistId) return null;
+  } else {
+    return null;
+  }
+
+  return getTrackingStatus(carrierSlug(row.carrier), row.tracking_number);
 }
 
 export async function confirmReceived(orderId: string, buyerId: string): Promise<Order | null> {

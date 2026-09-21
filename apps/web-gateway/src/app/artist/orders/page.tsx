@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatPrice } from "@/lib/utils";
 import { useApiResource } from "@/lib/client/hooks";
 import { apiFetch } from "@/lib/client/api";
+import { TrackingPanel } from "@/components/orders/TrackingPanel";
 import type { Artwork, Order, Shipment } from "@/types";
 
 type ArtistOrder = Order & { shipment: Shipment | null };
@@ -73,6 +74,11 @@ function ArtistOrderRow({ order, onChanged }: { order: ArtistOrder; onChanged: (
             </a>
           ) : null}
         </p>
+      ) : null}
+      {order.shipment?.trackingNumber ? (
+        <div className="mt-2">
+          <TrackingPanel fetchUrl={`/api/artist/orders/${encodeURIComponent(order.id)}/tracking`} />
+        </div>
       ) : null}
       {order.status === "paid" ? (
         <div className="mt-4">
