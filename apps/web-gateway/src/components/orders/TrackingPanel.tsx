@@ -14,7 +14,7 @@ import type { ShipmentTracking } from "@/types";
  * numbers Shippo itself doesn't recognize), which is expected and shown as
  * a plain message rather than an error.
  */
-export function TrackingPanel({ fetchUrl }: { fetchUrl: string }) {
+export function TrackingPanel({ fetchUrl, hasTrackingLink = false }: { fetchUrl: string; hasTrackingLink?: boolean }) {
   const [open, setOpen] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [tracking, setTracking] = React.useState<ShipmentTracking | null>(null);
@@ -49,7 +49,10 @@ export function TrackingPanel({ fetchUrl }: { fetchUrl: string }) {
               <Loader2 className="size-3.5 animate-spin" /> Checking live status…
             </span>
           ) : unavailable ? (
-            <span>Live status isn&apos;t available yet for this shipment. Use the tracking link above once the carrier picks it up.</span>
+            <span>
+              Live status isn&apos;t available yet for this shipment.
+              {hasTrackingLink ? " Use the tracking link above once the carrier picks it up." : ""}
+            </span>
           ) : tracking ? (
             <div className="flex flex-col gap-2">
               <p className="font-medium text-foreground">

@@ -247,7 +247,7 @@ export function ExhibitionEditorV2({ id }: ExhibitionEditorV2Props) {
                 <h2 className="font-medium text-foreground">Define Space</h2>
                 <p className="mt-1 text-caption text-muted-foreground">Use the full 50 × 50 m workspace to draw walls. Select a wall and drag its orange endpoints to reshape it.</p>
               </div>
-              <Badge variant="outline">Draft</Badge>
+              <Badge variant="outline" className="capitalize">{exhibition?.status ?? "draft"}</Badge>
             </div>
 
             <div className="mt-5 rounded-lg border border-border bg-muted/40 p-3">

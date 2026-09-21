@@ -178,7 +178,7 @@ function OrderRow({ order, onChanged }: { order: BuyerOrder; onChanged: () => vo
       ) : null}
       {order.shipment?.trackingNumber ? (
         <div className="mt-2">
-          <TrackingPanel fetchUrl={`/api/orders/${encodeURIComponent(order.id)}/tracking`} />
+          <TrackingPanel fetchUrl={`/api/orders/${encodeURIComponent(order.id)}/tracking`} hasTrackingLink={Boolean(order.shipment?.trackingUrl)} />
         </div>
       ) : null}
 

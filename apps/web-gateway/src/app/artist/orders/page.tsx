@@ -77,7 +77,7 @@ function ArtistOrderRow({ order, onChanged }: { order: ArtistOrder; onChanged: (
       ) : null}
       {order.shipment?.trackingNumber ? (
         <div className="mt-2">
-          <TrackingPanel fetchUrl={`/api/artist/orders/${encodeURIComponent(order.id)}/tracking`} />
+          <TrackingPanel fetchUrl={`/api/artist/orders/${encodeURIComponent(order.id)}/tracking`} hasTrackingLink={Boolean(order.shipment?.trackingUrl)} />
         </div>
       ) : null}
       {order.status === "paid" ? (
