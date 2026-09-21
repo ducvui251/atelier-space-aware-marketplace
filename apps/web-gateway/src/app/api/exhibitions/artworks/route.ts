@@ -8,7 +8,8 @@ export async function GET(request: NextRequest) {
   if (!access.ok) return access.response;
   try {
     if (access.actor.role === "artist") {
-      const result = await listArtistArtworks(access.actor.id);
+      const q = new URL(request.url).searchParams.get("q") ?? undefined;
+      const result = await listArtistArtworks(access.actor.id, { q });
       return json({ items: result.items, total: result.total ?? result.items.length });
     }
     const items = await listAllArtworksForAdmin();
