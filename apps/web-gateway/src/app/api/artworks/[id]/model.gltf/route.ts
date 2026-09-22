@@ -12,7 +12,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return new Response("Artwork not found", { status: 404 });
   }
 
-  const imageUrl = new URL(artwork.imageUrl, request.url).toString();
+  // Not request.url: Next.js's NextRequest.url doesn't reflect the actual
+  // incoming Host header in this setup (confirmed live — curling this route
+  // with `Host: 192.168.0.104:3000` still got back request.url on
+  // localhost:3000), so a root-relative artwork.imageUrl resolved against
+  // it silently pointed AR sessions at the phone's own "localhost" instead
+  // of this server. The raw Host header is what actually carries the
+  // origin the client connected to.
+  const host = request.headers.get("host") ?? new URL(request.url).host;
+  const protocol = request.headers.get("x-forwarded-proto") ?? "http";
+  const imageUrl = new URL(artwork.imageUrl, `${protocol}://${host}`).toString();
   const gltf = buildArtworkQuadGltf({
     widthCm: artwork.widthCm,
     heightCm: artwork.heightCm,
