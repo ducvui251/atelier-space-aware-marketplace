@@ -3,7 +3,7 @@
 import * as React from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { apiFetch } from "@/lib/client/api";
+import { useArtworkArQr } from "@/lib/ar/use-artwork-ar-qr";
 
 /**
  * True camera AR, not the flat 2D "view in your room" placement (RoomPlaceholder):
@@ -14,19 +14,17 @@ import { apiFetch } from "@/lib/client/api";
  * custom element on import, which touches the DOM, so it's loaded dynamically
  * client-side only rather than at module scope (SSR has no DOM to touch).
  *
- * On desktop, the browser itself usually can't launch AR — the buyer needs
- * to continue on their phone, so (same as Artfinder's ArtPlacer widget) this
- * fetches a phone-reachable link to this same page and renders it as a QR
- * code to scan. `resolvePhoneReachableOrigin` in the API route returns null
- * when AR_PHONE_ORIGIN isn't set, in which case there's no reachable link
- * to encode — the setup hint below explains what to set.
+ * Only reached by scanning the QR code shown in ArtworkArQrModal (this page
+ * with ?ar=1) — i.e. it's expected to already be running on an AR-capable
+ * phone. The `canActivateAR === false` branch below is just a defensive
+ * fallback (someone opens a ?ar=1 link directly on a desktop, a bookmark
+ * gets shared, etc.), not the primary desktop entry point anymore.
  */
 export function ArtworkArViewer({ artworkId, title, onClose }: { artworkId: string; title: string; onClose: () => void }) {
   const [ready, setReady] = React.useState(false);
   const [canActivateAR, setCanActivateAR] = React.useState<boolean | null>(null);
-  const [arLink, setArLink] = React.useState<string | null | undefined>(undefined);
-  const [qrDataUrl, setQrDataUrl] = React.useState<string | null>(null);
   const modelRef = React.useRef<HTMLElement | null>(null);
+  const { arLink, qrDataUrl } = useArtworkArQr(artworkId);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -37,12 +35,6 @@ export function ArtworkArViewer({ artworkId, title, onClose }: { artworkId: stri
       cancelled = true;
     };
   }, []);
-
-  React.useEffect(() => {
-    apiFetch<{ url: string | null }>(`/api/artworks/${encodeURIComponent(artworkId)}/ar-link`)
-      .then((result) => setArLink(result.url))
-      .catch(() => setArLink(null));
-  }, [artworkId]);
 
   React.useEffect(() => {
     const el = modelRef.current;
@@ -61,25 +53,6 @@ export function ArtworkArViewer({ artworkId, title, onClose }: { artworkId: stri
       el.removeEventListener("ar-status", updateArState);
     };
   }, [ready]);
-
-  // Only render a QR to scan when this device itself can't launch AR
-  // (matches Artfinder: the QR modal is a desktop-only fallback) and once
-  // there's an actual phone-reachable link to encode.
-  React.useEffect(() => {
-    if (canActivateAR !== false || !arLink) {
-      setQrDataUrl(null);
-      return;
-    }
-    let cancelled = false;
-    import("qrcode").then((QRCode) =>
-      QRCode.toDataURL(arLink, { width: 220, margin: 1 }).then((dataUrl) => {
-        if (!cancelled) setQrDataUrl(dataUrl);
-      }),
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [canActivateAR, arLink]);
 
   return (
     <div className="mt-4 overflow-hidden rounded-lg border border-border bg-muted">
@@ -116,10 +89,8 @@ export function ArtworkArViewer({ artworkId, title, onClose }: { artworkId: stri
             </>
           ) : arLink === null ? (
             <p className="max-w-sm text-caption text-muted-foreground">
-              No phone-reachable link is configured yet. Set <code className="rounded bg-muted px-1">AR_PHONE_ORIGIN</code> in{" "}
-              <code className="rounded bg-muted px-1">.env</code> to your PC&apos;s LAN IP on the same Wi-Fi as your phone (e.g.{" "}
-              <code className="rounded bg-muted px-1">http://192.168.1.23:3000</code>, find it with <code className="rounded bg-muted px-1">ipconfig</code>),
-              then restart <code className="rounded bg-muted px-1">web-gateway</code> — a QR code to scan will appear here.
+              No phone-reachable link is configured. Set <code className="rounded bg-muted px-1">AR_PHONE_ORIGIN</code> in{" "}
+              <code className="rounded bg-muted px-1">.env</code>, then restart <code className="rounded bg-muted px-1">web-gateway</code>.
             </p>
           ) : (
             <p className="text-caption text-muted-foreground">Generating QR code…</p>
