@@ -12,7 +12,9 @@
     "lint": "pnpm --filter @atelier/web-gateway lint",
     "type-check": "pnpm -r --if-present type-check",
     "validate": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate.ps1",
-    "test": "pnpm -r --if-present test"
+    "test": "pnpm -r --if-present test",
+    "classify:artworks": "node scripts/batch-classify-artworks.mjs",
+    "db:restore:classified": "node scripts/restore-classified.mjs"
   },
   "packageManager": "pnpm@10.34.5",
   "pnpm": {

@@ -1,0 +1,30 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies (curl for healthcheck, libgomp for pytorch)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install PyTorch CPU first (saves download size and build time)
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+# Copy requirements and install
+COPY services/ai-classification-service/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Pre-cache the model during build so startup is instant and offline-ready
+ENV HF_HOME=/app/cache/huggingface
+RUN python -c "from transformers import CLIPProcessor, CLIPModel; \
+    CLIPModel.from_pretrained('openai/clip-vit-base-patch32'); \
+    CLIPProcessor.from_pretrained('openai/clip-vit-base-patch32')"
+
+# Copy application source code
+COPY services/ai-classification-service/src ./src
+
+EXPOSE 4109
+
+CMD ["uvicorn", "src.app:app", "--host", "0.0.0.0", "--port", "4109"]

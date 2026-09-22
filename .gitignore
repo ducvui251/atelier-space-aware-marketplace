@@ -64,3 +64,9 @@ PROJECT_PROMPT.md
 
 # imported artwork dataset images (large binary blob, not source code)
 apps/web-gateway/public/img/met-import/
+
+# python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
