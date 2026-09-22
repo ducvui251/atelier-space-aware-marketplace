@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { AlertTriangle, ArrowLeft, Package } from "lucide-react";
 import type { Order, Shipment } from "@atelier/contracts";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -95,8 +97,14 @@ function OrderRow({ order }: { order: AdminOrder }) {
   );
 }
 
+function isStatusOption(value: string | null): value is (typeof STATUS_OPTIONS)[number] {
+  return value !== null && (STATUS_OPTIONS as readonly string[]).includes(value);
+}
+
 function AdminOrdersView() {
-  const [status, setStatus] = React.useState<(typeof STATUS_OPTIONS)[number]>("all");
+  const searchParams = useSearchParams();
+  const initialStatus = isStatusOption(searchParams.get("status")) ? (searchParams.get("status") as (typeof STATUS_OPTIONS)[number]) : "all";
+  const [status, setStatus] = React.useState<(typeof STATUS_OPTIONS)[number]>(initialStatus);
   const [page, setPage] = React.useState(1);
 
   const query = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
@@ -189,7 +197,9 @@ export default function AdminOrdersPage() {
   return (
     <PageContainer className="py-16">
       <RequireRole role="admin">
-        <AdminOrdersView />
+        <Suspense fallback={null}>
+          <AdminOrdersView />
+        </Suspense>
       </RequireRole>
     </PageContainer>
   );
