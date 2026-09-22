@@ -44,6 +44,15 @@ export function ArtworkDetailClient({ artwork, artist, related }: ArtworkDetailC
   const { isSaved, toggleSaved } = useSaved();
   const [showAr, setShowAr] = useState(false);
 
+  // Scanning the AR QR code lands here with ?ar=1 (see ArtworkArViewer /
+  // /api/artworks/[id]/ar-link) — open the panel immediately so the phone
+  // shows the AR button without an extra tap. Read from window.location
+  // rather than useSearchParams() so this component doesn't need a
+  // Suspense boundary just for a one-time initial check.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("ar") === "1") setShowAr(true);
+  }, []);
+
   const available = artwork.availability === "available";
   const inCart = cartArtworkIds.includes(artwork.id);
   const saved = isSaved(artwork.id);
