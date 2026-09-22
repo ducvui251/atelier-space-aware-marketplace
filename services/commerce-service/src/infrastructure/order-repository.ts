@@ -31,6 +31,55 @@ export async function listOrders(buyerId: string): Promise<(Order & { shipment: 
   }));
 }
 
+/**
+ * Platform-wide order listing for Admin — every order, not scoped to one
+ * buyer or artist, with the same shipment detail listOrders/
+ * listArtistOrders already join in. Admin's own service has no
+ * commerce.orders access of its own (each service owns its schema), so it
+ * proxies here (see admin-service's getAdminOrders) the same way it already
+ * proxies to /v1/commerce/stats for the overview numbers.
+ */
+export async function listAllOrdersForAdmin(options: { status?: Order["status"]; page: number; limit: number }): Promise<{ items: (Order & { shipment: Shipment | null })[]; total: number }> {
+  const offset = (options.page - 1) * options.limit;
+
+  // Two separate queries, each with its own placeholder numbering — a
+  // shared "where o.status = $3" string used to work for the rows query
+  // (limit/offset/status → $1/$2/$3) but broke the count query, which only
+  // ever binds one param and needs that same filter at $1. Caught live: the
+  // status filter 500'd every time (Postgres: "$3" with a 1-element params
+  // array).
+  const countWhere = options.status ? "where status = $1" : "";
+  const countRows = await query<{ count: string }>(
+    `select count(*)::text as count from commerce.orders ${countWhere}`,
+    options.status ? [options.status] : [],
+  );
+
+  const rowsWhere = options.status ? "where o.status = $3" : "";
+  const rowsParams: unknown[] = options.status ? [options.limit, offset, options.status] : [options.limit, offset];
+  const rows = await query<
+    OrderRow & { shipment_id: string | null; carrier: string | null; tracking_number: string | null; tracking_url: string | null; label_url: string | null; shipment_status: Shipment["status"] | null }
+  >(
+    `select o.id::text, o.buyer_id::text, o.artwork_id::text, o.edition_type, o.total_amount::text, o.currency, o.status, o.created_at::text, o.shipping_address,
+            s.id::text as shipment_id, s.carrier, s.tracking_number, s.tracking_url, s.label_url, s.status as shipment_status
+     from commerce.orders o
+     left join commerce.shipments s on s.order_id = o.id
+     ${rowsWhere}
+     order by o.created_at desc
+     limit $1 offset $2`,
+    rowsParams,
+  );
+
+  return {
+    total: Number(countRows[0]?.count ?? 0),
+    items: rows.map((row) => ({
+      ...mapOrder(row),
+      shipment: row.shipment_id
+        ? { id: row.shipment_id, orderId: row.id, carrier: row.carrier ?? undefined, trackingNumber: row.tracking_number ?? undefined, trackingUrl: row.tracking_url ?? undefined, labelUrl: row.label_url ?? undefined, status: row.shipment_status! }
+        : null,
+    })),
+  };
+}
+
 export async function listOrdersByIds(ids: string[]): Promise<Order[]> {
   if (ids.length === 0) return [];
   const rows = await query<OrderRow>(

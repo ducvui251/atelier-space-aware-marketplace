@@ -264,6 +264,12 @@ export const ArtistTopArtworksQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(20).default(5),
 });
 
+export const AdminOrdersQuerySchema = z.object({
+  status: z.enum(["pending", "confirmed", "paid", "shipped", "completed", "cancelled"]).optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(25),
+});
+
 // --- Recommendation ------------------------------------------------------------
 
 export const ToggleSavedRequestSchema = z.object({
@@ -641,6 +647,7 @@ export type ShipOrderRequest = z.infer<typeof ShipOrderRequestSchema>;
 export type ArtistEarningsQuery = z.infer<typeof ArtistEarningsQuerySchema>;
 export type ArtistAudienceQuery = z.infer<typeof ArtistAudienceQuerySchema>;
 export type ArtistTopArtworksQuery = z.infer<typeof ArtistTopArtworksQuerySchema>;
+export type AdminOrdersQuery = z.infer<typeof AdminOrdersQuerySchema>;
 export type ConfirmReceivedRequest = z.infer<typeof ConfirmReceivedRequestSchema>;
 export type OrderReviewRequest = z.infer<typeof OrderReviewRequestSchema>;
 export type ToggleSavedRequest = z.infer<typeof ToggleSavedRequestSchema>;

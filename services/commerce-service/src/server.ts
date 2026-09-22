@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createServiceServer, getPort, readJson, writeServiceError, writeServiceJson, type ServiceRouteHandler } from "@atelier/config/http";
 import { createLogger } from "@atelier/config/logger";
-import { ArtistEarningsQuerySchema, ArtistTopArtworksQuerySchema, CartAddRequestSchema, CheckoutCancelRequestSchema, CheckoutConfirmRequestSchema, CheckoutRequestSchema, ConfirmReceivedRequestSchema, OrderReviewRequestSchema, ShipOrderRequestSchema, ShippingQuoteRequestSchema, StripeWebhookRelaySchema, parseBody, type Artwork } from "@atelier/contracts";
+import { AdminOrdersQuerySchema, ArtistEarningsQuerySchema, ArtistTopArtworksQuerySchema, CartAddRequestSchema, CheckoutCancelRequestSchema, CheckoutConfirmRequestSchema, CheckoutRequestSchema, ConfirmReceivedRequestSchema, OrderReviewRequestSchema, ShipOrderRequestSchema, ShippingQuoteRequestSchema, StripeWebhookRelaySchema, parseBody, type Artwork } from "@atelier/contracts";
 import { runOutboxPublisher } from "@atelier/events";
 import { ping } from "@atelier/persistence";
 import { resolveCartArtworks } from "./application/checkout-cart.ts";
@@ -9,7 +9,7 @@ import { interpretReservationResponse, type ReservationResponseResult } from "./
 import { health } from "./health.ts";
 import { addCartItem, listCart, removeCartItem } from "./infrastructure/cart-repository.ts";
 import { confirmCheckoutSession, findOpenCheckoutSessionByOrder, findOpenCheckoutSessionForBuyer, findPendingOrderArtworkIds, getCheckoutSession, getIdempotencyRecord, handleChargeRefunded, handlePaymentFailed, persistPendingCheckout, recordPaymentEvent, saveCheckoutSession, saveIdempotencyRecord } from "./infrastructure/commerce-repository.ts";
-import { getArtistEarnings, getArtistTopSellingArtworks, getCommerceStats, listOrders, listOrdersByIds } from "./infrastructure/order-repository.ts";
+import { getArtistEarnings, getArtistTopSellingArtworks, getCommerceStats, listAllOrdersForAdmin, listOrders, listOrdersByIds } from "./infrastructure/order-repository.ts";
 import { confirmReceived, getOrderTrackingStatus, listArtistOrders, saveReview, shipOrder } from "./infrastructure/order-actions-repository.ts";
 import { createCheckoutSession, retrieveCheckoutSession, retrievePaymentIntent } from "./infrastructure/stripe-client.ts";
 import { getArtistOrigin } from "./infrastructure/shipping-repository.ts";
@@ -436,6 +436,12 @@ const routes: Record<string, ServiceRouteHandler> = {
       : new Date(to.getTime() - 90 * 24 * 60 * 60 * 1000);
     const items = await getArtistTopSellingArtworks(artistId, { from: from.toISOString(), to: to.toISOString(), limit: parsed.data.limit });
     return writeServiceJson(response, 200, { items, total: items.length }, correlationId);
+  },
+  "GET /v1/commerce/orders/admin": async ({ url, response, correlationId }) => {
+    const parsed = parseBody(AdminOrdersQuerySchema, Object.fromEntries(url.searchParams.entries()));
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
+    const result = await listAllOrdersForAdmin(parsed.data);
+    return writeServiceJson(response, 200, result, correlationId);
   },
   /**
    * A buyer who abandoned Stripe's hosted page mid-checkout had no way

@@ -63,9 +63,14 @@ function AdminOverview() {
     <>
       <p className="eyebrow">Admin</p>
       <h1 className="mt-2 font-display text-h2 text-foreground">Admin overview</h1>
-      <Button asChild variant="outline" className="mt-4">
-        <Link href="/exhibitions/manage">Manage exhibitions</Link>
-      </Button>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button asChild variant="outline">
+          <Link href="/admin/orders">Manage orders</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/exhibitions/manage">Manage exhibitions</Link>
+        </Button>
+      </div>
 
       {error ? (
         <div className="mt-6 flex items-center justify-between gap-3 rounded-md border border-destructive bg-destructive-soft px-4 py-3 text-body-sm text-destructive-foreground">

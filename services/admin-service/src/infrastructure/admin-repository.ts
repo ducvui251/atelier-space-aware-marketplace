@@ -145,6 +145,19 @@ async function getComplaintStatusCounts(): Promise<Record<string, number>> {
   return counts;
 }
 
+/**
+ * Full order detail (shipping address, shipment/tracking, status) for the
+ * Orders management page — admin.order_feed (above) only carries enough for
+ * the overview's aggregate counts/trend, not per-order detail, so this
+ * proxies straight through to Commerce's own orders table instead of
+ * duplicating it here.
+ */
+export async function getAdminOrders(query_: { status?: string; page: number; limit: number }) {
+  const params = new URLSearchParams({ page: String(query_.page), limit: String(query_.limit) });
+  if (query_.status) params.set("status", query_.status);
+  return requestInternalService<{ items: unknown[]; total: number }>("commerce", `/v1/commerce/orders/admin?${params.toString()}`);
+}
+
 export async function getStats() {
   const results = await Promise.allSettled([
     requestInternalService<{ items: Array<{ verificationStatus: string }> }>("artist-artwork", "/v1/artist-artwork/artists?status=all"),

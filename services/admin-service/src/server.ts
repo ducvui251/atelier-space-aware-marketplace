@@ -1,10 +1,10 @@
 import { createServiceServer, getPort, readJson, writeServiceError, writeServiceJson, type ServiceRouteHandler } from "@atelier/config/http";
-import { CreateComplaintRequestSchema, ResolveComplaintRequestSchema, parseBody } from "@atelier/contracts";
+import { AdminOrdersQuerySchema, CreateComplaintRequestSchema, ResolveComplaintRequestSchema, parseBody } from "@atelier/contracts";
 import { OrderCreatedPayloadSchema, OrderShippedPayloadSchema, PaymentFailedPayloadSchema, PaymentSucceededPayloadSchema } from "@atelier/contracts/events";
 import { consumeEvents, type ConsumedEvent } from "@atelier/events";
 import { ping } from "@atelier/persistence";
 import { health } from "./health.ts";
-import { createComplaint, getStats, listComplaints, markOrderFeedFailed, markOrderFeedPaid, markOrderFeedShipped, resolveComplaint, upsertOrderFeedCreated } from "./infrastructure/admin-repository.ts";
+import { createComplaint, getAdminOrders, getStats, listComplaints, markOrderFeedFailed, markOrderFeedPaid, markOrderFeedShipped, resolveComplaint, upsertOrderFeedCreated } from "./infrastructure/admin-repository.ts";
 
 async function source<T>(path: string): Promise<T> {
   const baseUrl = process.env.ARTIST_ARTWORK_SERVICE_URL ?? "http://localhost:4103";
@@ -30,6 +30,11 @@ const routes: Record<string, ServiceRouteHandler> = {
     if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
     const complaint = await resolveComplaint(url.pathname.split("/")[4] ?? "", parsed.data.status, parsed.data.note);
     return complaint ? writeServiceJson(response, 200, complaint, correlationId) : writeServiceError(response, 404, { code: "NOT_FOUND", message: "Complaint not found", correlationId, retryable: false });
+  },
+  "GET /v1/admin/orders": async ({ url, response, correlationId }) => {
+    const parsed = parseBody(AdminOrdersQuerySchema, Object.fromEntries(url.searchParams.entries()));
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
+    return writeServiceJson(response, 200, await getAdminOrders(parsed.data), correlationId);
   },
 };
 
