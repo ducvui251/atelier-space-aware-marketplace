@@ -255,6 +255,7 @@ services:
       # route itself returns a clear 500 instead of accepting unverified events.
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      AR_PHONE_ORIGIN: ${AR_PHONE_ORIGIN:-}
     ports: ["3000:3000"]
     restart: unless-stopped
     deploy:

@@ -2,6 +2,7 @@ import type { ZodType } from "zod";
 import {
   AccountSyncRequestSchema,
   AccountUpdateRequestSchema,
+  AdminOrdersQuerySchema,
   ArtistArtworkViewsQuerySchema,
   ArtistArtworkViewsResponseSchema,
   ArtistAudienceQuerySchema,
@@ -103,6 +104,7 @@ export const ROUTES: RouteDefinition[] = [
   { method: "GET", path: "/v1/commerce/artist-orders", service: "commerce", summary: "List orders for an artist's artworks", auth: "internal", successStatus: 200, errorStatuses: [400, 401] },
   { method: "GET", path: "/v1/commerce/artist-earnings", service: "commerce", summary: "Per-artist earnings aggregate: received/pending-payment/refunded totals, order status counts, revenue trend (§4.7)", auth: "internal", requestSchema: ArtistEarningsQuerySchema, requestLocation: "query", successStatus: 200, errorStatuses: [400, 401] },
   { method: "GET", path: "/v1/commerce/artist-top-artworks", service: "commerce", summary: "Top-selling artwork for an artist, gated on completed orders (§4.7)", auth: "internal", requestSchema: ArtistTopArtworksQuerySchema, requestLocation: "query", successStatus: 200, errorStatuses: [400, 401] },
+  { method: "GET", path: "/v1/commerce/orders/admin", service: "commerce", summary: "List every order platform-wide with shipment detail, paginated (admin)", auth: "internal", requestSchema: AdminOrdersQuerySchema, requestLocation: "query", successStatus: 200, errorStatuses: [400, 401] },
   { method: "POST", path: "/v1/commerce/orders/{id}/ship", service: "commerce", summary: "Mark an order shipped (artist-owned)", auth: "internal", requestSchema: ShipOrderRequestSchema, requestLocation: "body", successStatus: 200, errorStatuses: [400, 401, 403] },
   { method: "GET", path: "/v1/commerce/orders/{id}/tracking", service: "commerce", summary: "Live tracking status from Shippo for a shipped order (buyer- or artist-owned)", auth: "internal", successStatus: 200, errorStatuses: [400, 401, 404] },
   { method: "POST", path: "/v1/commerce/orders/{id}/confirm-received", service: "commerce", summary: "Buyer confirms receipt of a shipped order", auth: "internal", requestSchema: ConfirmReceivedRequestSchema, requestLocation: "body", successStatus: 200, errorStatuses: [400, 401, 409] },
@@ -145,4 +147,5 @@ export const ROUTES: RouteDefinition[] = [
   { method: "GET", path: "/v1/admin/complaints", service: "admin", summary: "List complaints", auth: "internal", successStatus: 200, errorStatuses: [401] },
   { method: "POST", path: "/v1/admin/complaints", service: "admin", summary: "File a complaint against an order", auth: "internal", requestSchema: CreateComplaintRequestSchema, requestLocation: "body", successStatus: 201, errorStatuses: [400, 401] },
   { method: "POST", path: "/v1/admin/complaints/{id}/resolve", service: "admin", summary: "Resolve or reject a complaint", auth: "internal", requestSchema: ResolveComplaintRequestSchema, requestLocation: "body", successStatus: 200, errorStatuses: [400, 401, 404] },
+  { method: "GET", path: "/v1/admin/orders", service: "admin", summary: "List every order platform-wide with shipment detail, paginated", auth: "internal", requestSchema: AdminOrdersQuerySchema, requestLocation: "query", successStatus: 200, errorStatuses: [400, 401] },
 ];

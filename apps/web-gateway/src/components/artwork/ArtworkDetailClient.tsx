@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   BadgeCheck,
@@ -12,11 +12,14 @@ import {
   ShoppingBag,
   Sofa,
   Truck,
+  View,
 } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Section } from "@/components/layout/Section";
 import { SectionHeader } from "@/components/layout/SectionHeader";
 import { Grid } from "@/components/layout/Grid";
+import { ArtworkArViewer } from "@/components/artwork/ArtworkArViewer";
+import { ArtworkArQrModal } from "@/components/artwork/ArtworkArQrModal";
 import { ArtworkCard } from "@/components/artwork/ArtworkCard";
 import { ArtworkImage } from "@/components/artwork/ArtworkImage";
 import { PriceDisplay } from "@/components/artwork/PriceDisplay";
@@ -40,6 +43,17 @@ export function ArtworkDetailClient({ artwork, artist, related }: ArtworkDetailC
   const { currentUser } = useAuth();
   const { cartArtworkIds, addToCart } = useCart();
   const { isSaved, toggleSaved } = useSaved();
+  const [showAr, setShowAr] = useState(false);
+  const [showArQrModal, setShowArQrModal] = useState(false);
+
+  // Scanning the AR QR code lands here with ?ar=1 (see ArtworkArViewer /
+  // /api/artworks/[id]/ar-link) — open the panel immediately so the phone
+  // shows the AR button without an extra tap. Read from window.location
+  // rather than useSearchParams() so this component doesn't need a
+  // Suspense boundary just for a one-time initial check.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("ar") === "1") setShowAr(true);
+  }, []);
 
   const available = artwork.availability === "available";
   const inCart = cartArtworkIds.includes(artwork.id);
@@ -178,13 +192,26 @@ export function ArtworkDetailClient({ artwork, artist, related }: ArtworkDetailC
                   {related.length > 0 ? " See similar artworks below." : ""}
                 </div>
               )}
-              <Button asChild variant="outline" size="default">
-                <Link href={`/rooms?artwork=${artwork.id}`}>
-                  <Sofa className="size-4" />
-                  View in your room
-                </Link>
-              </Button>
+              <div className="grid grid-cols-2 gap-3">
+                <Button asChild variant="outline" size="default">
+                  <Link href={`/rooms?artwork=${artwork.id}`}>
+                    <Sofa className="size-4" />
+                    View in your room
+                  </Link>
+                </Button>
+                <Button variant="outline" size="default" onClick={() => setShowArQrModal(true)}>
+                  <View className="size-4" />
+                  View in AR
+                </Button>
+              </div>
+              {/* Only reachable via the QR modal's link (?ar=1) — a real
+                  phone gets the actual camera-AR panel, not another QR. */}
+              {showAr ? (
+                <ArtworkArViewer artworkId={artwork.id} title={artwork.title} onClose={() => setShowAr(false)} />
+              ) : null}
             </div>
+
+            <ArtworkArQrModal artworkId={artwork.id} title={artwork.title} open={showArQrModal} onOpenChange={setShowArQrModal} />
 
             <div className="mt-8 space-y-4 rounded-lg border border-border bg-surface p-5">
               <InfoRow icon={<Truck className="size-4" />} title="Shipping">

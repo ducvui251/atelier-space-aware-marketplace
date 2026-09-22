@@ -11,17 +11,42 @@ import { useApiResource } from "@/lib/client/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
-function StatusBreakdown({ title, counts }: { title: string; counts: Record<string, number> }) {
+function StatusBreakdown({
+  title,
+  counts,
+  linkBase,
+  linkableStatuses,
+}: {
+  title: string;
+  counts: Record<string, number>;
+  linkBase?: string;
+  /** Restricts which rows link out — admin.order_feed's "failed" bucket, for example, has no matching commerce.orders status to filter /admin/orders by. */
+  linkableStatuses?: readonly string[];
+}) {
   return (
     <div className="rounded-lg border border-border bg-surface p-5">
       <p className="text-caption text-muted-foreground">{title}</p>
       <dl className="mt-3 flex flex-col gap-1.5">
-        {Object.entries(counts).map(([status, count]) => (
-          <div key={status} className="flex items-center justify-between text-body-sm">
-            <dt className="capitalize text-foreground">{status}</dt>
-            <dd className="font-medium text-foreground">{count}</dd>
-          </div>
-        ))}
+        {Object.entries(counts).map(([status, count]) => {
+          const row = (
+            <div className="flex items-center justify-between text-body-sm">
+              <dt className="capitalize text-foreground">{status}</dt>
+              <dd className="font-medium text-foreground">{count}</dd>
+            </div>
+          );
+          const canLink = linkBase && (!linkableStatuses || linkableStatuses.includes(status));
+          return canLink ? (
+            <Link
+              key={status}
+              href={`${linkBase}?status=${encodeURIComponent(status)}`}
+              className="focus-ring -mx-2 rounded px-2 transition-colors hover:bg-muted"
+            >
+              {row}
+            </Link>
+          ) : (
+            <div key={status}>{row}</div>
+          );
+        })}
       </dl>
     </div>
   );
@@ -63,9 +88,14 @@ function AdminOverview() {
     <>
       <p className="eyebrow">Admin</p>
       <h1 className="mt-2 font-display text-h2 text-foreground">Admin overview</h1>
-      <Button asChild variant="outline" className="mt-4">
-        <Link href="/exhibitions/manage">Manage exhibitions</Link>
-      </Button>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button asChild variant="outline">
+          <Link href="/admin/orders">Manage orders</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/exhibitions/manage">Manage exhibitions</Link>
+        </Button>
+      </div>
 
       {error ? (
         <div className="mt-6 flex items-center justify-between gap-3 rounded-md border border-destructive bg-destructive-soft px-4 py-3 text-body-sm text-destructive-foreground">
@@ -84,7 +114,7 @@ function AdminOverview() {
             <StatCard icon={ShieldQuestion} label="Artists pending review" value={String(data?.pendingArtists ?? 0)} href="/admin/artists/pending" />
             <StatCard icon={Package} label="Artworks pending review" value={String(data?.pendingArtworks ?? 0)} href="/admin/artworks/pending" />
             <StatCard icon={AlertTriangle} label="Open complaints" value={String(data?.openComplaints ?? 0)} href="/admin/complaints" />
-            <StatCard icon={DollarSign} label="Total revenue (orders placed)" value={formatPrice(data?.revenue ?? 0, "USD")} />
+            <StatCard icon={DollarSign} label="Total revenue (orders placed)" value={formatPrice(data?.revenue ?? 0, "USD")} href="/admin/orders" />
           </>
         )}
       </div>
@@ -102,7 +132,7 @@ function AdminOverview() {
 
       {!loading && data ? (
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatusBreakdown title="Orders" counts={data.orderStatusCounts} />
+          <StatusBreakdown title="Orders" counts={data.orderStatusCounts} linkBase="/admin/orders" linkableStatuses={["pending", "paid", "shipped"]} />
           <StatusBreakdown title="Artist verification" counts={data.verificationStatusCounts.artists} />
           <StatusBreakdown title="Artwork verification" counts={data.verificationStatusCounts.artworks} />
           <StatusBreakdown title="Complaints" counts={data.complaintStatusCounts} />
