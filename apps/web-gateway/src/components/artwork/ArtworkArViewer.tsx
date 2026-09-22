@@ -25,6 +25,11 @@ export function ArtworkArViewer({ artworkId, title, onClose }: { artworkId: stri
   const [canActivateAR, setCanActivateAR] = React.useState<boolean | null>(null);
   const modelRef = React.useRef<HTMLElement | null>(null);
   const { arLink, qrDataUrl } = useArtworkArQr(artworkId);
+  // Belt-and-suspenders alongside the route's own `no-store`: Scene
+  // Viewer/Quick Look are native downloaders outside the browser's own HTTP
+  // cache, and may cache-by-URL regardless of response headers. A
+  // per-session query param keeps every AR open a distinct URL.
+  const cacheBuster = React.useRef(Date.now()).current;
 
   React.useEffect(() => {
     let cancelled = false;
@@ -65,7 +70,7 @@ export function ArtworkArViewer({ artworkId, title, onClose }: { artworkId: stri
       {ready ? (
         <model-viewer
           ref={modelRef as React.RefObject<HTMLElement>}
-          src={`/api/artworks/${encodeURIComponent(artworkId)}/model.gltf`}
+          src={`/api/artworks/${encodeURIComponent(artworkId)}/model.gltf?v=${cacheBuster}`}
           alt={title}
           ar
           ar-modes="scene-viewer webxr quick-look"

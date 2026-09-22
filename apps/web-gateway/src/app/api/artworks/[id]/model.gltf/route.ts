@@ -32,9 +32,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   return new Response(JSON.stringify(gltf), {
     headers: {
       "content-type": "model/gltf+json",
-      // Artwork dimensions/images don't change often enough to justify
-      // regenerating this on every AR open; a day is a safe, short cache.
-      "cache-control": "public, max-age=86400",
+      // Deliberately no caching. A prior day-long max-age here caused a
+      // real, confirmed bug: a phone that had scanned an artwork's AR QR
+      // before the Host-header fix above kept serving its own cached (and
+      // broken — texture pointed at "localhost", i.e. the phone itself)
+      // response for up to 24h after the server was fixed, since nothing
+      // about this URL changes to bust that cache. The quad is cheap to
+      // regenerate on every request, so correctness wins over the caching.
+      "cache-control": "no-store",
     },
   });
 }
