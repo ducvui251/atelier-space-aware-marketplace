@@ -27,21 +27,64 @@ interface ExhibitionEditorV2ViewportProps {
   readOnly?: boolean;
   selectedWallId: string | null;
   onSelectWall: (wallId: string) => void;
-  onGroundPointerDown: (point: [number, number]) => void;
+  onGroundPointerDown: (point: [number, number]) => boolean;
+  onGroundPointerUp: (point: [number, number]) => void;
+  onGroundPointerCancel: () => void;
   onPlaceDoor?: (event: ThreeEvent<PointerEvent>, wall: SceneWall) => void;
   onBeginWallEndpointDrag: (wallId: string, endpoint: WallEndpoint) => void;
   onMoveWallEndpoint: (wallId: string, endpoint: WallEndpoint, point: [number, number]) => void;
   onEndWallEndpointDrag: () => void;
 }
 
-function Ground({ elevation, onPointerDown }: { elevation: number; onPointerDown: (point: [number, number]) => void }) {
+type PointerCaptureTarget = EventTarget & {
+  setPointerCapture: (pointerId: number) => void;
+  releasePointerCapture: (pointerId: number) => void;
+};
+
+function getPointerCaptureTarget(target: EventTarget | null) {
+  if (!target || typeof (target as PointerCaptureTarget).setPointerCapture !== "function") return null;
+  return target as PointerCaptureTarget;
+}
+
+function Ground({
+  elevation,
+  onPointerDown,
+  onPointerUp,
+  onPointerCancel,
+}: {
+  elevation: number;
+  onPointerDown: (point: [number, number]) => void;
+  onPointerUp: (point: [number, number]) => void;
+  onPointerCancel: () => void;
+}) {
+  const activePointerId = useRef<number | null>(null);
+
+  function releasePointer(event: { pointerId: number; target: EventTarget | null }) {
+    if (activePointerId.current !== event.pointerId) return false;
+    getPointerCaptureTarget(event.target)?.releasePointerCapture(event.pointerId);
+    activePointerId.current = null;
+    return true;
+  }
+
   return (
     <mesh
       position={[0, elevation - 0.02, 0]}
       rotation={[-Math.PI / 2, 0, 0]}
       onPointerDown={(event) => {
         event.stopPropagation();
+        activePointerId.current = event.pointerId;
+        getPointerCaptureTarget(event.target)?.setPointerCapture(event.pointerId);
         onPointerDown([event.point.x, event.point.z]);
+      }}
+      onPointerUp={(event) => {
+        event.stopPropagation();
+        if (!releasePointer(event)) return;
+        onPointerUp([event.point.x, event.point.z]);
+      }}
+      onPointerCancel={(event) => {
+        event.stopPropagation();
+        if (!releasePointer(event)) return;
+        onPointerCancel();
       }}
     >
       <planeGeometry args={[EDITOR_WORKSPACE_SIZE, EDITOR_WORKSPACE_SIZE]} />
@@ -144,6 +187,8 @@ function ExhibitionEditorScene({
   selectedWallId,
   onSelectWall,
   onGroundPointerDown,
+  onGroundPointerUp,
+  onGroundPointerCancel,
   onPlaceDoor,
   onBeginWallEndpointDrag,
   onMoveWallEndpoint,
@@ -151,6 +196,8 @@ function ExhibitionEditorScene({
 }: ExhibitionEditorV2ViewportProps) {
   const { camera, gl } = useThree();
   const [dragTarget, setDragTarget] = useState<DragTarget | null>(null);
+  const [groundDragging, setGroundDragging] = useState(false);
+  const groundDrawingRef = useRef(false);
   const dragTargetRef = useRef<DragTarget | null>(null);
   const orbitControlsRef = useRef<OrbitControlsHandle | null>(null);
   const raycaster = useRef(new THREE.Raycaster());
@@ -207,6 +254,25 @@ function ExhibitionEditorScene({
     onBeginWallEndpointDrag(wallId, endpoint);
   }
 
+  function beginGroundDrag(point: [number, number]) {
+    groundDrawingRef.current = onGroundPointerDown(point);
+    setGroundDragging(groundDrawingRef.current);
+  }
+
+  function finishGroundDrag(point: [number, number]) {
+    const drawing = groundDrawingRef.current;
+    groundDrawingRef.current = false;
+    setGroundDragging(false);
+    if (drawing) onGroundPointerUp(point);
+  }
+
+  function cancelGroundDrag() {
+    const drawing = groundDrawingRef.current;
+    groundDrawingRef.current = false;
+    setGroundDragging(false);
+    if (drawing) onGroundPointerCancel();
+  }
+
   return (
     <>
       <color attach="background" args={[sceneStyle.environmentColor]} />
@@ -227,7 +293,12 @@ function ExhibitionEditorScene({
       />
       <WorkspaceBoundary elevation={level.elevation} />
       <Floor elevation={level.elevation} color={sceneStyle.floorColor} {...floorMaterial} />
-      <Ground elevation={level.elevation} onPointerDown={readOnly ? () => undefined : onGroundPointerDown} />
+      <Ground
+        elevation={level.elevation}
+        onPointerDown={readOnly ? () => undefined : beginGroundDrag}
+        onPointerUp={readOnly ? () => undefined : finishGroundDrag}
+        onPointerCancel={readOnly ? () => undefined : cancelGroundDrag}
+      />
       {showCeilings ? roofLoops.map((loop) => <CeilingMesh key={`${loop.levelId}:${loop.wallIds.join("|")}`} loop={loop} color={sceneStyle.ceilingColor} {...wallMaterial} />) : null}
       {walls.map((wall) => (
         <WallMesh
@@ -251,13 +322,13 @@ function ExhibitionEditorScene({
         const selectedWall = walls.find((wall) => wall.id === selectedWallId);
         return selectedWall ? <DimensionOverlay wall={selectedWall} baseY={level.elevation} /> : null;
       })() : null}
-      <KeyboardCameraControls controlsRef={orbitControlsRef} disabled={Boolean(dragTarget)} />
+      <KeyboardCameraControls controlsRef={orbitControlsRef} disabled={Boolean(dragTarget) || groundDragging} />
       <OrbitControls
         ref={setOrbitControlsRef}
         enableDamping
         enablePan
         enableZoom
-        enabled={!dragTarget}
+        enabled={!dragTarget && !groundDragging}
         makeDefault
         mouseButtons={{ MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE }}
         target={[0, level.elevation, 0]}

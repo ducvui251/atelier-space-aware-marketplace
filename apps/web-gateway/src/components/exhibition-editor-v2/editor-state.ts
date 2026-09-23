@@ -25,6 +25,8 @@ export type EditorAction =
   | { type: "set-tool"; tool: EditorTool }
   | { type: "set-active-level"; levelId: string }
   | { type: "add-level" }
+  | { type: "begin-wall-draw"; point: Point2D }
+  | { type: "finish-wall-draw"; point: Point2D }
   | { type: "place-wall-point"; point: Point2D }
   | { type: "place-door"; wallId: string; along: number; doorType: ExhibitionDoorType }
   | { type: "cancel-wall" }
@@ -167,6 +169,23 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         activeLevelId: nextLevel.id,
         levels: [...state.scene.levels, nextLevel],
       });
+    }
+    case "begin-wall-draw":
+      return { ...state, pendingWallStart: clampPointToWorkspace(action.point), selectedWallId: null };
+    case "finish-wall-draw": {
+      const start = state.pendingWallStart;
+      const end = clampPointToWorkspace(action.point);
+      if (!start || distanceBetween(start, end) < MIN_WALL_LENGTH) return { ...state, pendingWallStart: null };
+      const level = activeLevel(state);
+      const wall: ExhibitionSceneWall = {
+        id: createId("wall"),
+        levelId: level.id,
+        start,
+        end,
+        height: DEFAULT_WALL_HEIGHT,
+        thickness: DEFAULT_WALL_THICKNESS,
+      };
+      return { ...withHistory(state, { ...state.scene, walls: [...state.scene.walls, wall] }), selectedWallId: wall.id };
     }
     case "place-wall-point": {
       const point = clampPointToWorkspace(action.point);

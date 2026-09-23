@@ -209,10 +209,25 @@ export function ExhibitionEditorV2({ id }: ExhibitionEditorV2Props) {
   function handleGroundPointerDown(point: [number, number]) {
     const workspacePoint = clampPointToWorkspace(snapPoint(point));
     if (state.tool === "wall") {
-      dispatch({ type: "place-wall-point", point: workspacePoint });
+      dispatch({ type: "begin-wall-draw", point: workspacePoint });
+      setSavedMessage(null);
+      return true;
     } else {
       dispatch({ type: "select-wall", wallId: null });
     }
+    setSavedMessage(null);
+    return false;
+  }
+
+  function handleGroundPointerUp(point: [number, number]) {
+    if (state.tool === "wall") {
+      dispatch({ type: "finish-wall-draw", point: clampPointToWorkspace(snapPoint(point)) });
+    }
+    setSavedMessage(null);
+  }
+
+  function handleGroundPointerCancel() {
+    dispatch({ type: "cancel-wall" });
     setSavedMessage(null);
   }
 
@@ -305,6 +320,8 @@ export function ExhibitionEditorV2({ id }: ExhibitionEditorV2Props) {
                 selectedWallId={state.selectedWallId}
                 onSelectWall={(wallId) => dispatch({ type: "select-wall", wallId })}
                 onGroundPointerDown={handleGroundPointerDown}
+                onGroundPointerUp={handleGroundPointerUp}
+                onGroundPointerCancel={handleGroundPointerCancel}
                 onPlaceDoor={handlePlaceDoor}
                 onBeginWallEndpointDrag={handleBeginWallEndpointDrag}
                 onMoveWallEndpoint={handleMoveWallEndpoint}
@@ -312,7 +329,7 @@ export function ExhibitionEditorV2({ id }: ExhibitionEditorV2Props) {
               />
             ) : null}
             <div className="pointer-events-none absolute left-4 top-4 rounded-md border border-border bg-surface/90 px-3 py-2 text-caption text-muted-foreground">
-              <p>{state.tool === "wall" ? "Click two points on the grid to create a wall" : state.tool === "door" ? "Select a door type, then click a wall to place it" : "Select a wall to edit it"}{state.pendingWallStart ? " · Choose the end point" : ""}</p>
+              <p>{state.tool === "wall" ? "Click and drag on the grid to create a wall" : state.tool === "door" ? "Select a door type, then click a wall to place it" : "Select a wall to edit it"}{state.pendingWallStart ? " · Release to create the wall" : ""}</p>
               <p className="mt-1">Left click select · Alt+left-drag orbit · middle-drag pan · right mouse + W/A/S/D fly · Q down / E up · Shift for 2× speed</p>
             </div>
           </div>
@@ -495,7 +512,9 @@ function ShapeStyleStep({
           readOnly
           selectedWallId={null}
           onSelectWall={() => undefined}
-          onGroundPointerDown={() => undefined}
+          onGroundPointerDown={() => false}
+          onGroundPointerUp={() => undefined}
+          onGroundPointerCancel={() => undefined}
           onBeginWallEndpointDrag={() => undefined}
           onMoveWallEndpoint={() => undefined}
           onEndWallEndpointDrag={() => undefined}

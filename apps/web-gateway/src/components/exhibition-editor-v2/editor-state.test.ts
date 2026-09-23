@@ -21,10 +21,10 @@ describe("Exhibition Editor V2 state", () => {
     expect(scene.walls).toEqual([{ id: "custom", start: [-1, 0], end: [1, 0], height: 3.2, thickness: 0.15, levelId: "ground-level" }]);
   });
 
-  it("creates a snapped wall and supports undo/redo", () => {
+  it("creates a snapped wall from a drag and supports undo/redo", () => {
     let state = createInitialEditorState();
-    state = editorReducer(state, { type: "place-wall-point", point: snapPoint([0.2, 0.2]) });
-    state = editorReducer(state, { type: "place-wall-point", point: snapPoint([4.1, 0.2]) });
+    state = editorReducer(state, { type: "begin-wall-draw", point: snapPoint([0.2, 0.2]) });
+    state = editorReducer(state, { type: "finish-wall-draw", point: snapPoint([4.1, 0.2]) });
 
     expect(state.scene.walls).toHaveLength(1);
     expect(state.scene.walls[0]?.start).toEqual([0, 0]);
@@ -34,6 +34,15 @@ describe("Exhibition Editor V2 state", () => {
     expect(state.scene.walls).toHaveLength(0);
     state = editorReducer(state, { type: "redo" });
     expect(state.scene.walls).toHaveLength(1);
+  });
+
+  it("does not create a wall for a click without a drag", () => {
+    let state = createInitialEditorState();
+    state = editorReducer(state, { type: "begin-wall-draw", point: [0, 0] });
+    state = editorReducer(state, { type: "finish-wall-draw", point: [0, 0] });
+
+    expect(state.scene.walls).toHaveLength(0);
+    expect(state.pendingWallStart).toBeNull();
   });
 
   it("stores style changes in the scene and supports undo", () => {

@@ -106,10 +106,22 @@ export function ExhibitionCreationStudio({ mode }: { mode: "premade" | "custom" 
 
   function handleGroundPointerDown(point: [number, number]) {
     if (mode === "custom" && state.tool === "wall") {
-      dispatch({ type: "place-wall-point", point: snapPoint(point) });
+      dispatch({ type: "begin-wall-draw", point: snapPoint(point) });
+      return true;
     } else {
       dispatch({ type: "select-wall", wallId: null });
     }
+    return false;
+  }
+
+  function handleGroundPointerUp(point: [number, number]) {
+    if (mode === "custom" && state.tool === "wall") {
+      dispatch({ type: "finish-wall-draw", point: snapPoint(point) });
+    }
+  }
+
+  function handleGroundPointerCancel() {
+    dispatch({ type: "cancel-wall" });
   }
 
   function handlePlaceDoor(event: ThreeEvent<PointerEvent>, wall: SceneWall) {
@@ -144,6 +156,8 @@ export function ExhibitionCreationStudio({ mode }: { mode: "premade" | "custom" 
               selectedWallId={state.selectedWallId}
               onSelectWall={(wallId) => dispatch({ type: "select-wall", wallId })}
               onGroundPointerDown={handleGroundPointerDown}
+              onGroundPointerUp={handleGroundPointerUp}
+              onGroundPointerCancel={handleGroundPointerCancel}
               onPlaceDoor={handlePlaceDoor}
               onBeginWallEndpointDrag={handleBeginWallEndpointDrag}
               onMoveWallEndpoint={handleMoveWallEndpoint}
@@ -151,8 +165,8 @@ export function ExhibitionCreationStudio({ mode }: { mode: "premade" | "custom" 
             />
           ) : null}
           <div className="pointer-events-none absolute left-4 top-4 rounded-md border border-border bg-surface/90 px-3 py-2 text-caption text-muted-foreground">
-            {mode !== "custom" ? "Choose a pre-made room or switch to Create Custom" : state.tool === "door" ? "Select a door type, then click a wall to place it" : "Click two points on the grid to create a wall"}
-            {state.pendingWallStart ? " · Choose the end point" : ""}
+            {mode !== "custom" ? "Choose a pre-made room or switch to Create Custom" : state.tool === "door" ? "Select a door type, then click a wall to place it" : "Click and drag on the grid to create a wall"}
+            {state.pendingWallStart ? " · Release to create the wall" : ""}
           </div>
         </div>
 
@@ -188,7 +202,7 @@ export function ExhibitionCreationStudio({ mode }: { mode: "premade" | "custom" 
           ) : (
             <div className="mt-4 grid gap-3">
               <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-caption text-primary">
-                Select Wall, then click two points on the grid. Walls snap to 0.5 m.
+                Select Wall, then click and drag on the grid. Walls snap to 0.5 m.
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <Button variant={state.tool === "select" ? "primary" : "outline"} onClick={() => selectTool("select")}>Select</Button>
