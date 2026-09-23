@@ -258,7 +258,31 @@ export async function updateExhibition(
      returning ${EXHIBITION_COLUMNS}`,
     params,
   );
-  return rows[0] ? mapExhibition(rows[0]) : null;
+  const updated = rows[0];
+  if (!updated) return null;
+
+  // A resize leaves the classic four-wall placements exactly where they were
+  // in absolute X/Z — which used to sit flush against the old wall but now
+  // floats short of (or past) the new one, rendering as invisible/clipped in
+  // Add Content's 3D preview. Snap each front/back/left/right placement back
+  // onto its wall using the *new* dimensions; the along-wall axis (X for
+  // front/back, Z for left/right) is left untouched. WALL_INSET (0.1) must
+  // match apps/web-gateway/.../AddContentStep.tsx's own constant.
+  if ((patch.roomWidth !== undefined || patch.roomDepth !== undefined) && updated.room_width && updated.room_depth) {
+    const WALL_INSET = 0.1;
+    const halfWidth = Number(updated.room_width) / 2 - WALL_INSET;
+    const halfDepth = Number(updated.room_depth) / 2 - WALL_INSET;
+    await query(
+      `update room_preview.exhibition_placements
+       set position_z = case wall_id when 'front' then $1 when 'back' then $2 else position_z end,
+           position_x = case wall_id when 'left' then $3 when 'right' then $4 else position_x end,
+           updated_at = now()
+       where exhibition_id::text = $5 and wall_id in ('front', 'back', 'left', 'right')`,
+      [-halfDepth, halfDepth, -halfWidth, halfWidth, id],
+    );
+  }
+
+  return mapExhibition(updated);
 }
 
 export async function deleteExhibition(id: string): Promise<boolean> {
