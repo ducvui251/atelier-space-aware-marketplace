@@ -1,15 +1,66 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, ShieldQuestion, Package, DollarSign } from "lucide-react";
+import type { ComponentType } from "react";
+import {
+  AlertTriangle,
+  ShieldQuestion,
+  Package,
+  DollarSign,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  CreditCard,
+  Truck,
+  AlertCircle,
+  CircleDot,
+} from "lucide-react";
 import type { AdminStats } from "@atelier/contracts";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { RequireRole } from "@/components/auth/RequireRole";
 import { RevenueTrendChart } from "@/components/admin/RevenueTrendChart";
-import { formatPrice } from "@/lib/utils";
+import { cn, formatPrice } from "@/lib/utils";
 import { useApiResource } from "@/lib/client/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+
+type Tone = "success" | "warning" | "destructive" | "neutral";
+
+const TONE_ICON_CLASS: Record<Tone, string> = {
+  success: "text-success",
+  warning: "text-warning",
+  destructive: "text-destructive",
+  neutral: "text-muted-foreground",
+};
+const TONE_FILL_CLASS: Record<Tone, string> = {
+  success: "bg-success",
+  warning: "bg-warning",
+  destructive: "bg-destructive",
+  neutral: "bg-subdued",
+};
+
+/**
+ * Every status a breakdown box renders here — validated against the
+ * dataviz skill's palette checker, this design system's success/warning/
+ * destructive tokens fall BELOW the colorblind-safe separation floor (some
+ * pairs aren't reliably distinguishable even with normal color vision). So
+ * color here is decorative reinforcement only; the icon shape is what
+ * actually carries the identity, per row, always paired with the text label.
+ */
+const STATUS_STYLE: Record<string, { icon: ComponentType<{ className?: string }>; tone: Tone }> = {
+  pending: { icon: Clock, tone: "warning" },
+  confirmed: { icon: CircleDot, tone: "warning" },
+  paid: { icon: CreditCard, tone: "success" },
+  shipped: { icon: Truck, tone: "success" },
+  completed: { icon: CheckCircle2, tone: "success" },
+  verified: { icon: CheckCircle2, tone: "success" },
+  resolved: { icon: CheckCircle2, tone: "success" },
+  cancelled: { icon: XCircle, tone: "destructive" },
+  rejected: { icon: XCircle, tone: "destructive" },
+  failed: { icon: AlertCircle, tone: "destructive" },
+  open: { icon: AlertCircle, tone: "warning" },
+};
+const DEFAULT_STATUS_STYLE = { icon: CircleDot, tone: "neutral" as Tone };
 
 function StatusBreakdown({
   title,
@@ -23,15 +74,30 @@ function StatusBreakdown({
   /** Restricts which rows link out — admin.order_feed's "failed" bucket, for example, has no matching commerce.orders status to filter /admin/orders by. */
   linkableStatuses?: readonly string[];
 }) {
+  const entries = Object.entries(counts);
+  const max = Math.max(...entries.map(([, count]) => count), 1);
+
   return (
     <div className="rounded-lg border border-border bg-surface p-5">
       <p className="text-caption text-muted-foreground">{title}</p>
-      <dl className="mt-3 flex flex-col gap-1.5">
-        {Object.entries(counts).map(([status, count]) => {
+      <dl className="mt-3 flex flex-col gap-2.5">
+        {entries.map(([status, count]) => {
+          const { icon: Icon, tone } = STATUS_STYLE[status] ?? DEFAULT_STATUS_STYLE;
           const row = (
-            <div className="flex items-center justify-between text-body-sm">
-              <dt className="capitalize text-foreground">{status}</dt>
-              <dd className="font-medium text-foreground">{count}</dd>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between text-body-sm">
+                <dt className="flex items-center gap-1.5 capitalize text-foreground">
+                  <Icon className={cn("size-3.5 shrink-0", TONE_ICON_CLASS[tone])} />
+                  {status}
+                </dt>
+                <dd className="font-medium text-foreground">{count}</dd>
+              </div>
+              <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className={cn("h-full rounded-full", TONE_FILL_CLASS[tone])}
+                  style={{ width: `${Math.max((count / max) * 100, count > 0 ? 4 : 0)}%` }}
+                />
+              </div>
             </div>
           );
           const canLink = linkBase && (!linkableStatuses || linkableStatuses.includes(status));
@@ -39,12 +105,14 @@ function StatusBreakdown({
             <Link
               key={status}
               href={`${linkBase}?status=${encodeURIComponent(status)}`}
-              className="focus-ring -mx-2 rounded px-2 transition-colors hover:bg-muted"
+              className="focus-ring -mx-2 rounded px-2 py-0.5 transition-colors hover:bg-muted"
             >
               {row}
             </Link>
           ) : (
-            <div key={status}>{row}</div>
+            <div key={status} className="px-0 py-0.5">
+              {row}
+            </div>
           );
         })}
       </dl>
@@ -52,21 +120,39 @@ function StatusBreakdown({
   );
 }
 
+const TONE_BADGE_BG: Record<Tone, string> = {
+  success: "bg-success-soft",
+  warning: "bg-warning-soft",
+  destructive: "bg-destructive-soft",
+  neutral: "bg-accent-soft",
+};
+const TONE_BADGE_ICON: Record<Tone, string> = {
+  success: "text-success-foreground",
+  warning: "text-warning-foreground",
+  destructive: "text-destructive-foreground",
+  neutral: "text-accent-foreground",
+};
+
 function StatCard({
   icon: Icon,
   label,
   value,
   href,
+  tone = "neutral",
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string;
   href?: string;
+  /** "Is this number fine or does it need attention?" — reserved status color on the icon chip, never the only signal (icon shape + label carry the meaning; see StatusBreakdown for why). */
+  tone?: Tone;
 }) {
   const content = (
     <div className="rounded-lg border border-border bg-surface p-5">
       <div className="flex items-center gap-2 text-muted-foreground">
-        <Icon className="size-4" />
+        <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-full", TONE_BADGE_BG[tone])}>
+          <Icon className={cn("size-3.5", TONE_BADGE_ICON[tone])} />
+        </span>
         <span className="text-caption">{label}</span>
       </div>
       <p className="mt-3 font-display text-h2 text-foreground">{value}</p>
@@ -111,9 +197,27 @@ function AdminOverview() {
           [0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[104px] w-full rounded-lg" />)
         ) : (
           <>
-            <StatCard icon={ShieldQuestion} label="Artists pending review" value={String(data?.pendingArtists ?? 0)} href="/admin/artists/pending" />
-            <StatCard icon={Package} label="Artworks pending review" value={String(data?.pendingArtworks ?? 0)} href="/admin/artworks/pending" />
-            <StatCard icon={AlertTriangle} label="Open complaints" value={String(data?.openComplaints ?? 0)} href="/admin/complaints" />
+            <StatCard
+              icon={ShieldQuestion}
+              label="Artists pending review"
+              value={String(data?.pendingArtists ?? 0)}
+              href="/admin/artists/pending"
+              tone={(data?.pendingArtists ?? 0) > 0 ? "warning" : "success"}
+            />
+            <StatCard
+              icon={Package}
+              label="Artworks pending review"
+              value={String(data?.pendingArtworks ?? 0)}
+              href="/admin/artworks/pending"
+              tone={(data?.pendingArtworks ?? 0) > 0 ? "warning" : "success"}
+            />
+            <StatCard
+              icon={AlertTriangle}
+              label="Open complaints"
+              value={String(data?.openComplaints ?? 0)}
+              href="/admin/complaints"
+              tone={(data?.openComplaints ?? 0) > 0 ? "destructive" : "success"}
+            />
             <StatCard icon={DollarSign} label="Total revenue (orders placed)" value={formatPrice(data?.revenue ?? 0, "USD")} href="/admin/orders" />
           </>
         )}
