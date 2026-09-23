@@ -100,12 +100,55 @@ export interface ExhibitionSceneWall extends SceneWall {
   levelId: string;
 }
 
+export type ExhibitionSurfaceMaterial = "matte" | "satin" | "polished";
+
+export interface ExhibitionSceneStyle {
+  wallColor: string;
+  floorColor: string;
+  ceilingColor: string;
+  environmentColor: string;
+  lightColor: string;
+  wallMaterial: ExhibitionSurfaceMaterial;
+  floorMaterial: ExhibitionSurfaceMaterial;
+  ambientLightIntensity: number;
+  directionalLightIntensity: number;
+}
+
+/** An uploaded image hung on a custom exhibition wall. */
+export interface ExhibitionSceneImagePlacement {
+  id: string;
+  name: string;
+  imageUrl: string;
+  widthMeters: number;
+  heightMeters: number;
+  wallId: string;
+  positionX: number;
+  positionY: number;
+  positionZ: number;
+  rotationY: number;
+}
+
+export type ExhibitionDoorType = "single" | "double";
+
+/** A wall-attached door placed at a distance along the wall segment. */
+export interface ExhibitionSceneDoor {
+  id: string;
+  levelId: string;
+  wallId: string;
+  type: ExhibitionDoorType;
+  /** Distance in metres from the wall start point to the door centre. */
+  along: number;
+}
+
 /** Versioned scene document used by the Exhibition Editor V2. */
 export interface ExhibitionSceneDocument {
   version: 1;
   activeLevelId: string;
   levels: ExhibitionSceneLevel[];
   walls: ExhibitionSceneWall[];
+  doors?: ExhibitionSceneDoor[];
+  style?: ExhibitionSceneStyle;
+  imagePlacements?: ExhibitionSceneImagePlacement[];
 }
 
 export interface ExhibitionRoomTemplate {

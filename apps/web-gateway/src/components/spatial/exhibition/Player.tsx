@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { ROOM_DEPTH, ROOM_WIDTH } from "../RoomEnvironment";
-import type { SceneWall } from "@atelier/contracts";
+import type { ExhibitionSceneDoor, SceneWall } from "@atelier/contracts";
+import { collisionWallsForDoors } from "../door-geometry";
 
 const MOVE_SPEED = 3.2;
 const PLAYER_RADIUS = 0.35;
@@ -37,6 +38,8 @@ interface PlayerProps {
    * When provided, overrides simple rectangular clamping with line-segment collision.
    */
   wallSegments?: SceneWall[];
+  doors?: ExhibitionSceneDoor[];
+  openDoorIds?: ReadonlySet<string>;
 }
 
 /**
@@ -71,13 +74,14 @@ function segmentIntersectsWall(
  * segment using line-segment distance checks. Falls back to rectangular
  * bounding-box clamping when no segments are given.
  */
-export function Player({ paused = false, roomWidth = ROOM_WIDTH, roomDepth = ROOM_DEPTH, wallSegments }: PlayerProps) {
+export function Player({ paused = false, roomWidth = ROOM_WIDTH, roomDepth = ROOM_DEPTH, wallSegments, doors, openDoorIds = new Set<string>() }: PlayerProps) {
   const { camera } = useThree();
   const position = useRef(new THREE.Vector3(...SPAWN_POSITION));
   const boundsX = roomWidth / 2 - PLAYER_RADIUS;
   const boundsZ = roomDepth / 2 - PLAYER_RADIUS;
   // Cache wall segment endpoints in Three.js vectors to avoid reallocation.
   const wallCache = useRef<{ a: THREE.Vector3; b: THREE.Vector3 }[]>([]);
+  const collisionWalls = useMemo(() => collisionWallsForDoors(wallSegments, doors, openDoorIds), [doors, openDoorIds, wallSegments]);
 
   useEffect(() => {
     camera.position.copy(position.current);
@@ -103,15 +107,15 @@ export function Player({ paused = false, roomWidth = ROOM_WIDTH, roomDepth = ROO
 
   // Rebuild wall cache when segments change.
   useEffect(() => {
-    if (!wallSegments || wallSegments.length === 0) {
+    if (!collisionWalls || collisionWalls.length === 0) {
       wallCache.current = [];
       return;
     }
-    wallCache.current = wallSegments.map((w) => ({
+    wallCache.current = collisionWalls.map((w) => ({
       a: new THREE.Vector3(w.start[0], 0, w.start[1]),
       b: new THREE.Vector3(w.end[0], 0, w.end[1]),
     }));
-  }, [wallSegments]);
+  }, [collisionWalls]);
 
   const forward = useMemo(() => new THREE.Vector3(), []);
   const right = useMemo(() => new THREE.Vector3(), []);
@@ -139,7 +143,7 @@ export function Player({ paused = false, roomWidth = ROOM_WIDTH, roomDepth = ROO
     moveDir.normalize().multiplyScalar(MOVE_SPEED * delta);
     candidatePos.copy(position.current).add(moveDir);
 
-    if (wallSegments && wallSegments.length > 0) {
+    if (collisionWalls && collisionWalls.length > 0) {
       // Raycast-style collision: test whether the movement step crosses
       // any wall segment on the XZ plane.  Check X and Z axes independently
       // so diagonal movement still slides along walls.

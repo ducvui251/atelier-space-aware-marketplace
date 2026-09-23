@@ -556,4 +556,22 @@ describe("ExhibitionSceneDocumentSchema", () => {
   it("rejects walls that reference an unknown level", () => {
     expect(ExhibitionSceneDocumentSchema.safeParse({ ...scene, walls: [{ ...scene.walls[0], levelId: "missing" }] }).success).toBe(false);
   });
+
+  it("accepts wall-attached single and double doors and rejects unknown walls", () => {
+    const doors = [
+      { id: "door-1", levelId: "ground-level", wallId: "wall-1", type: "single", along: 1 },
+      { id: "door-2", levelId: "ground-level", wallId: "wall-1", type: "double", along: 3 },
+    ] as const;
+    expect(ExhibitionSceneDocumentSchema.safeParse({ ...scene, doors }).success).toBe(true);
+    expect(ExhibitionSceneDocumentSchema.safeParse({ ...scene, doors: [{ ...doors[0], wallId: "missing" }] }).success).toBe(false);
+  });
+
+  it("accepts optional scene style and rejects invalid style values", () => {
+    const style = {
+      wallColor: "#112233", floorColor: "#223344", ceilingColor: "#334455", environmentColor: "#445566", lightColor: "#ffffff",
+      wallMaterial: "matte", floorMaterial: "satin", ambientLightIntensity: 1.2, directionalLightIntensity: 2.4,
+    } as const;
+    expect(ExhibitionSceneDocumentSchema.safeParse({ ...scene, style }).success).toBe(true);
+    expect(ExhibitionSceneDocumentSchema.safeParse({ ...scene, style: { ...style, floorMaterial: "fabric" } }).success).toBe(false);
+  });
 });

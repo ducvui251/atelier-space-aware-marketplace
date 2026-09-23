@@ -19,6 +19,9 @@ interface ArtworkMeshProps {
   selected?: boolean;
   /** When provided, the artwork is hoverable/clickable and shows a highlight. */
   onSelect?: () => void;
+  /** Used by the Add Content ghost image while it is being positioned. */
+  onPointerMove?: (event: ThreeEvent<PointerEvent>) => void;
+  onPlace?: () => void;
 }
 
 const FRAME_DEPTH = 0.04;
@@ -105,6 +108,8 @@ export function ArtworkMesh({
   sold = false,
   selected = false,
   onSelect,
+  onPointerMove,
+  onPlace,
 }: ArtworkMeshProps) {
   const [hovered, setHovered] = useState(false);
   const interactive = Boolean(onSelect);
@@ -124,7 +129,8 @@ export function ArtworkMesh({
   };
   const handleClick = (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation();
-    onSelect?.();
+    onPlace?.();
+    if (!onPlace) onSelect?.();
   };
 
   return (
@@ -133,7 +139,8 @@ export function ArtworkMesh({
       rotation={rotation ?? [0, rotationY, 0]}
       onPointerOver={interactive ? handlePointerOver : undefined}
       onPointerOut={interactive ? handlePointerOut : undefined}
-      onClick={interactive ? handleClick : undefined}
+      onPointerMove={onPointerMove}
+      onClick={interactive || onPlace ? handleClick : undefined}
     >
       <mesh>
         <boxGeometry args={[widthMeters + FRAME_BORDER, heightMeters + FRAME_BORDER, FRAME_DEPTH]} />

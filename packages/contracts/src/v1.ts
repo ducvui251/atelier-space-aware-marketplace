@@ -435,11 +435,46 @@ const exhibitionSceneWallSchema = z.object({
   thickness: z.number().finite().positive().max(2),
 }).strict();
 
+const exhibitionSceneColorSchema = z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, "must be a 6-digit hex color");
+const exhibitionSceneStyleSchema = z.object({
+  wallColor: exhibitionSceneColorSchema,
+  floorColor: exhibitionSceneColorSchema,
+  ceilingColor: exhibitionSceneColorSchema,
+  environmentColor: exhibitionSceneColorSchema,
+  lightColor: exhibitionSceneColorSchema,
+  wallMaterial: z.enum(["matte", "satin", "polished"]),
+  floorMaterial: z.enum(["matte", "satin", "polished"]),
+  ambientLightIntensity: z.number().finite().min(0).max(4),
+  directionalLightIntensity: z.number().finite().min(0).max(8),
+}).strict();
+const exhibitionSceneImagePlacementSchema = z.object({
+  id: z.string().trim().min(1).max(128),
+  name: z.string().trim().min(1).max(255),
+  imageUrl: z.string().trim().min(1).max(2048),
+  widthMeters: z.number().finite().positive().max(50),
+  heightMeters: z.number().finite().positive().max(50),
+  wallId: z.string().trim().min(1).max(64),
+  positionX: z.number().finite(),
+  positionY: z.number().finite().min(0).max(20),
+  positionZ: z.number().finite(),
+  rotationY: z.number().finite().min(-360).max(360),
+}).strict();
+const exhibitionSceneDoorSchema = z.object({
+  id: z.string().trim().min(1).max(64),
+  levelId: z.string().trim().min(1).max(64),
+  wallId: z.string().trim().min(1).max(64),
+  type: z.enum(["single", "double"]),
+  along: z.number().finite().nonnegative(),
+}).strict();
+
 export const ExhibitionSceneDocumentSchema = z.object({
   version: z.literal(1),
   activeLevelId: z.string().trim().min(1).max(64),
   levels: z.array(exhibitionSceneLevelSchema).min(1).max(20),
   walls: z.array(exhibitionSceneWallSchema).max(500),
+  doors: z.array(exhibitionSceneDoorSchema).max(500).optional(),
+  style: exhibitionSceneStyleSchema.optional(),
+  imagePlacements: z.array(exhibitionSceneImagePlacementSchema).max(200).optional(),
 }).strict().superRefine((scene, context) => {
   const levelIds = new Set(scene.levels.map((level) => level.id));
   if (!levelIds.has(scene.activeLevelId)) {
@@ -448,6 +483,17 @@ export const ExhibitionSceneDocumentSchema = z.object({
   scene.walls.forEach((wall, index) => {
     if (!levelIds.has(wall.levelId)) {
       context.addIssue({ code: "custom", path: ["walls", index, "levelId"], message: "wall levelId must reference a level" });
+    }
+  });
+  scene.doors?.forEach((door, index) => {
+    if (!levelIds.has(door.levelId)) {
+      context.addIssue({ code: "custom", path: ["doors", index, "levelId"], message: "door levelId must reference a level" });
+    }
+    const wall = scene.walls.find((candidate) => candidate.id === door.wallId);
+    if (!wall) {
+      context.addIssue({ code: "custom", path: ["doors", index, "wallId"], message: "door wallId must reference a wall" });
+    } else if (wall.levelId !== door.levelId) {
+      context.addIssue({ code: "custom", path: ["doors", index, "levelId"], message: "door levelId must match its wall" });
     }
   });
 });

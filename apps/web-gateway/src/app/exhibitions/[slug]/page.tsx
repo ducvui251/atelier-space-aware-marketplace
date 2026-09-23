@@ -35,15 +35,21 @@ export default async function ExhibitionPage({ params }: ExhibitionPageProps) {
   if (!exhibition) notFound();
 
   const placements = await listExhibitionPlacements(exhibition.id);
-  const artworks = await Promise.all(placements.map((placement) => findArtwork(placement.artworkId)));
+  // A public exhibition should still open when an optional catalog read is
+  // temporarily unavailable; uploaded scene images do not depend on it.
+  const artworks = await Promise.all(placements.map(async (placement) => {
+    try {
+      return await findArtwork(placement.artworkId);
+    } catch {
+      return null;
+    }
+  }));
   const placedArtworks: PlacedArtwork[] = placements
     .map((placement, index) => ({ placement, artwork: artworks[index] }))
     .filter((entry): entry is { placement: (typeof placements)[number]; artwork: Artwork } => entry.artwork !== null);
 
-  const creatorName =
-    exhibition.creatorType === "admin"
-      ? "Atelier"
-      : ((await findArtist(exhibition.creatorId))?.displayName ?? "An Atelier artist");
+  const creator = exhibition.creatorType === "admin" ? null : await findArtist(exhibition.creatorId).catch(() => null);
+  const creatorName = exhibition.creatorType === "admin" ? "Atelier" : (creator?.displayName ?? "An Atelier artist");
 
   return <ExhibitionLandingClient exhibition={exhibition} creatorName={creatorName} placedArtworks={placedArtworks} />;
 }

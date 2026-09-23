@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import type { PlacedArtwork } from "./exhibition/ExhibitionLiveScene";
-import type { SceneWall } from "@atelier/contracts";
+import type { ExhibitionSceneDoor, ExhibitionSceneImagePlacement, ExhibitionSceneStyle, SceneWall } from "@atelier/contracts";
 
 const ExhibitionViewer = dynamic(
   () => import("./ExhibitionViewer").then((mod) => mod.ExhibitionViewer),
@@ -16,6 +16,9 @@ interface ExhibitionViewerLoaderProps {
   roomDepth?: number;
   wallColor?: string;
   wallSegments?: SceneWall[];
+  doors?: ExhibitionSceneDoor[];
+  style?: ExhibitionSceneStyle;
+  imagePlacements?: ExhibitionSceneImagePlacement[];
   placedArtworks: PlacedArtwork[];
   onExit: () => void;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Artwork, ExhibitionPlacement, SceneWall } from "@atelier/contracts";
+import type { Artwork, ExhibitionPlacement, ExhibitionSceneDoor, ExhibitionSceneImagePlacement, ExhibitionSceneStyle, SceneWall } from "@atelier/contracts";
 import { PointerLockControls } from "@react-three/drei";
 import { Lighting } from "../Lighting";
 import { RoomEnvironment } from "../RoomEnvironment";
@@ -22,6 +22,9 @@ interface ExhibitionLiveSceneProps {
   roomDepth?: number;
   wallColor?: string;
   wallSegments?: SceneWall[];
+  doors?: ExhibitionSceneDoor[];
+  style?: ExhibitionSceneStyle;
+  imagePlacements?: ExhibitionSceneImagePlacement[];
   placedArtworks: PlacedArtwork[];
   onLockChange?: (locked: boolean) => void;
   onArtworkSelect?: (artwork: Artwork) => void;
@@ -40,12 +43,25 @@ export function ExhibitionLiveScene({
   roomDepth,
   wallColor,
   wallSegments,
+  doors,
+  style,
+  imagePlacements,
   placedArtworks,
   onLockChange,
   onArtworkSelect,
   paused = false,
 }: ExhibitionLiveSceneProps) {
   const [isLocked, setIsLocked] = useState(false);
+  const [openDoorIds, setOpenDoorIds] = useState<Set<string>>(() => new Set());
+
+  function toggleDoor(doorId: string) {
+    setOpenDoorIds((current) => {
+      const next = new Set(current);
+      if (next.has(doorId)) next.delete(doorId);
+      else next.add(doorId);
+      return next;
+    });
+  }
 
   const handleLockChange = (locked: boolean) => {
     setIsLocked(locked);
@@ -54,15 +70,27 @@ export function ExhibitionLiveScene({
 
   return (
     <>
-      <Lighting templateId={roomTemplateId} />
+      {style ? <color attach="background" args={[style.environmentColor]} /> : null}
+      <Lighting templateId={roomTemplateId} style={style} />
       <PointerLockControls
         onLock={() => handleLockChange(true)}
         onUnlock={() => handleLockChange(false)}
       />
 
-      <Player paused={paused} roomWidth={roomWidth} roomDepth={roomDepth} wallSegments={wallSegments} />
+      <Player paused={paused} roomWidth={roomWidth} roomDepth={roomDepth} wallSegments={wallSegments} doors={doors} openDoorIds={openDoorIds} />
 
-      <RoomEnvironment templateId={roomTemplateId} width={roomWidth} depth={roomDepth} wallColor={wallColor} wallSegments={wallSegments} />
+      <RoomEnvironment
+        templateId={roomTemplateId}
+        width={roomWidth}
+        depth={roomDepth}
+        wallColor={wallColor}
+        wallSegments={wallSegments}
+        doors={doors}
+        openDoorIds={openDoorIds}
+        onDoorToggle={toggleDoor}
+        doorInteractionsEnabled={!paused}
+        style={style}
+      />
 
       {placedArtworks.map(({ placement, artwork }) => (
         <ArtworkMesh
@@ -84,6 +112,17 @@ export function ExhibitionLiveScene({
                 }
               : undefined
           }
+        />
+      ))}
+      {imagePlacements?.map((image) => (
+        <ArtworkMesh
+          key={`uploaded-${image.id}`}
+          position={[image.positionX, image.positionY, image.positionZ]}
+          rotationY={(image.rotationY * DEGREES_TO_RADIANS)}
+          widthMeters={image.widthMeters}
+          heightMeters={image.heightMeters}
+          imageUrl={image.imageUrl}
+          frameColor="#2a2622"
         />
       ))}
     </>

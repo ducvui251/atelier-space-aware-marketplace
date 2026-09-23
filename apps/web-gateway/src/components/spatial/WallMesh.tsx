@@ -1,15 +1,22 @@
 "use client";
 
-import type { SceneWall } from "@atelier/contracts";
+import type { ExhibitionSceneDoor, SceneWall } from "@atelier/contracts";
+import type { ThreeEvent } from "@react-three/fiber";
 import { getWallMeshTransform } from "@/components/exhibition-editor-v2/wall-geometry";
+import { doorOpening } from "./door-geometry";
 
 interface WallMeshProps {
   wall: SceneWall;
   wallColor: string;
   selected?: boolean;
   onSelect?: () => void;
+  onWallPointerMove?: (event: ThreeEvent<PointerEvent>, wall: SceneWall) => void;
+  onWallPointerDown?: (event: ThreeEvent<PointerEvent>, wall: SceneWall) => void;
   onBeginEndpointDrag?: (endpoint: "start" | "end") => void;
+  doors?: ExhibitionSceneDoor[];
   baseY?: number;
+  roughness?: number;
+  metalness?: number;
 }
 
 /**
@@ -45,9 +52,23 @@ function EndpointHandle({
   );
 }
 
-export function WallMesh({ wall, wallColor, selected = false, onSelect, onBeginEndpointDrag, baseY = 0 }: WallMeshProps) {
+export function WallMesh({ wall, wallColor, selected = false, onSelect, onWallPointerMove, onWallPointerDown, onBeginEndpointDrag, doors = [], baseY = 0, roughness = 0.9, metalness = 0 }: WallMeshProps) {
   const transform = getWallMeshTransform(wall, baseY);
   if (!transform) return null;
+
+  const openings = doors
+    .map((door) => doorOpening(wall, door))
+    .filter((opening) => opening.end > opening.start)
+    .sort((a, b) => a.start - b.start);
+  const wallPieces: Array<{ x: number; y: number; width: number; height: number }> = [];
+  let cursor = 0;
+  openings.forEach((opening) => {
+    if (opening.start > cursor) wallPieces.push({ x: (cursor + opening.start) / 2, y: 0, width: opening.start - cursor, height: wall.height });
+    if (opening.height < wall.height) wallPieces.push({ x: (opening.start + opening.end) / 2, y: opening.height / 2, width: opening.end - opening.start, height: wall.height - opening.height });
+    cursor = Math.max(cursor, opening.end);
+  });
+  if (cursor < transform.length) wallPieces.push({ x: (cursor + transform.length) / 2, y: 0, width: transform.length - cursor, height: wall.height });
+  if (!wallPieces.length) wallPieces.push({ x: transform.length / 2, y: 0, width: transform.length, height: wall.height });
 
   return (
     <>
@@ -56,13 +77,20 @@ export function WallMesh({ wall, wallColor, selected = false, onSelect, onBeginE
         rotation={transform.rotation}
         onPointerDown={(event) => {
           event.stopPropagation();
+          onWallPointerDown?.(event, wall);
           onSelect?.();
         }}
+        onPointerMove={onWallPointerMove ? (event) => {
+          event.stopPropagation();
+          onWallPointerMove(event, wall);
+        } : undefined}
       >
-        <mesh receiveShadow castShadow>
-          <boxGeometry args={transform.size} />
-          <meshStandardMaterial color={selected ? "#2563eb" : wallColor} side={2 /* THREE.DoubleSide */} />
-        </mesh>
+        {wallPieces.map((piece, index) => (
+          <mesh key={`${wall.id}:piece:${index}`} position={[piece.x - transform.length / 2, piece.y, 0]} receiveShadow castShadow>
+            <boxGeometry args={[piece.width, piece.height, transform.size[2]]} />
+            <meshStandardMaterial color={selected ? "#2563eb" : wallColor} side={2 /* THREE.DoubleSide */} roughness={roughness} metalness={metalness} />
+          </mesh>
+        ))}
       </group>
       {selected && onBeginEndpointDrag ? (
         <>
