@@ -2,6 +2,8 @@ import type { ZodType } from "zod";
 import {
   AccountSyncRequestSchema,
   AccountUpdateRequestSchema,
+  AdminArtistsQuerySchema,
+  AdminArtworksQuerySchema,
   AdminOrdersQuerySchema,
   ArtistArtworkViewsQuerySchema,
   ArtistArtworkViewsResponseSchema,
@@ -73,6 +75,8 @@ export const ROUTES: RouteDefinition[] = [
 
   // artist-artwork
   { method: "GET", path: "/v1/artist-artwork/artworks", service: "artist-artwork", summary: "List canonical artworks", auth: "internal", successStatus: 200, errorStatuses: [401] },
+  { method: "GET", path: "/v1/artist-artwork/artworks/admin", service: "artist-artwork", summary: "List every artwork platform-wide, optionally filtered by verification status, paginated (admin)", auth: "internal", requestSchema: AdminArtworksQuerySchema, requestLocation: "query", successStatus: 200, errorStatuses: [400, 401] },
+  { method: "GET", path: "/v1/artist-artwork/verification-counts", service: "artist-artwork", summary: "Cheap grouped COUNT of artists/artworks by verification status — for stats, not listing", auth: "internal", successStatus: 200, errorStatuses: [401] },
   { method: "GET", path: "/v1/artist-artwork/artist/artworks", service: "artist-artwork", summary: "List one artist's artworks", auth: "internal", successStatus: 200, errorStatuses: [400, 401] },
   { method: "GET", path: "/v1/artist-artwork/artworks/{id}", service: "artist-artwork", summary: "Get canonical artwork detail", auth: "internal", successStatus: 200, errorStatuses: [401, 404] },
   { method: "GET", path: "/v1/artist-artwork/artists", service: "artist-artwork", summary: "List artist profiles", auth: "internal", successStatus: 200, errorStatuses: [401] },
@@ -148,4 +152,6 @@ export const ROUTES: RouteDefinition[] = [
   { method: "POST", path: "/v1/admin/complaints", service: "admin", summary: "File a complaint against an order", auth: "internal", requestSchema: CreateComplaintRequestSchema, requestLocation: "body", successStatus: 201, errorStatuses: [400, 401] },
   { method: "POST", path: "/v1/admin/complaints/{id}/resolve", service: "admin", summary: "Resolve or reject a complaint", auth: "internal", requestSchema: ResolveComplaintRequestSchema, requestLocation: "body", successStatus: 200, errorStatuses: [400, 401, 404] },
   { method: "GET", path: "/v1/admin/orders", service: "admin", summary: "List every order platform-wide with shipment detail, paginated", auth: "internal", requestSchema: AdminOrdersQuerySchema, requestLocation: "query", successStatus: 200, errorStatuses: [400, 401] },
+  { method: "GET", path: "/v1/admin/artworks", service: "admin", summary: "List every artwork platform-wide, optionally filtered by verification status, paginated", auth: "internal", requestSchema: AdminArtworksQuerySchema, requestLocation: "query", successStatus: 200, errorStatuses: [400, 401] },
+  { method: "GET", path: "/v1/admin/artists", service: "admin", summary: "List every artist profile, optionally filtered by verification status", auth: "internal", requestSchema: AdminArtistsQuerySchema, requestLocation: "query", successStatus: 200, errorStatuses: [400, 401] },
 ];

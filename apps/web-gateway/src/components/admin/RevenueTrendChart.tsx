@@ -13,6 +13,13 @@ interface RevenueTrendChartProps {
  * the same summary a sighted user gets from the bars, and a visually
  * hidden table repeats every data point, so the chart doesn't depend on
  * color or vision to be understood.
+ *
+ * This is a magnitude series (one measure over time), so per the dataviz
+ * skill's form heuristic it gets ONE hue ramped by value (sequential), not
+ * a rainbow — bars fade from a light tint at low values to full --primary
+ * at the peak. The peak and most-recent bar get a direct value label
+ * (selective, not one on every bar) so the headline numbers don't require
+ * hovering to read.
  */
 export function RevenueTrendChart({ series, currency, from, to }: RevenueTrendChartProps) {
   const fromLabel = new Date(from).toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -28,27 +35,68 @@ export function RevenueTrendChart({ series, currency, from, to }: RevenueTrendCh
 
   const total = series.reduce((sum, point) => sum + point.amount, 0);
   const max = Math.max(...series.map((point) => point.amount), 1);
+  const peakIndex = series.reduce((best, point, i) => (point.amount > series[best].amount ? i : best), 0);
+  const latestIndex = series.length - 1;
   const width = 600;
-  const height = 160;
+  const height = 180;
+  const labelSpace = 22; // headroom above bars for direct value labels
+  const chartHeight = height - labelSpace;
   const gap = 4;
   const barWidth = (width - gap * (series.length - 1)) / series.length;
   const summary = `Revenue trend from ${fromLabel} to ${toLabel}: total ${formatPrice(total, currency)} across ${series.length} day${series.length === 1 ? "" : "s"}.`;
 
+  function dayLabel(period: string) {
+    return new Date(period).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
+
   return (
     <div className="flex flex-col gap-2">
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={summary} className="h-40 w-full">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={summary} className="h-44 w-full overflow-visible">
+        {/* Baseline — recessive, grounds the bars instead of letting them float. */}
+        <line x1={0} y1={height} x2={width} y2={height} className="stroke-border" strokeWidth={1} />
         {series.map((point, i) => {
-          const barHeight = (point.amount / max) * (height - 8);
+          const ratio = point.amount / max;
+          // Sequential ramp within one hue: light tint at low values, full
+          // strength at the peak, never fully transparent so a $0 day still
+          // registers as a mark rather than disappearing.
+          const opacity = point.amount > 0 ? 0.28 + 0.72 * ratio : 0.12;
+          const barHeight = ratio * (chartHeight - 8);
           const x = i * (barWidth + gap);
           const y = height - barHeight;
+          const isCallout = i === peakIndex || i === latestIndex;
           return (
-            <rect key={point.period} x={x} y={y} width={barWidth} height={Math.max(barHeight, point.amount > 0 ? 2 : 0)} className="fill-foreground/80" rx={2}>
-              <title>{`${new Date(point.period).toLocaleDateString("en-US", { month: "short", day: "numeric" })}: ${formatPrice(point.amount, currency)}`}</title>
-            </rect>
+            <g key={point.period}>
+              <rect
+                x={x}
+                y={y}
+                width={barWidth}
+                height={Math.max(barHeight, point.amount > 0 ? 2 : 0)}
+                rx={2}
+                style={{ fill: "var(--primary)", fillOpacity: opacity }}
+              >
+                <title>{`${dayLabel(point.period)}: ${formatPrice(point.amount, currency)}`}</title>
+              </rect>
+              {isCallout && point.amount > 0 ? (
+                <text
+                  x={x + barWidth / 2}
+                  y={Math.max(y - 6, 10)}
+                  textAnchor="middle"
+                  className="fill-foreground text-[10px] font-medium"
+                >
+                  {formatPrice(point.amount, currency)}
+                </text>
+              ) : null}
+            </g>
           );
         })}
       </svg>
-      <p className="text-caption text-muted-foreground">{summary}</p>
+      <div className="flex items-center justify-between text-caption text-muted-foreground">
+        <span>{summary}</span>
+        <span className="flex items-center gap-1.5 whitespace-nowrap">
+          <span className="inline-block size-2 rounded-full" style={{ background: "var(--primary)" }} />
+          Peak {dayLabel(series[peakIndex].period)}
+        </span>
+      </div>
       <table className="sr-only">
         <caption>Daily revenue, {fromLabel} to {toLabel}</caption>
         <thead>
@@ -60,7 +108,7 @@ export function RevenueTrendChart({ series, currency, from, to }: RevenueTrendCh
         <tbody>
           {series.map((point) => (
             <tr key={point.period}>
-              <td>{new Date(point.period).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</td>
+              <td>{dayLabel(point.period)}</td>
               <td>{formatPrice(point.amount, currency)}</td>
             </tr>
           ))}

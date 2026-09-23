@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { RequireRole } from "@/components/auth/RequireRole";
@@ -12,6 +14,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useApiResource } from "@/lib/client/hooks";
 import { apiFetch } from "@/lib/client/api";
 import type { Complaint } from "@/types";
+
+const STATUS_OPTIONS = ["all", "open", "resolved", "rejected"] as const;
+type StatusOption = (typeof STATUS_OPTIONS)[number];
+
+function isStatusOption(value: string | null): value is StatusOption {
+  return value !== null && (STATUS_OPTIONS as readonly string[]).includes(value);
+}
 
 function ComplaintRow({ complaint, onChanged }: { complaint: Complaint; onChanged: () => void }) {
   const [note, setNote] = React.useState("");
@@ -66,13 +75,33 @@ function ComplaintRow({ complaint, onChanged }: { complaint: Complaint; onChange
 }
 
 function ComplaintsQueue() {
+  const searchParams = useSearchParams();
+  const initialStatus = isStatusOption(searchParams.get("status")) ? (searchParams.get("status") as StatusOption) : "all";
+  const [status, setStatus] = React.useState<StatusOption>(initialStatus);
+
   const { data, loading, error, refresh } = useApiResource<{ items: Complaint[]; total: number }>("/api/admin/complaints");
-  const complaints = data?.items ?? [];
+  const complaints = (data?.items ?? []).filter((complaint) => status === "all" || complaint.status === status);
 
   return (
     <>
-      <p className="eyebrow">Admin</p>
-      <h1 className="mt-2 font-display text-h2 text-foreground">Complaints</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p className="eyebrow">Admin</p>
+          <h1 className="mt-2 font-display text-h2 text-foreground">Complaints</h1>
+        </div>
+        <select
+          value={status}
+          onChange={(event) => setStatus(event.target.value as StatusOption)}
+          className="focus-ring h-10 rounded-md border border-border bg-surface px-3 text-body-sm capitalize text-foreground"
+          aria-label="Filter by status"
+        >
+          {STATUS_OPTIONS.map((option) => (
+            <option key={option} value={option}>
+              {option === "all" ? "All statuses" : option}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <div className="mt-8">
         {loading ? (
@@ -110,7 +139,9 @@ export default function AdminComplaintsPage() {
   return (
     <PageContainer className="py-16">
       <RequireRole role="admin">
-        <ComplaintsQueue />
+        <Suspense fallback={null}>
+          <ComplaintsQueue />
+        </Suspense>
       </RequireRole>
     </PageContainer>
   );

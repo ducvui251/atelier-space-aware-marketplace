@@ -91,11 +91,6 @@ export async function markOrderFeedFailed(input: { orderId: string; buyerId: str
   );
 }
 
-function countByVerificationStatus(items: Array<{ verificationStatus: string }>): Record<string, number> {
-  const counts: Record<string, number> = { pending: 0, verified: 0, rejected: 0 };
-  for (const item of items) counts[item.verificationStatus] = (counts[item.verificationStatus] ?? 0) + 1;
-  return counts;
-}
 
 /**
  * Admin overview chart data (§4.6 of the defect audit). Everything here
@@ -127,11 +122,19 @@ async function getOrderFeedTrend(periodDays: number): Promise<{ period: "day"; f
   };
 }
 
+/**
+ * Deliberately excludes order_feed's "failed" bucket (payment-failed
+ * events): every one of those orders already surfaces here as
+ * "cancelled" in commerce.orders itself, so showing "Failed" on the
+ * dashboard just double-counted the same orders under a second, made-up
+ * label that had no real status to filter /admin/orders by — a dead-end
+ * stat, not a mock one.
+ */
 async function getOrderStatusCounts(): Promise<Record<string, number>> {
   const rows = await query<{ status: string; count: string }>(
-    `select status, count(*)::text as count from admin.order_feed group by status`,
+    `select status, count(*)::text as count from admin.order_feed where status != 'failed' group by status`,
   );
-  const counts: Record<string, number> = { pending: 0, paid: 0, shipped: 0, failed: 0 };
+  const counts: Record<string, number> = { pending: 0, paid: 0, shipped: 0 };
   for (const row of rows) counts[row.status] = Number(row.count);
   return counts;
 }
@@ -158,36 +161,52 @@ export async function getAdminOrders(query_: { status?: string; page: number; li
   return requestInternalService<{ items: unknown[]; total: number }>("commerce", `/v1/commerce/orders/admin?${params.toString()}`);
 }
 
+/** Artwork verification browser, paginated — proxies to Artist & Artwork, same shape as getAdminOrders above. */
+export async function getAdminArtworks(query_: { status?: string; q?: string; page: number; limit: number }) {
+  const params = new URLSearchParams({ page: String(query_.page), limit: String(query_.limit) });
+  if (query_.status) params.set("status", query_.status);
+  if (query_.q) params.set("q", query_.q);
+  return requestInternalService<{ items: unknown[]; total: number }>("artist-artwork", `/v1/artist-artwork/artworks/admin?${params.toString()}`);
+}
+
+/**
+ * Artist verification browser — unlike artworks, the artist roster is small
+ * enough (dozens, not thousands) that Artist & Artwork's own unpaginated
+ * "everyone" endpoint is fine; filter to the requested status here rather
+ * than adding pagination the caller doesn't need.
+ */
+export async function getAdminArtists(query_: { status?: string }) {
+  const result = await requestInternalService<{ items: Array<{ verificationStatus: string }> }>("artist-artwork", "/v1/artist-artwork/artists?status=all");
+  const items = query_.status ? result.items.filter((item) => item.verificationStatus === query_.status) : result.items;
+  return { items, total: items.length };
+}
+
 export async function getStats() {
   const results = await Promise.allSettled([
-    requestInternalService<{ items: Array<{ verificationStatus: string }> }>("artist-artwork", "/v1/artist-artwork/artists?status=all"),
-    requestInternalService<{ items: Array<{ verificationStatus: string }> }>("artist-artwork", "/v1/artist-artwork/artworks?status=all"),
+    requestInternalService<{ artists: Record<string, number>; artworks: Record<string, number> }>("artist-artwork", "/v1/artist-artwork/verification-counts"),
     query<{ count: string }>(`select count(*)::text as count from admin.complaints where status = 'open'`),
     requestInternalService<{ totalOrders: number; revenue: number }>("commerce", "/v1/commerce/stats"),
     getOrderFeedTrend(30),
     getOrderStatusCounts(),
     getComplaintStatusCounts(),
   ]);
-  const [artistsResult, artworksResult, complaintsResult, commerceResult, revenueTrendResult, orderStatusResult, complaintStatusResult] = results;
-  const artists = artistsResult.status === "fulfilled" ? artistsResult.value : { items: [] };
-  const artworks = artworksResult.status === "fulfilled" ? artworksResult.value : { items: [] };
+  const [verificationResult, complaintsResult, commerceResult, revenueTrendResult, orderStatusResult, complaintStatusResult] = results;
+  const emptyStatusCounts = { pending: 0, verified: 0, rejected: 0 };
+  const verificationStatusCounts = verificationResult.status === "fulfilled" ? verificationResult.value : { artists: emptyStatusCounts, artworks: emptyStatusCounts };
   const complaints = complaintsResult.status === "fulfilled" ? complaintsResult.value : [];
   const commerceStats = commerceResult.status === "fulfilled" ? commerceResult.value : { totalOrders: 0, revenue: 0 };
   const revenueTrend = revenueTrendResult.status === "fulfilled" ? revenueTrendResult.value : null;
-  const orderStatusCounts = orderStatusResult.status === "fulfilled" ? orderStatusResult.value : { pending: 0, paid: 0, shipped: 0, failed: 0 };
+  const orderStatusCounts = orderStatusResult.status === "fulfilled" ? orderStatusResult.value : { pending: 0, paid: 0, shipped: 0 };
   const complaintStatusCounts = complaintStatusResult.status === "fulfilled" ? complaintStatusResult.value : { open: 0, resolved: 0, rejected: 0 };
   return {
-    pendingArtists: artists.items.filter((item) => item.verificationStatus === "pending").length,
-    pendingArtworks: artworks.items.filter((item) => item.verificationStatus === "pending").length,
+    pendingArtists: verificationStatusCounts.artists.pending ?? 0,
+    pendingArtworks: verificationStatusCounts.artworks.pending ?? 0,
     openComplaints: Number(complaints[0]?.count ?? 0),
     totalOrders: commerceStats.totalOrders,
     revenue: commerceStats.revenue,
     revenueTrend,
     orderStatusCounts,
-    verificationStatusCounts: {
-      artists: countByVerificationStatus(artists.items),
-      artworks: countByVerificationStatus(artworks.items),
-    },
+    verificationStatusCounts,
     complaintStatusCounts,
   };
 }
