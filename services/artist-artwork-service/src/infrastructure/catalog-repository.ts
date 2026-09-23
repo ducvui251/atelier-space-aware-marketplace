@@ -85,6 +85,58 @@ export async function listPersistedArtworks(options: { includeAllStatuses?: bool
 }
 
 /**
+ * Verification counts for Admin's overview (pending/verified/rejected, both
+ * entities) — a single grouped COUNT instead of what getStats() used to do:
+ * fetch listPersistedArtworks({includeAllStatuses}) (the *whole* catalog,
+ * 3.5MB+ once Met/Cleveland imports pushed it past 4600 rows) just to
+ * .filter().length it in memory. Caught live: under Promise.allSettled's
+ * concurrent load that fetch could miss its 3s internal timeout, silently
+ * settling as "rejected" and reporting 0 for every artwork status.
+ */
+export async function countVerificationStatuses(): Promise<{ artists: Record<string, number>; artworks: Record<string, number> }> {
+  const [artworkRows, artistRows] = await Promise.all([
+    query<{ verification_status: string; count: string }>(`select verification_status, count(*)::text as count from artist_artwork.artworks group by verification_status`),
+    query<{ verification_status: string; count: string }>(`select verification_status, count(*)::text as count from artist_artwork.artist_profiles group by verification_status`),
+  ]);
+  const toCounts = (rows: { verification_status: string; count: string }[]) => {
+    const counts: Record<string, number> = { pending: 0, verified: 0, rejected: 0 };
+    for (const row of rows) counts[row.verification_status] = Number(row.count);
+    return counts;
+  };
+  return { artworks: toCounts(artworkRows), artists: toCounts(artistRows) };
+}
+
+/**
+ * Admin's artwork browser (verification history, not just the pending
+ * queue): every artwork, optionally narrowed to one verification status,
+ * paginated — not to be confused with the counts-only helper above.
+ */
+export async function listPersistedArtworksForAdmin(options: { status?: Artwork["verificationStatus"]; page: number; limit: number; q?: string }): Promise<{ items: Artwork[]; total: number }> {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  if (options.status) {
+    params.push(options.status);
+    conditions.push(`a.verification_status = $${params.length}`);
+  }
+  const q = options.q?.trim();
+  if (q) {
+    params.push(`%${q}%`);
+    conditions.push(`a.title ilike $${params.length}`);
+  }
+  const where = conditions.length ? `where ${conditions.join(" and ")}` : "";
+
+  const countRows = await query<{ count: string }>(`select count(*)::text as count from artist_artwork.artworks a ${where}`, params);
+  const total = Number(countRows[0]?.count ?? 0);
+
+  const offset = (options.page - 1) * options.limit;
+  const items = (await query<ArtworkRow>(
+    `${artworkSql} ${where} order by a.reviewed_at desc nulls last, a.created_at desc limit $${params.length + 1} offset $${params.length + 2}`,
+    [...params, options.limit, offset],
+  )).map(mapArtwork);
+  return { items, total };
+}
+
+/**
  * page/limit are both optional with no default - omitting them returns the
  * full list unchanged (same convention as ArtworkSearchQuerySchema), which
  * every internal caller (orders, analytics, recommendations, the

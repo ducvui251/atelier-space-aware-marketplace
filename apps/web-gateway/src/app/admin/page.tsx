@@ -237,9 +237,9 @@ function AdminOverview() {
       {!loading && data ? (
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatusBreakdown title="Orders" counts={data.orderStatusCounts} linkBase="/admin/orders" linkableStatuses={["pending", "paid", "shipped"]} />
-          <StatusBreakdown title="Artist verification" counts={data.verificationStatusCounts.artists} />
-          <StatusBreakdown title="Artwork verification" counts={data.verificationStatusCounts.artworks} />
-          <StatusBreakdown title="Complaints" counts={data.complaintStatusCounts} />
+          <StatusBreakdown title="Artist verification" counts={data.verificationStatusCounts.artists} linkBase="/admin/artists" />
+          <StatusBreakdown title="Artwork verification" counts={data.verificationStatusCounts.artworks} linkBase="/admin/artworks" />
+          <StatusBreakdown title="Complaints" counts={data.complaintStatusCounts} linkBase="/admin/complaints" />
         </div>
       ) : null}
     </>

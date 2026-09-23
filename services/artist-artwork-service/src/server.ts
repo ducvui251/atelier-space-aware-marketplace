@@ -1,10 +1,10 @@
 import { createServiceServer, getPort, readJson, writeServiceError, writeServiceJson, type ServiceRouteHandler } from "@atelier/config/http";
-import { ArtistProfileUpdateRequestSchema, ArtworkArtistVerificationRequestSchema, ArtworkAvailabilityRequestSchema, ArtworkCreateRequestSchema, ArtworkUpdateRequestSchema, CreateReservationRequestSchema, EnsureArtistProfileRequestSchema, parseBody } from "@atelier/contracts";
+import { AdminArtworksQuerySchema, ArtistProfileUpdateRequestSchema, ArtworkArtistVerificationRequestSchema, ArtworkAvailabilityRequestSchema, ArtworkCreateRequestSchema, ArtworkUpdateRequestSchema, CreateReservationRequestSchema, EnsureArtistProfileRequestSchema, parseBody } from "@atelier/contracts";
 import { ArtistVerifiedPayloadSchema, ArtworkVerifiedPayloadSchema } from "@atelier/contracts/events";
 import { consumeEvents, runOutboxPublisher, type ConsumedEvent } from "@atelier/events";
 import { ping } from "@atelier/persistence";
 import { health } from "./health.ts";
-import { commitReservation, createPersistedArtwork, ensureArtistProfile, findPersistedArtist, findPersistedArtistByUserId, findPersistedArtwork, listPersistedArtistArtworks, listPersistedArtists, listPersistedArtworks, releaseExpiredReservations, releaseReservation, reserveArtwork, updatePersistedArtistProfile, updatePersistedArtistVerification, updatePersistedArtwork, updatePersistedArtworkVerification, updatePersistedAvailability } from "./infrastructure/catalog-repository.ts";
+import { commitReservation, countVerificationStatuses, createPersistedArtwork, ensureArtistProfile, findPersistedArtist, findPersistedArtistByUserId, findPersistedArtwork, listPersistedArtistArtworks, listPersistedArtists, listPersistedArtworks, listPersistedArtworksForAdmin, releaseExpiredReservations, releaseReservation, reserveArtwork, updatePersistedArtistProfile, updatePersistedArtistVerification, updatePersistedArtwork, updatePersistedArtworkVerification, updatePersistedAvailability } from "./infrastructure/catalog-repository.ts";
 
 function validationError(response: Parameters<ServiceRouteHandler>[0]["response"], correlationId: string, parsed: { code: "VALIDATION_ERROR"; message: string; field?: string }) {
   return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
@@ -14,6 +14,15 @@ const routes: Record<string, ServiceRouteHandler> = {
   "GET /v1/artist-artwork/artworks": async ({ url, response, correlationId }) => {
     const includeAllStatuses = url.searchParams.get("status") === "all";
     return writeServiceJson(response, 200, { items: await listPersistedArtworks({ includeAllStatuses }) }, correlationId);
+  },
+  "GET /v1/artist-artwork/verification-counts": async ({ response, correlationId }) => {
+    return writeServiceJson(response, 200, await countVerificationStatuses(), correlationId);
+  },
+  "GET /v1/artist-artwork/artworks/admin": async ({ url, response, correlationId }) => {
+    const parsed = parseBody(AdminArtworksQuerySchema, Object.fromEntries(url.searchParams.entries()));
+    if (!parsed.success) return writeServiceError(response, 400, { code: parsed.code, message: parsed.message, correlationId, field: parsed.field, retryable: false });
+    const result = await listPersistedArtworksForAdmin(parsed.data);
+    return writeServiceJson(response, 200, result, correlationId);
   },
   "GET /v1/artist-artwork/artist/artworks": async ({ url, response, correlationId }) => {
     const artistId = url.searchParams.get("artistId");
