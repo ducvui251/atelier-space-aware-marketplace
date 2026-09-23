@@ -1,9 +1,20 @@
 /**
- * Builds a minimal glTF 2.0 asset for a single artwork: a flat, real-scale
- * quad (metres, matching the artwork's actual widthCm/heightCm) textured
- * with the artwork's own image — nothing more. That's all AR placement
- * needs (see the "View in AR" flow): the quad's real-world size is what
- * lets an AR session drop it onto the buyer's wall at true scale.
+ * Builds a minimal glTF 2.0 asset for a single artwork: a thin real-scale
+ * box (metres, matching the artwork's actual widthCm/heightCm) — the front
+ * face textured with the artwork's own image, the back and four side edges
+ * a plain canvas-colored material. That's what "View in AR" needs (see the
+ * "View in AR" flow): the box's real-world size is what lets an AR session
+ * drop it onto the buyer's wall at true scale.
+ *
+ * A flat single quad (2 triangles, zero depth) was tried first and relied
+ * on the material's `doubleSided` flag to show anything when viewed from
+ * behind. Confirmed on a real device: iOS Quick Look's "Object" viewer does
+ * not reliably honor that flag on a zero-thickness mesh — rotating past
+ * roughly a 90° angle renders the back as a blank white plane instead of
+ * the (even mirrored) texture. Giving the box real depth means every face
+ * is explicit geometry with its own normal, so there's no back-face
+ * rendering left to the renderer's discretion — it also happens to match
+ * how a real stretched-canvas print actually looks from the side.
  *
  * The vertex/index buffer is embedded as a base64 data URI directly in the
  * JSON (no separate .bin file); the texture stays an external reference to
@@ -16,53 +27,86 @@ const UNSIGNED_SHORT = 5123;
 const ARRAY_BUFFER = 34962;
 const ELEMENT_ARRAY_BUFFER = 34963;
 
+// Gallery-wrap canvas depth. Small relative to typical artwork sizes, just
+// enough to give every face real geometry instead of a zero-thickness plane.
+const DEPTH_METERS = 0.02;
+// Raw canvas/paper color for the back and side faces — no texture, just a
+// plain, slightly warm off-white so the edge reads as material, not a glitch.
+const CANVAS_BACK_COLOR = [0.94, 0.93, 0.9, 1];
+
+interface Face {
+  // Corners in CCW order as seen from outside the box (so the default
+  // winding produces an outward-facing normal without extra bookkeeping).
+  corners: [number, number, number][];
+  normal: [number, number, number];
+  uvs?: [number, number][];
+}
+
 export function buildArtworkQuadGltf(input: { widthCm: number; heightCm: number; imageUrl: string; title: string }): object {
   const w = input.widthCm / 100;
   const h = input.heightCm / 100;
   const hw = w / 2;
   const hh = h / 2;
+  const hd = DEPTH_METERS / 2;
 
-  // Front face points +Z (toward model-viewer's default camera). Winding
-  // (0,1,2)/(0,2,3) is counter-clockwise when viewed from +Z.
-  const positions = new Float32Array([
-    -hw, -hh, 0,
-    hw, -hh, 0,
-    hw, hh, 0,
-    -hw, hh, 0,
-  ]);
-  const normals = new Float32Array([
-    0, 0, 1,
-    0, 0, 1,
-    0, 0, 1,
-    0, 0, 1,
-  ]);
-  // glTF texcoord origin is top-left, so the bottom-left vertex (-hw,-hh)
-  // maps to the bottom-left of the image (v=1) and so on.
-  const uvs = new Float32Array([
-    0, 1,
-    1, 1,
-    1, 0,
-    0, 0,
-  ]);
-  const indices = new Uint16Array([0, 1, 2, 0, 2, 3]);
+  // glTF texcoord origin is top-left, so the bottom-left vertex maps to the
+  // bottom-left of the image (v=1) and so on.
+  const frontUvs: [number, number][] = [[0, 1], [1, 1], [1, 0], [0, 0]];
 
-  const positionsBytes = new Uint8Array(positions.buffer);
-  const normalsBytes = new Uint8Array(normals.buffer);
-  const uvsBytes = new Uint8Array(uvs.buffer);
-  const indicesBytes = new Uint8Array(indices.buffer);
+  const frontFace: Face = {
+    corners: [[-hw, -hh, hd], [hw, -hh, hd], [hw, hh, hd], [-hw, hh, hd]],
+    normal: [0, 0, 1],
+    uvs: frontUvs,
+  };
+  const untexturedFaces: Face[] = [
+    { corners: [[hw, -hh, -hd], [-hw, -hh, -hd], [-hw, hh, -hd], [hw, hh, -hd]], normal: [0, 0, -1] }, // back
+    { corners: [[-hw, hh, hd], [hw, hh, hd], [hw, hh, -hd], [-hw, hh, -hd]], normal: [0, 1, 0] }, // top
+    { corners: [[-hw, -hh, -hd], [hw, -hh, -hd], [hw, -hh, hd], [-hw, -hh, hd]], normal: [0, -1, 0] }, // bottom
+    { corners: [[hw, -hh, hd], [hw, -hh, -hd], [hw, hh, -hd], [hw, hh, hd]], normal: [1, 0, 0] }, // right
+    { corners: [[-hw, -hh, -hd], [-hw, -hh, hd], [-hw, hh, hd], [-hw, hh, -hd]], normal: [-1, 0, 0] }, // left
+  ];
 
-  const positionsOffset = 0;
-  const normalsOffset = positionsBytes.byteLength;
-  const uvsOffset = normalsOffset + normalsBytes.byteLength;
-  const indicesOffset = uvsOffset + uvsBytes.byteLength;
-  const totalLength = indicesOffset + indicesBytes.byteLength;
+  function faceBuffers(faces: Face[], includeUvs: boolean) {
+    const positions: number[] = [];
+    const normals: number[] = [];
+    const uvs: number[] = [];
+    const indices: number[] = [];
+    faces.forEach((face, faceIndex) => {
+      const base = faceIndex * 4;
+      for (let i = 0; i < 4; i++) {
+        positions.push(...face.corners[i]);
+        normals.push(...face.normal);
+        if (includeUvs) uvs.push(...(face.uvs?.[i] ?? [0, 0]));
+      }
+      indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    });
+    return { positions: new Float32Array(positions), normals: new Float32Array(normals), uvs: new Float32Array(uvs), indices: new Uint16Array(indices) };
+  }
 
-  const combined = new Uint8Array(totalLength);
-  combined.set(positionsBytes, positionsOffset);
-  combined.set(normalsBytes, normalsOffset);
-  combined.set(uvsBytes, uvsOffset);
-  combined.set(indicesBytes, indicesOffset);
+  const front = faceBuffers([frontFace], true);
+  const rest = faceBuffers(untexturedFaces, false);
 
+  const chunks = [
+    { bytes: new Uint8Array(front.positions.buffer), target: ARRAY_BUFFER },
+    { bytes: new Uint8Array(front.normals.buffer), target: ARRAY_BUFFER },
+    { bytes: new Uint8Array(front.uvs.buffer), target: ARRAY_BUFFER },
+    { bytes: new Uint8Array(front.indices.buffer), target: ELEMENT_ARRAY_BUFFER },
+    { bytes: new Uint8Array(rest.positions.buffer), target: ARRAY_BUFFER },
+    { bytes: new Uint8Array(rest.normals.buffer), target: ARRAY_BUFFER },
+    { bytes: new Uint8Array(rest.indices.buffer), target: ELEMENT_ARRAY_BUFFER },
+  ];
+  let offset = 0;
+  const bufferViews = chunks.map((chunk) => {
+    const view = { buffer: 0, byteOffset: offset, byteLength: chunk.bytes.byteLength, target: chunk.target };
+    offset += chunk.bytes.byteLength;
+    return view;
+  });
+  const combined = new Uint8Array(offset);
+  let writeOffset = 0;
+  for (const chunk of chunks) {
+    combined.set(chunk.bytes, writeOffset);
+    writeOffset += chunk.bytes.byteLength;
+  }
   const base64 = Buffer.from(combined).toString("base64");
 
   return {
@@ -73,22 +117,20 @@ export function buildArtworkQuadGltf(input: { widthCm: number; heightCm: number;
     meshes: [
       {
         primitives: [
-          {
-            attributes: { POSITION: 0, NORMAL: 1, TEXCOORD_0: 2 },
-            indices: 3,
-            material: 0,
-          },
+          { attributes: { POSITION: 0, NORMAL: 1, TEXCOORD_0: 2 }, indices: 3, material: 0 },
+          { attributes: { POSITION: 4, NORMAL: 5 }, indices: 6, material: 1 },
         ],
       },
     ],
     materials: [
       {
         name: input.title,
-        pbrMetallicRoughness: {
-          baseColorTexture: { index: 0 },
-          metallicFactor: 0,
-          roughnessFactor: 1,
-        },
+        pbrMetallicRoughness: { baseColorTexture: { index: 0 }, metallicFactor: 0, roughnessFactor: 1 },
+        doubleSided: true,
+      },
+      {
+        name: `${input.title} (canvas edge)`,
+        pbrMetallicRoughness: { baseColorFactor: CANVAS_BACK_COLOR, metallicFactor: 0, roughnessFactor: 0.85 },
         doubleSided: true,
       },
     ],
@@ -96,24 +138,15 @@ export function buildArtworkQuadGltf(input: { widthCm: number; heightCm: number;
     samplers: [{ magFilter: 9729, minFilter: 9729, wrapS: 33071, wrapT: 33071 }],
     images: [{ uri: input.imageUrl }],
     accessors: [
-      {
-        bufferView: 0,
-        componentType: FLOAT,
-        count: 4,
-        type: "VEC3",
-        min: [-hw, -hh, 0],
-        max: [hw, hh, 0],
-      },
+      { bufferView: 0, componentType: FLOAT, count: 4, type: "VEC3", min: [-hw, -hh, hd], max: [hw, hh, hd] },
       { bufferView: 1, componentType: FLOAT, count: 4, type: "VEC3" },
       { bufferView: 2, componentType: FLOAT, count: 4, type: "VEC2" },
       { bufferView: 3, componentType: UNSIGNED_SHORT, count: 6, type: "SCALAR" },
+      { bufferView: 4, componentType: FLOAT, count: rest.positions.length / 3, type: "VEC3", min: [-hw, -hh, -hd], max: [hw, hh, hd] },
+      { bufferView: 5, componentType: FLOAT, count: rest.normals.length / 3, type: "VEC3" },
+      { bufferView: 6, componentType: UNSIGNED_SHORT, count: rest.indices.length, type: "SCALAR" },
     ],
-    bufferViews: [
-      { buffer: 0, byteOffset: positionsOffset, byteLength: positionsBytes.byteLength, target: ARRAY_BUFFER },
-      { buffer: 0, byteOffset: normalsOffset, byteLength: normalsBytes.byteLength, target: ARRAY_BUFFER },
-      { buffer: 0, byteOffset: uvsOffset, byteLength: uvsBytes.byteLength, target: ARRAY_BUFFER },
-      { buffer: 0, byteOffset: indicesOffset, byteLength: indicesBytes.byteLength, target: ELEMENT_ARRAY_BUFFER },
-    ],
-    buffers: [{ byteLength: totalLength, uri: `data:application/octet-stream;base64,${base64}` }],
+    bufferViews,
+    buffers: [{ byteLength: offset, uri: `data:application/octet-stream;base64,${base64}` }],
   };
 }
