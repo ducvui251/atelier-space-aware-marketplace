@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { CreateExhibitionBuilderPlacementRequestSchema } from "@atelier/contracts";
+import { CreateExhibitionPlacementRequestSchema } from "@atelier/contracts";
 import { createManagedExhibitionPlacement, listExhibitionPlacements } from "@/lib/gateway/clients/exhibition.client";
 import { exhibitionServiceError, requireExhibitionAccess } from "@/lib/server/exhibition-access";
 import { errorResponse, json } from "@/lib/server/respond";
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const access = await requireExhibitionAccess(request, id);
   if (!access.ok) return access.response;
   const body = await request.json().catch(() => null);
-  const parsed = CreateExhibitionBuilderPlacementRequestSchema.safeParse(body);
+  const parsed = CreateExhibitionPlacementRequestSchema.omit({ requesterId: true, requesterRole: true }).safeParse(body);
   if (!parsed.success) return errorResponse(parsed.error.issues[0]?.message ?? "Invalid artwork placement", 400);
   try {
     return json(await createManagedExhibitionPlacement(id, access.actor, parsed.data), 201);

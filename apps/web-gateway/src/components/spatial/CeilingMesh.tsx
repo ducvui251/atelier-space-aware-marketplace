@@ -36,10 +36,12 @@ interface CeilingMeshProps {
   loop: DerivedRoofLoop;
   color?: string;
   thickness?: number;
+  roughness?: number;
+  metalness?: number;
 }
 
 /** Renders a non-interactive, double-sided ceiling for one derived room loop. */
-export function CeilingMesh({ loop, color = "#f7fafc", thickness = DEFAULT_CEILING_THICKNESS }: CeilingMeshProps) {
+export function CeilingMesh({ loop, color = "#f7fafc", thickness = DEFAULT_CEILING_THICKNESS, roughness = 0.9, metalness = 0 }: CeilingMeshProps) {
   const geometry = useMemo(() => createCeilingGeometry(loop.points, thickness), [loop.points, thickness]);
   if (!geometry) return null;
 
@@ -51,7 +53,7 @@ export function CeilingMesh({ loop, color = "#f7fafc", thickness = DEFAULT_CEILI
       raycast={ignoreRaycast}
       receiveShadow
     >
-      <meshStandardMaterial color={color} side={THREE.DoubleSide} roughness={0.9} />
+      <meshStandardMaterial color={color} side={THREE.DoubleSide} roughness={roughness} metalness={metalness} />
     </mesh>
   );
 }

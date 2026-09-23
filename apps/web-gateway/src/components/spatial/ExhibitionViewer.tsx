@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { X } from "lucide-react";
-import type { Artwork, SceneWall } from "@atelier/contracts";
+import type { Artwork, ExhibitionSceneDoor, ExhibitionSceneImagePlacement, ExhibitionSceneStyle, SceneWall } from "@atelier/contracts";
 import { SpatialCanvas } from "./SpatialCanvas";
 import { ExhibitionLiveScene, type PlacedArtwork } from "./exhibition/ExhibitionLiveScene";
 import { ArtworkDetailSheet } from "./exhibition/ArtworkDetailSheet";
@@ -15,11 +15,14 @@ interface ExhibitionViewerProps {
   roomDepth?: number;
   wallColor?: string;
   wallSegments?: SceneWall[];
+  doors?: ExhibitionSceneDoor[];
+  style?: ExhibitionSceneStyle;
+  imagePlacements?: ExhibitionSceneImagePlacement[];
   placedArtworks: PlacedArtwork[];
   onExit: () => void;
 }
 
-export function ExhibitionViewer({ title, roomTemplateId, roomWidth, roomDepth, wallColor, wallSegments, placedArtworks, onExit }: ExhibitionViewerProps) {
+export function ExhibitionViewer({ title, roomTemplateId, roomWidth, roomDepth, wallColor, wallSegments, doors, style, imagePlacements, placedArtworks, onExit }: ExhibitionViewerProps) {
   const [locked, setLocked] = useState(false);
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
 
@@ -32,6 +35,9 @@ export function ExhibitionViewer({ title, roomTemplateId, roomWidth, roomDepth, 
           roomDepth={roomDepth}
           wallColor={wallColor}
           wallSegments={wallSegments}
+          doors={doors}
+          style={style}
+          imagePlacements={imagePlacements}
           placedArtworks={placedArtworks}
           onLockChange={setLocked}
           onArtworkSelect={setSelectedArtwork}
@@ -62,7 +68,7 @@ export function ExhibitionViewer({ title, roomTemplateId, roomWidth, roomDepth, 
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-background/40">
           <div className="rounded-md border border-border bg-surface px-4 py-3 text-center shadow-sm">
             <p className="text-body-sm font-medium text-foreground">Click to look around</p>
-            <p className="mt-1 text-caption text-muted-foreground">WASD to move · Esc to exit</p>
+          <p className="mt-1 text-caption text-muted-foreground">WASD to move · Click doors to open/close · Esc to exit</p>
           </div>
         </div>
       ) : null}

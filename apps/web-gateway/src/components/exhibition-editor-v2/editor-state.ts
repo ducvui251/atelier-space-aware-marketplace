@@ -1,7 +1,9 @@
-import type { Exhibition, ExhibitionSceneDocument, ExhibitionSceneWall } from "@atelier/contracts";
+import type { Exhibition, ExhibitionDoorType, ExhibitionSceneDocument, ExhibitionSceneImagePlacement, ExhibitionSceneStyle, ExhibitionSceneWall } from "@atelier/contracts";
 import { createExhibitionBoxWalls, EXHIBITION_BOX_DEPTH, EXHIBITION_BOX_WIDTH } from "../spatial/exhibition-box";
+import { clampDoorAlong, doorOverlapsExisting } from "../spatial/door-geometry";
+import { resolveSceneStyle } from "./scene-style";
 
-export type EditorTool = "select" | "wall";
+export type EditorTool = "select" | "wall" | "door";
 export type Point2D = [number, number];
 export type WallEndpoint = "start" | "end";
 
@@ -24,9 +26,12 @@ export type EditorAction =
   | { type: "set-active-level"; levelId: string }
   | { type: "add-level" }
   | { type: "place-wall-point"; point: Point2D }
+  | { type: "place-door"; wallId: string; along: number; doorType: ExhibitionDoorType }
   | { type: "cancel-wall" }
   | { type: "select-wall"; wallId: string | null }
   | { type: "update-wall"; wallId: string; patch: Partial<ExhibitionSceneWall> }
+  | { type: "update-style"; patch: Partial<ExhibitionSceneStyle> }
+  | { type: "update-image-placements"; imagePlacements: ExhibitionSceneImagePlacement[] }
   | { type: "begin-wall-drag"; wallId: string }
   | { type: "preview-wall-endpoint"; wallId: string; endpoint: WallEndpoint; point: Point2D }
   | { type: "end-wall-drag" }
@@ -178,6 +183,21 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       };
       return { ...withHistory(state, { ...state.scene, walls: [...state.scene.walls, wall] }), selectedWallId: wall.id };
     }
+    case "place-door": {
+      const wall = state.scene.walls.find((candidate) => candidate.id === action.wallId);
+      if (!wall) return state;
+      const along = clampDoorAlong(wall, action.along, action.doorType);
+      const doors = state.scene.doors ?? [];
+      if (along === null || doorOverlapsExisting(wall, along, action.doorType, doors)) return state;
+      const door = {
+        id: createId("door"),
+        levelId: wall.levelId,
+        wallId: wall.id,
+        type: action.doorType,
+        along,
+      };
+      return withHistory(state, { ...state.scene, doors: [...doors, door] });
+    }
     case "cancel-wall":
       return { ...state, pendingWallStart: null };
     case "select-wall":
@@ -189,6 +209,10 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       if (updatedWall && distanceBetween(updatedWall.start, updatedWall.end) < MIN_WALL_LENGTH) return state;
       return withHistory(state, { ...state.scene, walls });
     }
+    case "update-style":
+      return withHistory(state, { ...state.scene, style: { ...resolveSceneStyle(state.scene.style), ...action.patch } });
+    case "update-image-placements":
+      return withHistory(state, { ...state.scene, imagePlacements: action.imagePlacements });
     case "begin-wall-drag":
       return { ...state, selectedWallId: action.wallId, dragStartScene: state.scene };
     case "preview-wall-endpoint": {
@@ -214,7 +238,14 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     }
     case "delete-selected": {
       if (!state.selectedWallId) return state;
-      return { ...withHistory(state, { ...state.scene, walls: state.scene.walls.filter((wall) => wall.id !== state.selectedWallId) }), selectedWallId: null };
+      return {
+        ...withHistory(state, {
+          ...state.scene,
+          walls: state.scene.walls.filter((wall) => wall.id !== state.selectedWallId),
+          doors: state.scene.doors?.filter((door) => door.wallId !== state.selectedWallId),
+        }),
+        selectedWallId: null,
+      };
     }
     case "undo": {
       const previous = state.past.at(-1);

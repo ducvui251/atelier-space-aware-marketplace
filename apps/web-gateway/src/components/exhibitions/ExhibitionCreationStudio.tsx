@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useReducer, useState } from "react";
+import type { ThreeEvent } from "@react-three/fiber";
 import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
-import type { ExhibitionRoomTemplateId, ExhibitionSceneWall } from "@atelier/contracts";
+import type { ExhibitionDoorType, ExhibitionRoomTemplateId, ExhibitionSceneWall, SceneWall } from "@atelier/contracts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ExhibitionEditorV2Viewport } from "@/components/exhibition-editor-v2/ExhibitionEditorV2Viewport";
@@ -18,6 +19,7 @@ import {
 import { deriveRoofLoops } from "@/components/exhibition-editor-v2/roof-geometry";
 import { CreateExhibitionForm } from "./CreateExhibitionForm";
 import { EXHIBITION_ROOM_OPTIONS } from "./exhibition-room-options";
+import { wallLength } from "@/components/spatial/door-geometry";
 
 const DEFAULT_TEMPLATE: ExhibitionRoomTemplateId = "white-cube";
 
@@ -51,17 +53,42 @@ export function ExhibitionCreationStudio({ mode }: { mode: "premade" | "custom" 
     () => state.scene.walls.filter((wall) => wall.levelId === activeLevel?.id),
     [activeLevel?.id, state.scene.walls],
   );
+  const activeDoors = useMemo(
+    () => (state.scene.doors ?? []).filter((door) => door.levelId === activeLevel?.id),
+    [activeLevel?.id, state.scene.doors],
+  );
   const roofLoops = useMemo(
     () => activeLevel ? deriveRoofLoops(state.scene).filter((loop) => loop.levelId === activeLevel.id) : [],
     [activeLevel, state.scene],
   );
   const [showCeilings, setShowCeilings] = useState(true);
   const selectedWall = activeWalls.find((wall) => wall.id === state.selectedWallId) ?? null;
+  const [doorType, setDoorType] = useState<ExhibitionDoorType>("single");
 
   useEffect(() => {
     dispatch({ type: "load", scene: mode === "custom" ? createDefaultScene() : defaultPremadeScene() });
     dispatch({ type: "set-tool", tool: mode === "custom" ? "wall" : "select" });
   }, [mode]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      const editingText = target instanceof HTMLElement && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      if (event.key.toLowerCase() === "v" && !editingText) {
+        event.preventDefault();
+        dispatch({ type: "set-tool", tool: "select" });
+      }
+      if (event.key.toLowerCase() === "w" && !editingText) {
+        event.preventDefault();
+        dispatch({ type: "set-tool", tool: "wall" });
+      }
+      if (event.key !== "Delete" || editingText) return;
+      event.preventDefault();
+      dispatch({ type: "delete-selected" });
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   function choosePremade(templateId: ExhibitionRoomTemplateId) {
     setRoomTemplateId(templateId);
@@ -85,6 +112,15 @@ export function ExhibitionCreationStudio({ mode }: { mode: "premade" | "custom" 
     }
   }
 
+  function handlePlaceDoor(event: ThreeEvent<PointerEvent>, wall: SceneWall) {
+    const length = wallLength(wall);
+    if (!length) return;
+    const directionX = (wall.end[0] - wall.start[0]) / length;
+    const directionZ = (wall.end[1] - wall.start[1]) / length;
+    const along = (event.point.x - wall.start[0]) * directionX + (event.point.z - wall.start[1]) * directionZ;
+    dispatch({ type: "place-door", wallId: wall.id, along, doorType });
+  }
+
   function handleBeginWallEndpointDrag(wallId: string) {
     dispatch({ type: "begin-wall-drag", wallId });
   }
@@ -101,18 +137,21 @@ export function ExhibitionCreationStudio({ mode }: { mode: "premade" | "custom" 
             <ExhibitionEditorV2Viewport
               level={activeLevel}
               walls={activeWalls}
+              doors={activeDoors}
               roofLoops={roofLoops}
               showCeilings={showCeilings}
+              tool={state.tool}
               selectedWallId={state.selectedWallId}
               onSelectWall={(wallId) => dispatch({ type: "select-wall", wallId })}
               onGroundPointerDown={handleGroundPointerDown}
+              onPlaceDoor={handlePlaceDoor}
               onBeginWallEndpointDrag={handleBeginWallEndpointDrag}
               onMoveWallEndpoint={handleMoveWallEndpoint}
               onEndWallEndpointDrag={() => dispatch({ type: "end-wall-drag" })}
             />
           ) : null}
           <div className="pointer-events-none absolute left-4 top-4 rounded-md border border-border bg-surface/90 px-3 py-2 text-caption text-muted-foreground">
-            {mode === "custom" ? "Click two points on the grid to create a wall" : "Choose a pre-made room or switch to Create Custom"}
+            {mode !== "custom" ? "Choose a pre-made room or switch to Create Custom" : state.tool === "door" ? "Select a door type, then click a wall to place it" : "Click two points on the grid to create a wall"}
             {state.pendingWallStart ? " · Choose the end point" : ""}
           </div>
         </div>
@@ -151,10 +190,30 @@ export function ExhibitionCreationStudio({ mode }: { mode: "premade" | "custom" 
               <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-caption text-primary">
                 Select Wall, then click two points on the grid. Walls snap to 0.5 m.
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <Button variant={state.tool === "select" ? "primary" : "outline"} onClick={() => selectTool("select")}>Select</Button>
                 <Button variant={state.tool === "wall" ? "primary" : "outline"} onClick={() => selectTool("wall")}><Plus className="size-4" /> Wall</Button>
+                <Button variant={state.tool === "door" ? "primary" : "outline"} onClick={() => selectTool("door")}>Door</Button>
               </div>
+              {state.tool === "door" ? (
+                <div className="rounded-md border border-border bg-muted/30 p-3">
+                  <p className="text-body-sm font-medium text-foreground">Door type</p>
+                  <p className="mt-1 text-caption text-muted-foreground">Click a wall to place a door.</p>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {(["single", "double"] as const).map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        aria-pressed={doorType === type}
+                        onClick={() => setDoorType(type)}
+                        className={`rounded-md border p-2 text-left text-caption capitalize ${doorType === type ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground"}`}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               <div className="rounded-md border border-border bg-muted/30 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div>

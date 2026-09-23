@@ -36,6 +36,15 @@ describe("Exhibition Editor V2 state", () => {
     expect(state.scene.walls).toHaveLength(1);
   });
 
+  it("stores style changes in the scene and supports undo", () => {
+    let state = createInitialEditorState();
+    state = editorReducer(state, { type: "update-style", patch: { wallColor: "#123456", wallMaterial: "polished" } });
+
+    expect(state.scene.style).toMatchObject({ wallColor: "#123456", wallMaterial: "polished" });
+    state = editorReducer(state, { type: "undo" });
+    expect(state.scene.style).toBeUndefined();
+  });
+
   it("moves an endpoint as one undoable drag operation", () => {
     let state = createInitialEditorState({
       ...createDefaultScene(),

@@ -1,9 +1,11 @@
 "use client";
 
 import { EXHIBITION_BUILDER_ROOM_TEMPLATE_ID } from "@atelier/contracts";
-import type { SceneWall } from "@atelier/contracts";
+import type { ExhibitionSceneDoor, ExhibitionSceneStyle, SceneWall } from "@atelier/contracts";
+import type { ThreeEvent } from "@react-three/fiber";
 import { EXHIBITION_BOX_DEPTH, EXHIBITION_BOX_HEIGHT, EXHIBITION_BOX_WIDTH } from "./exhibition-box";
 import { WallMesh } from "./WallMesh";
+import { DoorMesh } from "./DoorMesh";
 
 export const ROOM_WIDTH = EXHIBITION_BOX_WIDTH;
 export const ROOM_DEPTH = EXHIBITION_BOX_DEPTH;
@@ -35,6 +37,19 @@ interface RoomEnvironmentProps {
    * of the fixed 4-wall box. Floor and ceiling still render.
    */
   wallSegments?: SceneWall[];
+  doors?: ExhibitionSceneDoor[];
+  openDoorIds?: ReadonlySet<string>;
+  onDoorToggle?: (doorId: string) => void;
+  doorInteractionsEnabled?: boolean;
+  style?: ExhibitionSceneStyle;
+  onWallPointerMove?: (event: ThreeEvent<PointerEvent>, wall: SceneWall) => void;
+  onWallPointerDown?: (event: ThreeEvent<PointerEvent>, wall: SceneWall) => void;
+}
+
+function materialProperties(material: ExhibitionSceneStyle["wallMaterial"] | undefined) {
+  if (material === "polished") return { roughness: 0.24, metalness: 0.08 };
+  if (material === "satin") return { roughness: 0.58, metalness: 0.04 };
+  return { roughness: 0.92, metalness: 0 };
 }
 
 export function RoomEnvironment({
@@ -43,34 +58,59 @@ export function RoomEnvironment({
   depth,
   wallColor,
   wallSegments,
+  doors = [],
+  openDoorIds = new Set<string>(),
+  onDoorToggle,
+  doorInteractionsEnabled = false,
+  style,
+  onWallPointerMove,
+  onWallPointerDown,
 }: RoomEnvironmentProps) {
   const appearance = ROOM_APPEARANCES[templateId] ?? ROOM_APPEARANCES[EXHIBITION_BUILDER_ROOM_TEMPLATE_ID];
   const roomWidth = width ?? ROOM_WIDTH;
   const roomDepth = depth ?? ROOM_DEPTH;
-  const wall = wallColor ?? appearance.wall;
+  const wall = style?.wallColor ?? wallColor ?? appearance.wall;
+  const wallMaterial = materialProperties(style?.wallMaterial);
+  const floorMaterial = materialProperties(style?.floorMaterial);
   const hasCustomWalls = Array.isArray(wallSegments) && wallSegments.length > 0;
 
   return (
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[roomWidth, roomDepth]} />
-        <meshStandardMaterial color={appearance.floor} />
+        <meshStandardMaterial color={style?.floorColor ?? appearance.floor} {...floorMaterial} />
       </mesh>
 
       <mesh position={[0, ROOM_HEIGHT, 0]} rotation={[Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[roomWidth, roomDepth]} />
-        <meshStandardMaterial color={appearance.ceiling} />
+        <meshStandardMaterial color={style?.ceilingColor ?? appearance.ceiling} {...wallMaterial} />
       </mesh>
 
       {hasCustomWalls ? (
-        wallSegments.map((w) => (
-          <WallMesh key={w.id} wall={w} wallColor={wall} />
-        ))
+        <>
+          {wallSegments.map((w) => (
+            <WallMesh key={w.id} wall={w} wallColor={wall} doors={doors.filter((door) => door.wallId === w.id)} onWallPointerMove={onWallPointerMove} onWallPointerDown={onWallPointerDown} {...wallMaterial} />
+          ))}
+          {doors.map((door) => {
+            const wallForDoor = wallSegments.find((wallSegment) => wallSegment.id === door.wallId);
+            return wallForDoor ? (
+              <DoorMesh
+                key={door.id}
+                door={door}
+                wall={wallForDoor}
+                levelWalls={wallSegments}
+                open={openDoorIds.has(door.id)}
+                interactive={doorInteractionsEnabled}
+                onToggle={onDoorToggle}
+              />
+            ) : null;
+          })}
+        </>
       ) : (
         <>
           <mesh position={[0, ROOM_HEIGHT / 2, -roomDepth / 2]} receiveShadow>
             <planeGeometry args={[roomWidth, ROOM_HEIGHT]} />
-            <meshStandardMaterial color={wall} />
+            <meshStandardMaterial color={wall} {...wallMaterial} />
           </mesh>
 
           <mesh
@@ -78,7 +118,7 @@ export function RoomEnvironment({
             rotation={[0, Math.PI, 0]}
           >
             <planeGeometry args={[roomWidth, ROOM_HEIGHT]} />
-            <meshStandardMaterial color={wall} />
+            <meshStandardMaterial color={wall} {...wallMaterial} />
           </mesh>
 
           <mesh
@@ -86,7 +126,7 @@ export function RoomEnvironment({
             rotation={[0, Math.PI / 2, 0]}
           >
             <planeGeometry args={[roomDepth, ROOM_HEIGHT]} />
-            <meshStandardMaterial color={wall} />
+            <meshStandardMaterial color={wall} {...wallMaterial} />
           </mesh>
 
           <mesh
@@ -94,7 +134,7 @@ export function RoomEnvironment({
             rotation={[0, -Math.PI / 2, 0]}
           >
             <planeGeometry args={[roomDepth, ROOM_HEIGHT]} />
-            <meshStandardMaterial color={wall} />
+            <meshStandardMaterial color={wall} {...wallMaterial} />
           </mesh>
 
           {appearance.trim ? (

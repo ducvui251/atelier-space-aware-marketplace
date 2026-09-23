@@ -1,10 +1,10 @@
 import type {
-  CreateExhibitionBuilderPlacementRequest,
   CreateExhibitionBuilderRequest,
+  CreateExhibitionPlacementRequest,
   Exhibition,
   ExhibitionPlacement,
-  UpdateExhibitionBuilderPlacementRequest,
   UpdateExhibitionBuilderRequest,
+  UpdateExhibitionPlacementRequest,
 } from "@atelier/contracts";
 import { requestService, ServiceClientError } from "../http-client";
 
@@ -82,7 +82,7 @@ export async function updateManagedExhibition(id: string, actor: ExhibitionActor
 export async function createManagedExhibitionPlacement(
   id: string,
   actor: ExhibitionActor,
-  input: CreateExhibitionBuilderPlacementRequest,
+  input: Omit<CreateExhibitionPlacementRequest, "requesterId" | "requesterRole">,
 ): Promise<ExhibitionPlacement> {
   return requestService<ExhibitionPlacement>("room-preview", `/v1/room-preview/exhibitions/${encodeURIComponent(id)}/placements`, {
     method: "POST",
@@ -94,7 +94,7 @@ export async function updateManagedExhibitionPlacement(
   id: string,
   placementId: string,
   actor: ExhibitionActor,
-  input: UpdateExhibitionBuilderPlacementRequest,
+  input: Omit<UpdateExhibitionPlacementRequest, "requesterId" | "requesterRole">,
 ): Promise<ExhibitionPlacement> {
   return requestService<ExhibitionPlacement>(
     "room-preview",

@@ -17,7 +17,20 @@ interface ExhibitionLandingClientProps {
 
 export function ExhibitionLandingClient({ exhibition, creatorName, placedArtworks }: ExhibitionLandingClientProps) {
   const [entered, setEntered] = useState(false);
-  const previewImageUrl = displayableImageUrl(placedArtworks[0]?.artwork.imageUrl);
+  const previewImageUrl = displayableImageUrl(placedArtworks[0]?.artwork.imageUrl ?? exhibition.scene?.imagePlacements?.[0]?.imageUrl);
+  const artworkCount = placedArtworks.length + (exhibition.scene?.imagePlacements?.length ?? 0);
+  const activeLevel = exhibition.scene?.levels.find((level) => level.id === exhibition.scene?.activeLevelId) ?? exhibition.scene?.levels[0];
+  const sceneWalls = activeLevel
+    ? exhibition.scene?.walls
+        .filter((wall) => wall.levelId === activeLevel.id)
+        .map(({ levelId: _levelId, ...wall }) => wall)
+    : undefined;
+  const wallSegments = sceneWalls?.length ? sceneWalls : exhibition.wallSegments;
+  const sceneDoors = activeLevel
+    ? exhibition.scene?.doors?.filter((door) => door.levelId === activeLevel.id)
+    : undefined;
+  const roomWidth = activeLevel?.floor.width ?? exhibition.roomWidth;
+  const roomDepth = activeLevel?.floor.depth ?? exhibition.roomDepth;
 
   if (entered) {
     return (
@@ -25,10 +38,13 @@ export function ExhibitionLandingClient({ exhibition, creatorName, placedArtwork
         <ExhibitionViewerLoader
           title={exhibition.title}
           roomTemplateId={exhibition.roomTemplateId}
-          roomWidth={exhibition.roomWidth}
-          roomDepth={exhibition.roomDepth}
+          roomWidth={roomWidth}
+          roomDepth={roomDepth}
           wallColor={exhibition.wallColor}
-          wallSegments={exhibition.wallSegments}
+          wallSegments={wallSegments}
+          doors={sceneDoors}
+          style={exhibition.scene?.style}
+          imagePlacements={exhibition.scene?.imagePlacements}
           placedArtworks={placedArtworks}
           onExit={() => setEntered(false)}
         />
@@ -46,7 +62,7 @@ export function ExhibitionLandingClient({ exhibition, creatorName, placedArtwork
             <p className="mt-3 max-w-xl text-body text-muted-foreground">{exhibition.description}</p>
           ) : null}
           <p className="mt-4 text-body-sm text-muted-foreground">
-            {placedArtworks.length} {placedArtworks.length === 1 ? "artwork" : "artworks"}
+            {artworkCount} {artworkCount === 1 ? "artwork" : "artworks"}
           </p>
           <Button size="lg" className="mt-6" onClick={() => setEntered(true)}>
             Enter Exhibition
