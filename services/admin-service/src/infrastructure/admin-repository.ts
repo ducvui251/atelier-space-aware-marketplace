@@ -122,11 +122,19 @@ async function getOrderFeedTrend(periodDays: number): Promise<{ period: "day"; f
   };
 }
 
+/**
+ * Deliberately excludes order_feed's "failed" bucket (payment-failed
+ * events): every one of those orders already surfaces here as
+ * "cancelled" in commerce.orders itself, so showing "Failed" on the
+ * dashboard just double-counted the same orders under a second, made-up
+ * label that had no real status to filter /admin/orders by — a dead-end
+ * stat, not a mock one.
+ */
 async function getOrderStatusCounts(): Promise<Record<string, number>> {
   const rows = await query<{ status: string; count: string }>(
-    `select status, count(*)::text as count from admin.order_feed group by status`,
+    `select status, count(*)::text as count from admin.order_feed where status != 'failed' group by status`,
   );
-  const counts: Record<string, number> = { pending: 0, paid: 0, shipped: 0, failed: 0 };
+  const counts: Record<string, number> = { pending: 0, paid: 0, shipped: 0 };
   for (const row of rows) counts[row.status] = Number(row.count);
   return counts;
 }
@@ -188,7 +196,7 @@ export async function getStats() {
   const complaints = complaintsResult.status === "fulfilled" ? complaintsResult.value : [];
   const commerceStats = commerceResult.status === "fulfilled" ? commerceResult.value : { totalOrders: 0, revenue: 0 };
   const revenueTrend = revenueTrendResult.status === "fulfilled" ? revenueTrendResult.value : null;
-  const orderStatusCounts = orderStatusResult.status === "fulfilled" ? orderStatusResult.value : { pending: 0, paid: 0, shipped: 0, failed: 0 };
+  const orderStatusCounts = orderStatusResult.status === "fulfilled" ? orderStatusResult.value : { pending: 0, paid: 0, shipped: 0 };
   const complaintStatusCounts = complaintStatusResult.status === "fulfilled" ? complaintStatusResult.value : { open: 0, resolved: 0, rejected: 0 };
   return {
     pendingArtists: verificationStatusCounts.artists.pending ?? 0,
